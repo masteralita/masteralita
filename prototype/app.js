@@ -9,7 +9,7 @@ const SAVE_KEY = 'gw.save.v1';
 function freshSave() {
   return {
     v: 1, name: '', title: 'Star Wanderer', lv: 1, xp: 0, dust: 30000, piece: 1500, birthday: null,
-    lastCollect: Date.now(), chest: 0, best: 0, wins: 0, losses: 0, adsRemoved: false,
+    skins: [], lastCollect: Date.now(), chest: 0, best: 0, wins: 0, losses: 0, adsRemoved: false,
     planets: { earth: { lv: 1 } }, mainPlanet: 'earth',
     cons: { sgr: newCon(0), leo: newCon(0), vir: newCon(0) },
     team: ['sgr', 'leo', 'vir'],
@@ -19,7 +19,8 @@ function freshSave() {
 function newCon(g) { return { g, slots: {}, skins: [], skin: null }; }
 // Every constellation owns its classic skin; others are bought with Star Piece in the 별자리 tab
 const equippedSkin = id => (save.cons[id] && save.cons[id].skin) || id;
-const ownsSkin = (id, sid) => sid === id || !!(save.cons[id] && (save.cons[id].skins || []).includes(sid));
+const ownsSkin = (id, sid) => sid === id || (save.skins || []).includes(sid) || !!(save.cons[id] && (save.cons[id].skins || []).includes(sid));
+const addSkin = sid => { save.skins = [...new Set([...(save.skins || []), sid])]; };
 const STYLE_LABEL = { arrow:'화살', shot:'탄환', orb:'구체', beam:'레이저', heal:'회복', poison:'독침', twin:'쌍탄' };
 const KIND_LABEL = { phys:'물리', magic:'마법', both:'물리·마법' };
 const skinStyle = sk => { const d = CON[sk.con]; return `${STYLE_LABEL[sk.style || d.style]} · ${KIND_LABEL[sk.kind || d.kind]}`; };
@@ -200,10 +201,13 @@ $('chestBtn').addEventListener('click', () => {
   const n = Math.floor(save.chest / CHEST_STEP); if (!n) return;
   save.chest -= n * CHEST_STEP;
   const got = []; let dust = 0, piece = 0;
+  const O = CHEST_ODDS;
   for (let i = 0; i < n; i++) {
     const r = Math.random();
-    if (r < .6) dust += Math.round(rnd(800, 1500));
-    else if (r < .85) piece += Math.round(rnd(20, 50));
+    const skin = r < O.skin ? dropSkin() : null;
+    if (skin) got.push(skin);
+    else if (r < O.skin + O.dust) dust += Math.round(rnd(800, 1500));
+    else if (r < O.skin + O.dust + O.piece) piece += Math.round(rnd(20, 50));
     else got.push(rollCon(GACHA.gold.w, false));
   }
   save.dust += dust; save.piece += piece; persist(); renderTopBar(); renderHome();
@@ -274,15 +278,28 @@ function grantCon(id, g) {
   else { const d = 400 * (g + 1); save.dust += d; res = 'dup'; return { id, g, res, dust: d }; }
   return { id, g, res };
 }
+// 성운 스킨 drop from a chest: an unowned chest skin, preferring constellations the player owns
+function dropSkin() {
+  const pool = Object.values(SKIN).filter(s => SKIN_TIER[s.tier].src === 'chest' && !ownsSkin(s.con, s.id));
+  if (!pool.length) return null;
+  const mine = pool.filter(s => save.cons[s.con]), from = mine.length ? mine : pool;
+  const s = from[Math.floor(Math.random() * from.length)];
+  addSkin(s.id);
+  return { skin: s.id, id: s.con };
+}
 function showGachaResult(list, title, extra = []) {
   persist(); renderTopBar();
   const label = r => r.res === 'new' ? '<em class="new">NEW</em>' : r.res === 'up' ? '<em class="up">등급 상승</em>' : `<em>Star Dust +${fmt(r.dust)}</em>`;
+  const card = (r, i) => r.skin
+    ? `<div class="gcard skin" style="--g:rgb(${SKIN[r.skin].pal.line});animation-delay:${i * 70}ms">
+        ${conSvg(r.id, 64, { skin: r.skin })}<b>${SKIN[r.skin].name}</b><span class="gchip" style="--g:rgb(${SKIN[r.skin].pal.line})">${SKIN_TIER[SKIN[r.skin].tier].name} 스킨</span><em class="new">SKIN</em>
+      </div>`
+    : `<div class="gcard" style="--g:${GRADES[r.g].col};animation-delay:${i * 70}ms">
+        ${conSvg(r.id, 64)}<b>${CON[r.id].name}</b>${gradeChip(r.g)}${label(r)}
+      </div>`;
   openModal(`<h3>${title}</h3>
     ${extra.length ? `<p class="mtxt">${extra.join(' · ')}</p>` : ''}
-    ${list.length ? `<div class="gres">${list.map((r, i) => `
-      <div class="gcard" style="--g:${GRADES[r.g].col};animation-delay:${i * 70}ms">
-        ${conSvg(r.id, 64)}<b>${CON[r.id].name}</b>${gradeChip(r.g)}${label(r)}
-      </div>`).join('')}</div>` : ''}
+    ${list.length ? `<div class="gres">${list.map(card).join('')}</div>` : ''}
     <div class="mbtns"><button class="cta sm" data-act="ok" type="button">확인</button></div>`, () => { closeModal(); if (tab !== 'home') setTab(tab); else renderHome(); });
 }
 function conSvg(id, size, opts = {}) {
@@ -326,7 +343,7 @@ function renderStore() {
           <button class="piece-pack" data-buy="piece" data-n="${n}" type="button"><b class="piece">${fmt(n)}</b><span>${p}</span></button>`).join('')}
       </div>
     </section>
-    <p class="fine">확률 안내 · 골드 뽑기: ${odds(GACHA.gold.w)}<br>유료 뽑기: ${odds(GACHA.paid.w)}<br>이미 가진 별자리는 더 높은 등급이면 등급이 오르고, 아니면 Star Dust로 바뀌어요.<br>프로토타입이라 실제 결제는 일어나지 않고 바로 지급돼요.</p>`;
+    <p class="fine">확률 안내 · 골드 뽑기: ${odds(GACHA.gold.w)}<br>유료 뽑기: ${odds(GACHA.paid.w)}<br>보물 상자 1개: 성운 스킨 ${pct(CHEST_ODDS.skin)} · Star Dust ${pct(CHEST_ODDS.dust)} · Star Piece ${pct(CHEST_ODDS.piece)} · 별자리 카드 ${pct(CHEST_ODDS.con)} (성운 스킨을 모두 가지면 Star Dust로 바뀌어요)<br>스페셜 스킨은 별자리 탭에서만 구매할 수 있어요.<br>이미 가진 별자리는 더 높은 등급이면 등급이 오르고, 아니면 Star Dust로 바뀌어요.<br>프로토타입이라 실제 결제는 일어나지 않고 바로 지급돼요.</p>`;
 }
 $('pane-store').addEventListener('click', e => {
   const g = e.target.closest('[data-gacha]');
@@ -442,17 +459,20 @@ function renderStars() {
 function skinSection(id, o) {
   const list = SKINS[id], sel = SKIN[skinSel], eq = equippedSkin(id);
   const owned = ownsSkin(id, sel.id), isEq = sel.id === eq;
-  const action = !o ? '<button class="ghost sm" type="button" disabled>별자리를 먼저 얻어야 해요</button>'
-    : isEq ? '<button class="ghost sm" type="button" disabled>장착 중</button>'
+  const src = SKIN_TIER[sel.tier].src, have = !!o;
+  const action = isEq && have ? '<button class="ghost sm" type="button" disabled>장착 중</button>'
+    : owned && !have ? '<button class="ghost sm" type="button" disabled>보유 중 · 별자리를 얻으면 장착할 수 있어요</button>'
     : owned ? `<button class="cta sm" data-kact="equip" type="button">장착</button>`
-    : `<button class="cta sm" data-kact="buy" type="button">구매 <b class="piece">${fmt(SKIN_TIER[sel.tier].price)}</b></button>`;
+    : src === 'chest' ? `<button class="ghost sm" type="button" disabled>로비 보물 상자에서 ${Math.round(CHEST_ODDS.skin * 100)}% 확률로 획득</button>`
+    : !have ? '<button class="ghost sm" type="button" disabled>별자리를 먼저 얻어야 구매할 수 있어요</button>'
+    : `<button class="cta sm" data-kact="buy" type="button">스페셜 스킨 구매 <b class="piece">${fmt(SKIN_TIER[sel.tier].price)}</b></button>`;
   return `<section class="skins">
     <div class="sec-h"><h2>스킨</h2><span>스킨마다 공격 방식과 스킬셋이 달라요</span></div>
     <div class="skin-row">${list.map(sk => `
       <button class="skin-card tier-${sk.tier}" type="button" data-skin="${sk.id}" aria-pressed="${sk.id === skinSel}" style="--ln:rgb(${sk.pal.line})">
         ${conSvg(id, 54, { skin: sk.id, dim: !ownsSkin(id, sk.id) })}
         <b>${sk.name}</b><span class="mini">${SKIN_TIER[sk.tier].name} · ${skinStyle(sk)}</span>
-        ${sk.id === eq && o ? '<em class="eq">장착</em>' : ownsSkin(id, sk.id) ? '' : `<em class="piece">${fmt(SKIN_TIER[sk.tier].price)}</em>`}
+        ${sk.id === eq && o ? '<em class="eq">장착</em>' : ownsSkin(id, sk.id) ? '<em class="own">보유</em>' : SKIN_TIER[sk.tier].src === 'chest' ? '<em>상자</em>' : `<em class="piece">${fmt(SKIN_TIER[sk.tier].price)}</em>`}
       </button>`).join('')}</div>
     <div class="detail">${perkList(sel)}${action}</div>
   </section>`;
@@ -504,7 +524,7 @@ $('pane-stars').addEventListener('click', e => {
     const o = save.cons[starSel], S = SKIN[skinSel];
     if (ka.dataset.kact === 'buy') {
       if (!spend('piece', SKIN_TIER[S.tier].price)) return;
-      o.skins = [...(o.skins || []), S.id]; o.skin = S.id; toast(`${S.name} 스킨을 얻고 장착했어요`);
+      addSkin(S.id); o.skin = S.id; toast(`${S.name} 스킨을 얻고 장착했어요`);
     } else { o.skin = S.id; toast(`${S.name} 스킨 장착`); }
     persist(); enterHomeSystemOnly(); renderStars(); return;
   }

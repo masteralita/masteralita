@@ -123,10 +123,11 @@ const PAL = {
   supernova: { line:'255,120,80',  star:'#ffe0cc', proj:'#ff8a4a' },
   special:   { line:'213,139,255', star:'#f6e3ff', proj:'#d58bff' },
 };
+// source: how the skin is obtained — free / chest drop only / purchase only (별자리 탭)
 const SKIN_TIER = {
-  classic:   { name:'기본',   price:0 },
-  nebula:    { name:'성운',   price:600 },
-  supernova: { name:'초신성', price:1200 },
+  classic:   { name:'기본',   src:'free',  price:0 },
+  nebula:    { name:'성운',   src:'chest', price:0 },
+  supernova: { name:'스페셜', src:'buy',   price:1200 },
 };
 const c3 = (a, b, c) => [a, b, c].map(([name, type, p]) => ({ name, type, p }));
 const SKINS = {
@@ -318,6 +319,8 @@ const SUMMON_COST = 1000, RESUMMON_COST = 800, promoteCost = p => 60 * (p.g + 1)
 /* ---------- Economy (필요 화면 시트: 공통) ---------- */
 const INCOME = { dust: lv => 90 + lv * 10, piece: () => 1, capHours: 12 };
 const CHEST_STEP = 10, CHEST_MAX = 1000;
+// per chest: 성운 스킨 → Star Dust → Star Piece → 별자리 카드 (cumulative bands)
+const CHEST_ODDS = { skin:.12, dust:.5, piece:.23, con:.15 };
 const accNeed = lv => 100 * lv;
 const ZODIAC_DATES = [ // 생일 → 별자리 (별자리 시트 조건 열)
   ['cap', 1, 19], ['aqr', 2, 18], ['psc', 3, 20], ['ari', 4, 19], ['tau', 5, 20], ['gem', 6, 20],
