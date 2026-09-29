@@ -67,60 +67,179 @@ const STAT = {
   tEvade:  { v:.08, txt:v => `아군 전체 회피율 <b>+${Math.round(v*100)}%</b>` },
   pHp:     { v:.1,  txt:v => `행성 최대 HP <b>+${v*100}%</b>` },
 };
-const PERKS = {
-  sgr: { stats:[['rate','연사 강화'],['crit','날카로운 촉']], chain:[
-    ['분열 화살','3번째 공격마다 다른 적에게 화살 2발을 추가로 쏴요.'],
-    ['꿰뚫는 화살','화살이 적 행성에도 피해의 25%를 줘요. 별자리가 살아 있어도 적용돼요.'],
-    ['사수의 집중','같은 대상을 연속으로 맞히면 공격력이 8%씩 올라요 (최대 +80%).'] ] },
-  cap: { stats:[['atk','단단한 뿔'],['critDmg','급소 찌르기']], chain:[
-    ['뿔 들이받기','공격 시 20% 확률로 적 별자리를 1초 기절시켜요.'],
-    ['산악 돌파','HP 50% 이하인 적에게 주는 피해가 40% 늘어요.'],
-    ['거인의 일격','5번째 공격마다 피해가 3배예요.'] ] },
-  aqr: { stats:[['tMArmor','물의 장막'],['atk','수압']], chain:[
-    ['물결','구체가 명중하면 주변 적 별자리에게 50% 피해가 퍼져요.'],
-    ['정화의 비','8초마다 아군의 기절과 독을 풀고 HP를 8% 회복해요.'],
-    ['범람','구체 피해가 60% 늘어요.'] ] },
-  psc: { stats:[['atk','심해의 힘'],['rate','유영']], chain:[
-    ['쌍어','구체를 2개씩 쏴요.'],
-    ['심해의 저주','명중할 때마다 대상의 마법 방어가 10 줄어요 (최대 -40).'],
-    ['회유','구체가 명중 후 다른 적에게 한 번 튕겨요 (60% 피해).'] ] },
-  ari: { stats:[['tArmor','양털 갑옷'],['hp','두꺼운 털']], chain:[
-    ['황금 양털','아군 별자리와 행성이 받는 피해가 15% 줄어요.'],
-    ['돌진','피격 시 25% 확률로 즉시 반격해요.'],
-    ['불굴','파괴되면 웨이브마다 한 번, HP 40%로 되살아나요.'] ] },
-  tau: { stats:[['hp','강인한 몸'],['pHp','대지의 뿌리']], chain:[
-    ['분노의 뿔','잃은 HP 비율만큼 공격력이 올라요 (최대 +100%).'],
-    ['지진','6초마다 모든 적 별자리에게 공격력 200% 피해를 줘요.'],
-    ['대지의 가호','행성이 받는 피해가 15% 줄어요.'] ] },
-  gem: { stats:[['rate','호흡 맞추기'],['crit','쌍성의 눈']], chain:[
-    ['거울상','25% 확률로 한 번 더 공격해요.'],
-    ['카스토르','치명타 피해가 60% 늘어요.'],
-    ['폴룩스','마법탄이 적 행성에도 피해의 30%를 줘요.'] ] },
-  cnc: { stats:[['tArmor','껍질 연마'],['hp','단단한 등딱지']], chain:[
-    ['가시 껍질','받은 피해의 25%를 공격자에게 돌려줘요.'],
-    ['집게','명중한 적의 공격속도를 3초 동안 30% 낮춰요.'],
-    ['탈피','HP가 30% 아래로 떨어지면 웨이브마다 한 번, 3초 무적이 돼요.'] ] },
-  leo: { stats:[['atk','맹수의 이빨'],['critDmg','사냥 본능']], chain:[
-    ['포효','10초마다 아군 전체 공격력이 4초 동안 30% 올라요.'],
-    ['레굴루스','레이저가 뒤에 있는 적 하나를 더 관통해요.'],
-    ['왕의 위엄','적 별자리를 처치하면 기력을 1 얻어요.'] ] },
-  vir: { stats:[['heal','풍요의 손길'],['rate','수확의 계절']], chain:[
-    ['풍요의 가호','행성 회복량이 넘치면 넘친 만큼 보호막이 생겨요 (최대 HP 20%).'],
-    ['스피카','5번째 회복마다 아군 별자리 전체 HP를 12% 회복해요.'],
-    ['정결','행성 HP가 30% 이하이면 회복량이 2배예요.'] ] },
-  lib: { stats:[['tEvade','기울어진 저울'],['tMArmor','공정한 법정']], chain:[
-    ['저울질','적 행성의 HP 비율이 내 행성보다 높으면 공격력이 30% 올라요.'],
-    ['심판','공격이 대상 최대 HP의 2%만큼 추가 피해를 줘요.'],
-    ['평형','아군이 회피할 때마다 천칭이 즉시 반격해요.'] ] },
-  sco: { stats:[['poison','맹독 분비'],['crit','급소 노리기']], chain:[
-    ['맹독','독이 최대 3번까지 중첩돼요.'],
-    ['안타레스','독에 걸린 적이 파괴되면 가까운 적에게 독이 옮아가요.'],
-    ['꼬리침','독에 걸린 대상에게 주는 피해가 40% 늘어요.'] ] },
-  oph: { stats:[['atk','뱀의 독니'],['rate','치유의 지팡이']], chain:[
-    ['의술','행성에 준 피해의 10%만큼 내 행성 HP를 회복해요.'],
-    ['독사의 입맞춤','공격이 적 행성에 독을 걸어요.'],
-    ['아스클레피오스','레이저를 2줄씩 쏴요.'] ] },
+/* ---------- Skins: each skin swaps a constellation's look, attack style and whole skill set ---------- */
+// Awakening effects are shared building blocks; a skin picks three of them with its own numbers.
+const pct = v => Math.round(v * 100) + '%';
+const FX = {
+  multishot:   p => `${p.every}번째 공격마다 다른 적에게 ${p.n}발을 추가로 쏴요.`,
+  planetChip:  p => `명중할 때 적 행성에도 피해의 ${pct(p.v)}를 줘요. 별자리가 살아 있어도 적용돼요.`,
+  focus:       p => `같은 대상을 연속으로 맞히면 공격력이 ${pct(p.v)}씩 올라요 (최대 +${pct(p.v * p.max)}).`,
+  stun:        p => `공격 시 ${pct(p.p)} 확률로 적 별자리를 ${p.dur}초 기절시켜요.`,
+  execute:     p => `HP ${pct(p.th)} 이하인 적에게 주는 피해가 ${pct(p.mul - 1)} 늘어요.`,
+  nth:         p => `${p.every}번째 공격마다 피해가 ${p.mul}배예요.`,
+  splash:      p => `명중하면 주변 적 별자리에게 ${pct(p.v)} 피해가 퍼져요.`,
+  cleanse:     p => `${p.every}초마다 아군의 기절과 독을 풀고 HP를 ${pct(p.heal)} 회복해요.`,
+  amp:         p => `공격력이 ${pct(p.mul - 1)} 늘어요.`,
+  extraProj:   p => `같은 대상에게 투사체를 ${p.n}개 더 쏴요.`,
+  shred:       p => `명중할 때마다 대상의 마법 방어가 ${p.v} 줄어요 (최대 -${p.max}).`,
+  bounce:      p => `투사체가 명중 후 다른 적에게 한 번 튕겨요 (${pct(p.v)} 피해).`,
+  teamGuard:   p => `아군 별자리와 행성이 받는 피해가 ${pct(p.v)} 줄어요.`,
+  counter:     p => `피격 시 ${pct(p.p)} 확률로 즉시 반격해요.`,
+  revive:      p => `파괴되면 웨이브마다 한 번, HP ${pct(p.hp)}로 되살아나요.`,
+  rage:        p => `잃은 HP 비율만큼 공격력이 올라요 (최대 +${pct(p.max)}).`,
+  quake:       p => `${p.every}초마다 모든 적 별자리에게 공격력 ${pct(p.mul)} 피해를 줘요.`,
+  planetGuard: p => `행성이 받는 피해가 ${pct(p.v)} 줄어요.`,
+  echo:        p => `${pct(p.p)} 확률로 한 번 더 공격해요.`,
+  critDmg:     p => `치명타 피해가 ${pct(p.v)} 늘어요.`,
+  reflect:     p => `받은 피해의 ${pct(p.v)}를 공격자에게 돌려줘요.`,
+  slow:        p => `명중한 적의 공격속도를 ${p.dur}초 동안 ${pct(p.v)} 낮춰요.`,
+  molt:        p => `HP가 ${pct(p.th)} 아래로 떨어지면 웨이브마다 한 번, ${p.dur}초 무적이 돼요.`,
+  roar:        p => `${p.every}초마다 아군 전체 공격력이 ${p.dur}초 동안 ${pct(p.v)} 올라요.`,
+  pierceBeam:  p => `레이저가 다른 적 하나를 더 관통해요 (${pct(p.v)} 피해).`,
+  energyKill:  p => `적 별자리를 처치하면 기력을 ${p.v} 얻어요.`,
+  overheal:    p => `행성 회복량이 넘치면 넘친 만큼 보호막이 생겨요 (최대 HP ${pct(p.cap)}).`,
+  nthHeal:     p => `${p.every}번째 회복마다 아군 별자리 전체 HP를 ${pct(p.v)} 회복해요.`,
+  lowHpHeal:   p => `행성 HP가 ${pct(p.th)} 이하이면 회복량이 ${p.mul}배예요.`,
+  balance:     p => `적 행성의 HP 비율이 내 행성보다 높으면 공격력이 ${pct(p.mul - 1)} 올라요.`,
+  pctDmg:      p => `공격이 대상 최대 HP의 ${pct(p.v)}만큼 추가 피해를 줘요.`,
+  evadeCounter:p => `아군이 회피할 때마다 즉시 반격해요.`,
+  poisonStack: p => `독이 최대 ${p.max}번까지 중첩돼요.`,
+  poisonSpread:p => `독에 걸린 적이 파괴되면 가까운 적에게 독이 옮아가요.`,
+  poisonBonus: p => `독에 걸린 대상에게 주는 피해가 ${pct(p.mul - 1)} 늘어요.`,
+  leech:       p => `준 피해의 ${pct(p.v)}만큼 내 행성 HP를 회복해요.`,
+  applyPoison: p => `명중한 ${p.planetOnly ? '적 행성' : '대상'}에 ${p.burn ? '화상' : '독'}을 걸어요 (초당 공격력 ${pct(p.v)}, 4초).`,
+  twinBeam:    p => `레이저를 2줄씩 쏴요 (두 번째 ${pct(p.v)} 피해).`,
+  shieldPulse: p => `${p.every}초마다 행성에 최대 HP ${pct(p.v)}의 보호막을 씌워요.`,
+  energyPulse: p => `${p.every}초마다 기력을 1 얻어요.`,
+  meteorCall:  p => `${p.every}초마다 조준한 적에게 유성 ${p.n}개를 떨어뜨려요 (공격력 ${pct(p.mul)}).`,
 };
+// team-wide effects that apply the moment they are picked
+const FX_TEAM = { teamGuard: 'dmgRed', planetGuard: 'planetRed' };
+
+// palette: line = constellation rgb, star = star dot colour, proj = projectile colour
+const PAL = {
+  classic:   { line:'245,196,81',  star:'#fff1c2', proj:'#ffd76a' },
+  nebula:    { line:'170,140,255', star:'#efe3ff', proj:'#b59cff' },
+  supernova: { line:'255,120,80',  star:'#ffe0cc', proj:'#ff8a4a' },
+  special:   { line:'213,139,255', star:'#f6e3ff', proj:'#d58bff' },
+};
+const SKIN_TIER = {
+  classic:   { name:'기본',   price:0 },
+  nebula:    { name:'성운',   price:600 },
+  supernova: { name:'초신성', price:1200 },
+};
+const c3 = (a, b, c) => [a, b, c].map(([name, type, p]) => ({ name, type, p }));
+const SKINS = {
+  sgr: [
+    { id:'sgr', tier:'classic', name:'궁수', sig:'빠르게 화살을 연사해요.', stats:[['rate','연사 강화'],['crit','날카로운 촉']],
+      chain: c3(['분열 화살','multishot',{ every:3, n:2 }], ['꿰뚫는 화살','planetChip',{ v:.25 }], ['사수의 집중','focus',{ v:.08, max:10 }]) },
+    { id:'sgr_nb', tier:'nebula', name:'성운 사냥꾼', style:'orb', kind:'magic', mod:{ atk:1.35, rate:.8 }, sig:'튕기는 성운 구체로 사냥해요.', stats:[['crit','별빛 조준'],['rate','사냥 리듬']],
+      chain: c3(['유성 추적','bounce',{ v:.6 }], ['별빛 저주','shred',{ v:10, max:40 }], ['사냥꾼의 표식','execute',{ th:.5, mul:1.5 }]) },
+    { id:'sgr_sn', tier:'supernova', name:'불화살 궁수', mod:{ atk:1.1 }, sig:'불붙은 화살로 적을 태워요.', stats:[['atk','화염 촉'],['critDmg','작열']],
+      chain: c3(['화염 화살','applyPoison',{ v:.35, burn:true }], ['연쇄 폭발','splash',{ v:.4 }], ['태양 화살','nth',{ every:4, mul:3 }]) },
+  ],
+  cap: [
+    { id:'cap', tier:'classic', name:'염소', sig:'묵직한 물리탄을 쏴요.', stats:[['atk','단단한 뿔'],['critDmg','급소 찌르기']],
+      chain: c3(['뿔 들이받기','stun',{ p:.2, dur:1 }], ['산악 돌파','execute',{ th:.5, mul:1.4 }], ['거인의 일격','nth',{ every:5, mul:3 }]) },
+    { id:'cap_nb', tier:'nebula', name:'심연의 뿔', style:'orb', kind:'magic', sig:'심연의 구체로 적을 묶어요.', stats:[['atk','심연의 힘'],['crit','어둠의 눈']],
+      chain: c3(['심연 속박','stun',{ p:.25, dur:1.2 }], ['공허의 부식','shred',{ v:12, max:48 }], ['심연 개방','amp',{ mul:1.5 }]) },
+    { id:'cap_sn', tier:'supernova', name:'용암 산양', mod:{ hp:1.2 }, sig:'용암 덩어리를 던져 주변까지 태워요.', stats:[['hp','용암 갑각'],['atk','분화']],
+      chain: c3(['용암 파편','splash',{ v:.5 }], ['녹이는 열기','execute',{ th:.5, mul:1.5 }], ['화산 폭발','quake',{ every:7, mul:1.6 }]) },
+  ],
+  aqr: [
+    { id:'aqr', tier:'classic', name:'물병', sig:'마법 구체를 쏘고, 마법 공격에 강해요.', stats:[['tMArmor','물의 장막'],['atk','수압']],
+      chain: c3(['물결','splash',{ v:.5 }], ['정화의 비','cleanse',{ every:8, heal:.08 }], ['범람','amp',{ mul:1.6 }]) },
+    { id:'aqr_nb', tier:'nebula', name:'은하수 물병', sig:'은하수를 흘려 적 사이를 튕겨요.', stats:[['tMArmor','별빛 장막'],['rate','흐르는 별']],
+      chain: c3(['은하 물줄기','bounce',{ v:.55 }], ['별비','cleanse',{ every:7, heal:.1 }], ['쏟아지는 은하','extraProj',{ n:1 }]) },
+    { id:'aqr_sn', tier:'supernova', name:'증기 폭발', style:'shot', mod:{ atk:1.2 }, sig:'뜨거운 증기탄으로 적을 느리게 해요.', stats:[['atk','고압 증기'],['crit','과열']],
+      chain: c3(['끓는 안개','slow',{ v:.3, dur:3 }], ['증기 폭발','splash',{ v:.6 }], ['임계점','nth',{ every:4, mul:2.5 }]) },
+  ],
+  psc: [
+    { id:'psc', tier:'classic', name:'물고기', sig:'강한 마법 구체를 쏴요.', stats:[['atk','심해의 힘'],['rate','유영']],
+      chain: c3(['쌍어','extraProj',{ n:1 }], ['심해의 저주','shred',{ v:10, max:40 }], ['회유','bounce',{ v:.6 }]) },
+    { id:'psc_nb', tier:'nebula', name:'심해 성어', sig:'독을 품은 심해의 구체를 쏴요.', stats:[['poison','심해 독'],['atk','수압']],
+      chain: c3(['심해의 저주','shred',{ v:12, max:48 }], ['해파리 독','applyPoison',{ v:.5 }], ['소용돌이','bounce',{ v:.7 }]) },
+    { id:'psc_sn', tier:'supernova', name:'불새 물고기', style:'beam', mod:{ atk:1.25, rate:.85 }, sig:'불꽃 레이저를 뿜어요.', stats:[['critDmg','불꽃 비늘'],['crit','날쌘 지느러미']],
+      chain: c3(['불꽃 조준','focus',{ v:.1, max:8 }], ['열선','critDmg',{ v:.6 }], ['관통 불꽃','pierceBeam',{ v:.7 }]) },
+  ],
+  ari: [
+    { id:'ari', tier:'classic', name:'양', sig:'물리 공격에 강한 방어형이에요.', stats:[['tArmor','양털 갑옷'],['hp','두꺼운 털']],
+      chain: c3(['황금 양털','teamGuard',{ v:.15 }], ['돌진','counter',{ p:.25 }], ['불굴','revive',{ hp:.4 }]) },
+    { id:'ari_nb', tier:'nebula', name:'꿈꾸는 양', style:'orb', kind:'magic', sig:'꿈의 장막으로 행성을 감싸요.', stats:[['tMArmor','꿈의 장막'],['hp','포근한 털']],
+      chain: c3(['자장가','teamGuard',{ v:.1 }], ['꿈의 방패','shieldPulse',{ every:12, v:.1 }], ['다시 꾸는 꿈','revive',{ hp:.5 }]) },
+    { id:'ari_sn', tier:'supernova', name:'불꽃 뿔 양', mod:{ atk:1.3 }, sig:'맞을수록 뜨거워지는 반격형이에요.', stats:[['atk','달군 뿔'],['tArmor','그을린 털']],
+      chain: c3(['불꽃 돌진','counter',{ p:.35 }], ['타오르는 분노','rage',{ max:1 }], ['화염 가시','reflect',{ v:.3 }]) },
+  ],
+  tau: [
+    { id:'tau', tier:'classic', name:'황소', sig:'HP가 가장 높은 탱커예요.', stats:[['hp','강인한 몸'],['pHp','대지의 뿌리']],
+      chain: c3(['분노의 뿔','rage',{ max:1 }], ['지진','quake',{ every:6, mul:2 }], ['대지의 가호','planetGuard',{ v:.15 }]) },
+    { id:'tau_nb', tier:'nebula', name:'플레이아데스', style:'orb', kind:'magic', sig:'일곱 자매 성단이 행성을 지켜요.', stats:[['pHp','성단의 품'],['hp','푸른 별빛']],
+      chain: c3(['성단의 가호','planetGuard',{ v:.12 }], ['일곱 자매','cleanse',{ every:10, heal:.1 }], ['성단 방벽','shieldPulse',{ every:10, v:.12 }]) },
+    { id:'tau_sn', tier:'supernova', name:'성난 황소', mod:{ atk:1.25, hp:.9 }, sig:'다칠수록 강해지는 돌격형이에요.', stats:[['atk','돌격'],['critDmg','들이받기']],
+      chain: c3(['광분','rage',{ max:1.5 }], ['짓밟기','nth',{ every:4, mul:2.5 }], ['대지 붕괴','quake',{ every:5, mul:2.5 }]) },
+  ],
+  gem: [
+    { id:'gem', tier:'classic', name:'쌍둥이', sig:'물리탄과 마법탄을 동시에 쏴요.', stats:[['rate','호흡 맞추기'],['crit','쌍성의 눈']],
+      chain: c3(['거울상','echo',{ p:.25 }], ['카스토르','critDmg',{ v:.6 }], ['폴룩스','planetChip',{ v:.3 }]) },
+    { id:'gem_nb', tier:'nebula', name:'거울 성운', sig:'거울에 비친 탄이 계속 늘어나요.', stats:[['rate','반사광'],['atk','겹친 별빛']],
+      chain: c3(['거울 반사','echo',{ p:.35 }], ['분광','extraProj',{ n:1 }], ['난반사','bounce',{ v:.6 }]) },
+    { id:'gem_sn', tier:'supernova', name:'쌍성 폭발', style:'beam', mod:{ atk:1.15 }, sig:'두 별의 레이저를 동시에 쏴요.', stats:[['critDmg','쌍성 공명'],['crit','동기화']],
+      chain: c3(['쌍둥이 광선','twinBeam',{ v:.8 }], ['공명','critDmg',{ v:.6 }], ['마무리','execute',{ th:.4, mul:1.6 }]) },
+  ],
+  cnc: [
+    { id:'cnc', tier:'classic', name:'게', sig:'단단한 껍질로 버티는 방어형이에요.', stats:[['tArmor','껍질 연마'],['hp','단단한 등딱지']],
+      chain: c3(['가시 껍질','reflect',{ v:.25 }], ['집게','slow',{ v:.3, dur:3 }], ['탈피','molt',{ th:.3, dur:3 }]) },
+    { id:'cnc_nb', tier:'nebula', name:'달빛 게', style:'orb', kind:'magic', sig:'달빛으로 적의 발을 묶어요.', stats:[['tMArmor','달빛 껍질'],['hp','조수']],
+      chain: c3(['밀물','slow',{ v:.4, dur:3 }], ['달의 허물','molt',{ th:.35, dur:4 }], ['조석의 수호','planetGuard',{ v:.1 }]) },
+    { id:'cnc_sn', tier:'supernova', name:'용암 집게', mod:{ atk:1.3 }, sig:'뜨거운 집게로 붙잡고 부숴요.', stats:[['atk','달군 집게'],['tArmor','흑요석 껍질']],
+      chain: c3(['용암 가시','reflect',{ v:.35 }], ['조이기','stun',{ p:.2, dur:1 }], ['부수기','execute',{ th:.5, mul:1.5 }]) },
+  ],
+  leo: [
+    { id:'leo', tier:'classic', name:'사자', sig:'즉시 명중하는 강한 레이저를 쏴요.', stats:[['atk','맹수의 이빨'],['critDmg','사냥 본능']],
+      chain: c3(['포효','roar',{ every:10, dur:4, v:.3 }], ['레굴루스','pierceBeam',{ v:.7 }], ['왕의 위엄','energyKill',{ v:1 }]) },
+    { id:'leo_nb', tier:'nebula', name:'별무리 사자', style:'orb', kind:'magic', sig:'별무리를 흩뿌려 무리를 이끌어요.', stats:[['atk','별의 갈기'],['rate','무리 사냥']],
+      chain: c3(['별무리 포효','roar',{ every:10, dur:4, v:.25 }], ['흩날리는 별','splash',{ v:.5 }], ['무리의 왕','energyKill',{ v:1 }]) },
+    { id:'leo_sn', tier:'supernova', name:'태양 사자', mod:{ atk:1.2 }, sig:'태양 레이저로 전장을 가로질러요.', stats:[['critDmg','태양 갈기'],['atk','열풍']],
+      chain: c3(['태양 관통','pierceBeam',{ v:.8 }], ['코로나','nth',{ every:3, mul:2 }], ['태양의 포효','roar',{ every:8, dur:4, v:.35 }]) },
+  ],
+  vir: [
+    { id:'vir', tier:'classic', name:'처녀', sig:'공격할 때마다 행성과 다친 별자리를 회복해요.', stats:[['heal','풍요의 손길'],['rate','수확의 계절']],
+      chain: c3(['풍요의 가호','overheal',{ cap:.2 }], ['스피카','nthHeal',{ every:5, v:.12 }], ['정결','lowHpHeal',{ th:.3, mul:2 }]) },
+    { id:'vir_nb', tier:'nebula', name:'성운의 성녀', sig:'성운의 장막으로 행성을 감싸요.', stats:[['heal','성운의 축복'],['pHp','품어주는 빛']],
+      chain: c3(['성운의 기도','nthHeal',{ every:4, v:.1 }], ['성운 장막','shieldPulse',{ every:10, v:.1 }], ['넘치는 은총','overheal',{ cap:.3 }]) },
+    { id:'vir_sn', tier:'supernova', name:'불사조 처녀', mod:{ atk:1.2 }, sig:'위기에 강해지는 불꽃 회복형이에요.', stats:[['heal','재의 온기'],['rate','날갯짓']],
+      chain: c3(['불씨','energyPulse',{ every:15 }], ['재에서 피어남','lowHpHeal',{ th:.4, mul:2.5 }], ['불사조의 노래','nthHeal',{ every:3, v:.15 }]) },
+  ],
+  lib: [
+    { id:'lib', tier:'classic', name:'천칭', sig:'물리와 마법 모두 버티는 균형형이에요.', stats:[['tEvade','기울어진 저울'],['tMArmor','공정한 법정']],
+      chain: c3(['저울질','balance',{ mul:1.3 }], ['심판','pctDmg',{ v:.02 }], ['평형','evadeCounter',{}]) },
+    { id:'lib_nb', tier:'nebula', name:'성간 저울', sig:'별의 무게로 적을 짓눌러요.', stats:[['tEvade','별의 기울기'],['atk','무게']],
+      chain: c3(['중력','pctDmg',{ v:.025 }], ['되갚음','evadeCounter',{}], ['균형의 장막','teamGuard',{ v:.1 }]) },
+    { id:'lib_sn', tier:'supernova', name:'심판의 칼', style:'beam', kind:'phys', mod:{ atk:1.3 }, sig:'판결의 레이저를 내려요.', stats:[['critDmg','단죄'],['crit','판결']],
+      chain: c3(['역전의 저울','balance',{ mul:1.4 }], ['처형','execute',{ th:.3, mul:2 }], ['최후 판결','critDmg',{ v:.6 }]) },
+  ],
+  sco: [
+    { id:'sco', tier:'classic', name:'전갈', sig:'독을 걸고, 아군의 기절 시간을 줄여줘요.', stats:[['poison','맹독 분비'],['crit','급소 노리기']],
+      chain: c3(['맹독','poisonStack',{ max:3 }], ['안타레스','poisonSpread',{}], ['꼬리침','poisonBonus',{ mul:1.4 }]) },
+    { id:'sco_nb', tier:'nebula', name:'보라 독침', kind:'magic', sig:'마법 독으로 방어를 녹여요.', stats:[['poison','보랏빛 독'],['atk','독니']],
+      chain: c3(['겹겹의 독','poisonStack',{ max:5 }], ['부식','shred',{ v:10, max:40 }], ['독의 절정','poisonBonus',{ mul:1.5 }]) },
+    { id:'sco_sn', tier:'supernova', name:'작열 전갈', sig:'화상이 번지며 폭발해요.', stats:[['poison','작열 독'],['critDmg','불꽃 꼬리']],
+      chain: c3(['번지는 불','poisonSpread',{}], ['화염 폭발','splash',{ v:.4 }], ['초열 꼬리','nth',{ every:4, mul:3 }]) },
+  ],
+  oph: [
+    { id:'oph', tier:'classic', name:'뱀주인', sig:'적 별자리를 무시하고 행성을 바로 공격해요.', stats:[['atk','뱀의 독니'],['rate','치유의 지팡이']],
+      chain: c3(['의술','leech',{ v:.1 }], ['독사의 입맞춤','applyPoison',{ v:.4, planetOnly:true }], ['아스클레피오스','twinBeam',{ v:.8 }]) },
+    { id:'oph_nb', tier:'nebula', name:'성운 뱀', style:'orb', sig:'성운 독을 행성에 스며들게 해요.', stats:[['poison','성운 독'],['atk','휘감기']],
+      chain: c3(['생명 흡수','leech',{ v:.15 }], ['성운 독','applyPoison',{ v:.5, planetOnly:true }], ['탈피하는 뱀','extraProj',{ n:1 }]) },
+    { id:'oph_sn', tier:'supernova', name:'신의 의사', mod:{ atk:1.2 }, sig:'하늘의 유성을 불러 행성을 내리쳐요.', stats:[['atk','신의 손'],['critDmg','천벌']],
+      chain: c3(['쌍두 뱀','twinBeam',{ v:.8 }], ['유성 소환','meteorCall',{ every:12, n:3, mul:1.2 }], ['천상의 기운','energyPulse',{ every:12 }]) },
+  ],
+};
+const SKIN = Object.fromEntries(Object.values(SKINS).flat().map(s => [s.id, s]));
+for (const [cid, list] of Object.entries(SKINS)) for (const s of list) {
+  s.con = cid; s.pal = cid === 'oph' && s.tier === 'classic' ? PAL.special : PAL[s.tier];
+  for (const ch of s.chain) ch.desc = FX[ch.type](ch.p);
+}
 const STAT_MAX = 3;
 
 /* ---------- Voyage zones ---------- */

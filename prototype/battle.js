@@ -20,7 +20,7 @@ addEventListener('resize', resize);
 /* ---------- Game state ---------- */
 const G = {
   state: 'title', mode: 'arcade', ghost: null, kills: 0, wave: 1, timer: 40, energy: 2, maxEnergy: 10, focus: null, me: null, foe: null, zone: ZONES[0],
-  proj: [], beams: [], fx: [], texts: [], shield: 0, nova: 0, roar: 0, pShield: 0, enraged: false, bossCd: 6, bossCd2: 8,
+  proj: [], beams: [], fx: [], texts: [], shield: 0, nova: 0, roar: 0, roarV: .3, pShield: 0, enraged: false, bossCd: 6, bossCd2: 8,
   paused: false, choosing: false, clearT: 0, lv: 1, xp: 0, pendingLv: 0, taken: [],
   T: { armor: 0, marmor: 0, evade: 0, dmgRed: 0, planetRed: 0 },
 };
@@ -32,7 +32,8 @@ function makeCon(def, side, mult) {
   return { def, side, hp, maxHp: hp, baseHp: hp, atkBase: def.atk * mult.atk, rate: def.rate, dArmor: def.def, mArmor: def.mdef,
     lv: 1, cd: rnd(.2, 1.2), dead: false, stun: 0, dot: null, slow: 0, shred: 0, invuln: 0, x: 0, y: 0, s: 1, flash: 0, alpha: 1,
     m: { atk: 0, rate: 0, crit: 0, critDmg: 0, hp: 0, heal: 0, poison: 0 }, stacks: {}, chain: 0,
-    shots: 0, heals: 0, focusStack: 0, lastT: null, tA: 0, revived: false, molted: false };
+    shots: 0, heals: 0, focusStack: 0, lastT: null, revived: false, molted: false,
+    skin: SKIN[def.id], style: def.style, kind: def.kind, fxOn: {}, fxT: {} };
 }
 function makeSystem(side, planet, cons) {
   return { side, planet, cons, phase: rnd(0, TAU), speed: TAU / (side === 'me' ? 7 : 8.5), orbits: 0, cx: 0, cy: 0, R: 0, ry: 0, pr: 0 };
@@ -46,7 +47,8 @@ function layout() {
     sys.pr = R * (sys.planet.bossTier === 2 ? .34 : sys.planet.bossTier === 1 ? .29 : .24);
   }
 }
-const has = (c, k) => c.chain >= k && c.side === 'me';
+// Active awakening effect of a given type on one of my constellations (null if the skin hasn't unlocked it)
+const E = (c, type) => c && c.side === 'me' ? c.fxOn[type] || null : null;
 const myCons = id => G.me ? G.me.cons.filter(c => c.def.id === id) : [];
 
 // Builds the player's center planet object from its definition + planet level (행성 탭)
@@ -58,8 +60,10 @@ function makePlayerPlanet(pid, lv) {
 }
 // Constellation with account-side bonuses (grade + star parts from 별자리 탭)
 function makeMyCon(id) {
-  const b = conBonus(id), c = makeCon(CON[id], 'me', { hp: b.hp, atk: b.atk });
-  c.m.rate = b.rate - 1; c.grade = b.grade;
+  const b = conBonus(id), sk = SKIN[equippedSkin(id)], mod = sk.mod || {};
+  const c = makeCon(CON[id], 'me', { hp: b.hp * (mod.hp || 1), atk: b.atk * (mod.atk || 1) });
+  c.m.rate = b.rate * (mod.rate || 1) - 1; c.grade = b.grade;
+  c.skin = sk; c.style = sk.style || CON[id].style; c.kind = sk.kind || CON[id].kind;
   return c;
 }
 function startRun(mode) {
@@ -126,16 +130,17 @@ function alive(t) { return !!t && (t.isPlanet ? t.hp > 0 : !t.dead); }
 function say(x, y, v, c, t = .9, size) { G.texts.push({ x, y, v, c, t, size }); }
 
 function critRate(c) { return .05 + c.m.crit + (c.side === 'me' ? G.me.planet.crit + Math.max(0, G.T.evade - .75) * 2 : 0); }
-function critDmg(c) { return 1.5 + c.m.critDmg + (has(c, 2) && c.def.id === 'gem' ? .6 : 0); }
+function critDmg(c) { const e = E(c, 'critDmg'); return 1.5 + c.m.critDmg + (e ? e.v : 0); }
 function evadeRate() { return Math.min(.75, G.T.evade); }
 function conAtk(c) {
   let a = c.atkBase * (1 + .3 * (c.lv - 1)) * (1 + c.m.atk);
   if (c.side === 'me') {
     a *= G.me.planet.atkMul;
-    if (G.roar > 0) a *= 1.3;
-    if (has(c, 1) && c.def.id === 'tau') a *= 1 + clamp(1 - c.hp / c.maxHp, 0, 1);
-    if (has(c, 1) && c.def.id === 'lib' && G.foe.planet.hp / G.foe.planet.maxHp > G.me.planet.hp / G.me.planet.maxHp) a *= 1.3;
-    if (has(c, 3) && c.def.id === 'aqr') a *= 1.6;
+    if (G.roar > 0) a *= 1 + G.roarV;
+    let e;
+    if ((e = E(c, 'rage'))) a *= 1 + e.max * clamp(1 - c.hp / c.maxHp, 0, 1);
+    if ((e = E(c, 'balance')) && G.foe.planet.hp / G.foe.planet.maxHp > G.me.planet.hp / G.me.planet.maxHp) a *= e.mul;
+    if ((e = E(c, 'amp'))) a *= e.mul;
   }
   return a;
 }
@@ -158,11 +163,11 @@ function randomOtherEnemy(c, t) {
 // src: attacking constellation (or null). Returns nothing; handles crit, evade, reactions, kills.
 function strike(src, t, base, kind, opt = {}) {
   if (!alive(t)) return;
-  let dmg = base, tier = 0;
+  let dmg = base, tier = 0, e;
   if (src && src.side === 'me') {
-    if (has(src, 2) && src.def.id === 'cap' && t.hp / t.maxHp <= .5) dmg *= 1.4;
-    if (has(src, 3) && src.def.id === 'sco' && t.dot) dmg *= 1.4;
-    if (has(src, 2) && src.def.id === 'lib') dmg += t.maxHp * .02;
+    if ((e = E(src, 'execute')) && t.hp / t.maxHp <= e.th) dmg *= e.mul;
+    if ((e = E(src, 'poisonBonus')) && t.dot) dmg *= e.mul;
+    if ((e = E(src, 'pctDmg'))) dmg += t.maxHp * e.v;
     const r = critRate(src);
     tier = Math.min(5, Math.floor(r) + (chance(r - Math.floor(r)) ? 1 : 0));
     if (tier > 0) dmg *= critDmg(src) * Math.pow(2, tier - 1);
@@ -176,7 +181,7 @@ function applyDamage(t, dmg, kind, { src = null, tier = 0, color = null, silent 
     if (!t.isPlanet && t.invuln > 0) { if (!silent) say(x, y - 14, '무적', '#a9c1ff', .5); return; }
     if (src && chance(evadeRate())) {
       if (!silent) say(x, y - 14, 'MISS', '#a9c1ff', .6);
-      for (const l of myCons('lib')) if (has(l, 3) && !l.dead) fire(l, true);
+      for (const l of G.me.cons) if (E(l, 'evadeCounter') && !l.dead) fire(l, true);
       return;
     }
     if (G.shield > 0) dmg *= .3;
@@ -192,13 +197,15 @@ function applyDamage(t, dmg, kind, { src = null, tier = 0, color = null, silent 
     const big = tier >= 1;
     say(x + rnd(-10, 10), y - 14, Math.max(1, Math.round(d)), color || (t.side === 'me' ? '#ff8a9a' : CRIT_COL[tier]), big ? 1 : .8, big ? 13 + tier * 2 : 13);
   }
+  let e;
+  if (src && src.side === 'me' && (e = E(src, 'leech'))) G.me.planet.hp = Math.min(G.me.planet.maxHp, G.me.planet.hp + d * e.v);
   // reactions on my side
   if (t.side === 'me' && !t.isPlanet && src && alive(src)) {
-    if (has(t, 1) && t.def.id === 'cnc') applyDamage(src, d * .25, 'phys', { color: '#ffd76a' });
-    if (has(t, 2) && t.def.id === 'ari' && chance(.25)) fire(t, true);
+    if ((e = E(t, 'reflect'))) applyDamage(src, d * e.v, 'phys', { color: '#ffd76a' });
+    if ((e = E(t, 'counter')) && chance(e.p)) fire(t, true);
   }
-  if (t.side === 'me' && !t.isPlanet && has(t, 3) && t.def.id === 'cnc' && !t.molted && t.hp > 0 && t.hp < t.maxHp * .3) {
-    t.molted = true; t.invuln = 3; say(x, y - 26, '탈피', '#a9c1ff', 1);
+  if (t.side === 'me' && !t.isPlanet && (e = E(t, 'molt')) && !t.molted && t.hp > 0 && t.hp < t.maxHp * e.th) {
+    t.molted = true; t.invuln = e.dur; say(x, y - 26, '무적', '#a9c1ff', 1);
   }
   if (t.hp <= 0) {
     t.hp = 0;
@@ -208,18 +215,19 @@ function applyDamage(t, dmg, kind, { src = null, tier = 0, color = null, silent 
 }
 function killCon(t, src) {
   const [x, y] = posOf(t);
-  if (t.side === 'me' && has(t, 3) && t.def.id === 'ari' && !t.revived) {
-    t.revived = true; t.hp = t.maxHp * .4; say(x, y - 24, '불굴', '#f5c451', 1); burst(x, y, 14, '#f5c451'); return;
+  let e;
+  if ((e = E(t, 'revive')) && !t.revived) {
+    t.revived = true; t.hp = t.maxHp * e.hp; say(x, y - 24, '부활', '#f5c451', 1); burst(x, y, 14, '#f5c451'); return;
   }
   t.dead = true; burst(x, y, 26, t.side === 'me' ? '#ff8a9a' : '#f5c451');
   if (G.focus === t) G.focus = null;
   if (t.side === 'foe') {
     G.kills += 1;
     gainXp(6 + G.wave);
-    if (src && has(src, 3) && src.def.id === 'leo') { G.energy = Math.min(G.maxEnergy, G.energy + 1); say(x, y - 26, '기력 +1', '#f5c451', 1); }
-    if (t.dot && myCons('sco').some(s => has(s, 2))) {
+    if ((e = E(src, 'energyKill'))) { G.energy = Math.min(G.maxEnergy, G.energy + e.v); say(x, y - 26, '기력 +' + e.v, '#f5c451', 1); }
+    if (t.dot && G.me.cons.some(s => E(s, 'poisonSpread'))) {
       const live = G.foe.cons.filter(x => !x.dead && x !== t), n = live[Math.floor(Math.random() * live.length)];
-      if (n) { n.dot = { dps: t.dot.dps, t: 4, stacks: t.dot.stacks || 1 }; G.beams.push({ x1: x, y1: y, x2: n.x, y2: n.y, t: .3, c: '#9dff6a', w: 2 }); }
+      if (n) { n.dot = { dps: t.dot.dps, t: 4, stacks: t.dot.stacks || 1, burn: t.dot.burn }; G.beams.push({ x1: x, y1: y, x2: n.x, y2: n.y, t: .3, c: t.dot.burn ? '#ff8a4a' : '#9dff6a', w: 2 }); }
     }
   }
 }
@@ -255,12 +263,12 @@ function perkOptions() {
   const opts = [];
   const ids = [...new Set(G.me.cons.map(c => c.def.id))];
   for (const id of ids) {
-    const c = G.me.cons.find(x => x.def.id === id), P = PERKS[id];
-    for (const [k, name] of P.stats) {
+    const c = G.me.cons.find(x => x.def.id === id), S = c.skin;
+    for (const [k, name] of S.stats) {
       const n = c.stacks[k] || 0;
       if (n < STAT_MAX) opts.push({ type: 'stat', id, k, name, lvl: n + 1, desc: STAT[k].txt(STAT[k].v) });
     }
-    if (c.chain < 3) { const [name, desc] = P.chain[c.chain]; opts.push({ type: 'chain', id, lvl: c.chain + 1, name, desc }); }
+    if (c.chain < 3) { const ch = S.chain[c.chain]; opts.push({ type: 'chain', id, lvl: c.chain + 1, name: ch.name, desc: ch.desc }); }
   }
   // awakenings are rarer than stat cards but always possible
   const weighted = opts.flatMap(o => o.type === 'chain' ? [o, o] : [o, o, o]);
@@ -303,11 +311,11 @@ function applyPerk(o) {
   const cons = G.me.cons.filter(c => c.def.id === o.id);
   const d = CON[o.id];
   if (o.type === 'chain') {
-    for (const c of cons) c.chain = o.lvl;
-    if (o.id === 'ari' && o.lvl === 1) G.T.dmgRed += .15;
-    if (o.id === 'tau' && o.lvl === 3) G.T.planetRed += .15;
-    G.taken.push(`${d.name} ${ROMAN[o.lvl]} ${o.name}`);
-    banner(`각성 ${ROMAN[o.lvl]}`, `${d.name}자리 · ${o.name}`, 1.2);
+    const ch = cons[0].skin.chain[o.lvl - 1];
+    for (const c of cons) { c.chain = o.lvl; c.fxOn[ch.type] = ch.p; c.fxT[ch.type] = 0; }
+    if (FX_TEAM[ch.type]) G.T[FX_TEAM[ch.type]] += ch.p.v;
+    G.taken.push(`${cons[0].skin.name} ${ROMAN[o.lvl]} ${o.name}`);
+    banner(`각성 ${ROMAN[o.lvl]}`, `${cons[0].skin.name} · ${o.name}`, 1.2);
     return;
   }
   const v = STAT[o.k].v;
@@ -326,55 +334,43 @@ function applyPerk(o) {
 /* ---------- Firing ---------- */
 function projOf(c, t, over = {}) {
   const mine = c.side === 'me';
-  const col = c.def.special ? '#d58bff' : mine ? '#ffd76a' : '#ff7b8a';
+  const col = mine ? c.skin.pal.proj : '#ff7b8a';
   const atk = conAtk(c);
+  const burn = mine && c.skin.tier === 'supernova';
   const S = {
-    arrow:  { sp: 520, dmg: atk, kind: 'phys', col, w: 1.6, len: 12 },
-    shot:   { sp: 360, dmg: atk, kind: c.def.kind === 'magic' ? 'magic' : 'phys', col, w: 3, len: 6 },
-    orb:    { sp: 240, dmg: atk, kind: 'magic', col: mine ? '#9fb8ff' : '#ff8ad0', w: 4.5, len: 0, orb: true },
-    poison: { sp: 300, dmg: atk * .6, kind: 'phys', col: '#9dff6a', w: 3, len: 5, poison: atk * .5 * (1 + c.m.poison) },
-  }[c.def.style] || { sp: 320, dmg: atk, kind: 'magic', col, w: 3, len: 0, orb: true };
+    arrow:  { sp: 520, dmg: atk, kind: c.kind === 'magic' ? 'magic' : 'phys', col, w: 1.6, len: 12 },
+    shot:   { sp: 360, dmg: atk, kind: c.kind === 'magic' ? 'magic' : 'phys', col, w: 3, len: 6 },
+    orb:    { sp: 240, dmg: atk, kind: 'magic', col: mine ? c.skin.pal.proj : '#ff8ad0', w: 4.5, len: 0, orb: true },
+    poison: { sp: 300, dmg: atk * .6, kind: c.kind === 'magic' ? 'magic' : 'phys', col: burn ? '#ff8a4a' : mine && c.skin.tier === 'nebula' ? '#c77dff' : '#9dff6a', w: 3, len: 5, poison: atk * .5 * (1 + c.m.poison), burn },
+  }[c.style] || { sp: 320, dmg: atk, kind: 'magic', col, w: 3, len: 0, orb: true };
   return Object.assign({ x: c.x, y: c.y, t, src: c }, S, over);
 }
-function fire(c, counter = false) {
-  const sys = sysOf(c.side), t = pickTarget(c);
-  if (!alive(t)) return;
-  const mine = c.side === 'me', id = c.def.id;
-  c.shots += 1;
-  if (mine && has(c, 3) && id === 'sgr') { c.focusStack = c.lastT === t ? Math.min(10, c.focusStack + 1) : 0; c.lastT = t; }
-  let mul = 1;
-  if (mine && has(c, 3) && id === 'sgr') mul *= 1 + .08 * c.focusStack;
-  if (mine && has(c, 3) && id === 'cap' && c.shots % 5 === 0) { mul *= 3; say(c.x, c.y - 22, '거인의 일격', '#f5c451', .7); }
-  const [tx, ty] = posOf(t);
-  switch (c.def.style) {
-    case 'arrow':
-      G.proj.push(projOf(c, t, { dmg: conAtk(c) * mul }));
-      if (mine && has(c, 1) && id === 'sgr' && c.shots % 3 === 0) {
-        for (let i = 0; i < 2; i++) { const o = randomOtherEnemy(c, t) || t; G.proj.push(projOf(c, o, { x: c.x + rnd(-6, 6) })); }
-      }
+// One volley of a constellation's basic attack (style comes from its skin)
+function volley(c, t, mul) {
+  const sys = sysOf(c.side), mine = c.side === 'me', [tx, ty] = posOf(t);
+  let e;
+  switch (c.style) {
+    case 'arrow': case 'orb': case 'shot': case 'poison': {
+      const p = projOf(c, t); p.dmg *= mul; G.proj.push(p);
+      if ((e = E(c, 'extraProj'))) for (let i = 0; i < e.n; i++) G.proj.push(Object.assign(projOf(c, t), { dmg: p.dmg, x: c.x + 8 * (i + 1), y: c.y - 4, sp: p.sp * .88 }));
       break;
-    case 'shot': case 'poison':
-      G.proj.push(projOf(c, t, { dmg: projOf(c, t).dmg * mul })); break;
-    case 'orb':
-      G.proj.push(projOf(c, t, { dmg: conAtk(c) * mul }));
-      if (mine && has(c, 1) && id === 'psc') G.proj.push(projOf(c, t, { x: c.x + 8, y: c.y - 4, sp: 210 }));
-      break;
+    }
     case 'twin':
-      G.proj.push(projOf(c, t, { x: c.x - 4, sp: 380, kind: 'phys', w: 2.4, len: 8, orb: false }));
-      G.proj.push(projOf(c, t, { x: c.x + 4, sp: 300, kind: 'magic', col: '#9fb8ff', w: 3.5, len: 0, orb: true, twinMagic: true }));
-      if (mine && has(c, 1) && chance(.25)) setTimeout(() => { if (!c.dead && G.state === 'fight') { const t2 = pickTarget(c); if (alive(t2)) G.proj.push(projOf(c, t2, { kind: 'phys', w: 2.4, len: 8, orb: false, sp: 380 })); } }, 120);
+      G.proj.push(projOf(c, t, { x: c.x - 4, sp: 380, kind: 'phys', w: 2.4, len: 8, orb: false, dmg: conAtk(c) * mul }));
+      G.proj.push(projOf(c, t, { x: c.x + 4, sp: 300, kind: 'magic', col: '#9fb8ff', w: 3.5, len: 0, orb: true, dmg: conAtk(c) * mul }));
+      if ((e = E(c, 'extraProj'))) G.proj.push(projOf(c, t, { x: c.x, y: c.y - 6, sp: 340, kind: 'magic', col: '#c9b6ff', w: 3, len: 0, orb: true, dmg: conAtk(c) * mul }));
       break;
     case 'beam': {
-      const col = c.def.special ? '#d58bff' : mine ? '#ffd76a' : '#ff7b8a';
+      const col = mine ? c.skin.pal.proj : '#ff7b8a';
       G.beams.push({ x1: c.x, y1: c.y, x2: tx, y2: ty, t: .18, c: col, w: c.def.special ? 3 : 2.4 });
       beamHit(c, t, conAtk(c) * mul);
-      if (mine && has(c, 2) && id === 'leo') {
+      if ((e = E(c, 'pierceBeam'))) {
         const t2 = randomOtherEnemy(c, t) || (t.isPlanet ? null : other(c.side).planet);
-        if (t2 && (t2.isPlanet ? !other(c.side).cons.some(x => !x.dead) : true)) { const [x2, y2] = posOf(t2); G.beams.push({ x1: tx, y1: ty, x2, y2, t: .18, c: col, w: 1.8 }); beamHit(c, t2, conAtk(c) * .7); }
+        if (t2 && (t2.isPlanet ? !other(c.side).cons.some(x => !x.dead) : true)) { const [x2, y2] = posOf(t2); G.beams.push({ x1: tx, y1: ty, x2, y2, t: .18, c: col, w: 1.8 }); beamHit(c, t2, conAtk(c) * e.v); }
       }
-      if (mine && has(c, 3) && id === 'oph') {
+      if ((e = E(c, 'twinBeam'))) {
         G.beams.push({ x1: c.x + 6, y1: c.y + 4, x2: tx + rnd(-8, 8), y2: ty + rnd(-8, 8), t: .18, c: col, w: 2 });
-        beamHit(c, t, conAtk(c) * .8);
+        beamHit(c, t, conAtk(c) * e.v);
       }
       break;
     }
@@ -382,52 +378,67 @@ function fire(c, counter = false) {
       const P = sys.planet;
       c.heals += 1;
       let amt = conAtk(c) * 4 * (1 + c.m.heal);
-      if (mine && has(c, 3) && P.hp < P.maxHp * .3) amt *= 2;
+      if ((e = E(c, 'lowHpHeal')) && P.hp < P.maxHp * e.th) amt *= e.mul;
       G.beams.push({ x1: c.x, y1: c.y, x2: sys.cx, y2: sys.cy, t: .25, c: '#8cf2c6', w: 2 });
       const over = heal(P, amt);
-      if (mine && has(c, 1) && over > 0) G.pShield = Math.min(P.maxHp * .2, G.pShield + over);
+      if ((e = E(c, 'overheal')) && over > 0) G.pShield = Math.min(P.maxHp * e.cap, G.pShield + over);
       const hurt = sys.cons.filter(x => !x.dead && x.hp < x.maxHp).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
       if (hurt) heal(hurt, amt * .6);
-      if (mine && has(c, 2) && c.heals % 5 === 0) { for (const a of sys.cons) if (!a.dead) heal(a, a.maxHp * .12); say(c.x, c.y - 22, '스피카', '#8cf2c6', .8); }
-      G.proj.push(projOf(c, t, { dmg: conAtk(c) * .5, col: '#8cf2c6', w: 3, orb: true, len: 0 }));
+      if ((e = E(c, 'nthHeal')) && c.heals % e.every === 0) { for (const a of sys.cons) if (!a.dead) heal(a, a.maxHp * e.v); say(c.x, c.y - 22, '전체 회복', '#8cf2c6', .8); }
+      G.proj.push(projOf(c, t, { dmg: conAtk(c) * .5 * mul, col: mine ? c.skin.pal.proj : '#8cf2c6', w: 3, orb: true, len: 0 }));
       break;
     }
   }
+}
+function fire(c, counter = false) {
+  const t = pickTarget(c);
+  if (!alive(t)) return;
+  c.shots += 1;
+  let mul = 1, e;
+  if ((e = E(c, 'focus'))) { c.focusStack = c.lastT === t ? Math.min(e.max, c.focusStack + 1) : 0; c.lastT = t; mul *= 1 + e.v * c.focusStack; }
+  if ((e = E(c, 'nth')) && c.shots % e.every === 0) { mul *= e.mul; say(c.x, c.y - 22, `×${e.mul}`, '#f5c451', .7); }
+  volley(c, t, mul);
+  if ((e = E(c, 'multishot')) && c.shots % e.every === 0) {
+    for (let i = 0; i < e.n; i++) { const o = randomOtherEnemy(c, t) || t; G.proj.push(projOf(c, o, { x: c.x + rnd(-6, 6) })); }
+  }
+  if ((e = E(c, 'echo')) && chance(e.p)) setTimeout(() => { if (!c.dead && G.state === 'fight') { const t2 = pickTarget(c); if (alive(t2)) volley(c, t2, 1); } }, 140);
   if (counter) say(c.x, c.y - 22, '반격', '#ffd76a', .6);
 }
 function beamHit(c, t, dmg) {
-  strike(c, t, dmg, c.def.kind === 'both' ? 'phys' : c.def.kind, { color: c.def.special ? '#e7b6ff' : null });
-  if (c.side === 'me' && t.isPlanet && c.def.id === 'oph') {
-    if (has(c, 1)) heal(G.me.planet, dmg * .1);
-    if (has(c, 2)) t.dot = { dps: conAtk(c) * .4, t: 4 };
-  }
+  strike(c, t, dmg, c.kind === 'both' ? 'phys' : c.kind, { color: c.def.special && c.side === 'me' ? '#e7b6ff' : null });
+  afterHit(c, t, dmg, false);
 }
 function onProjHit(p) {
-  const c = p.src, t = p.t, mine = c && c.side === 'me', id = c && c.def.id;
+  const c = p.src, t = p.t, mine = c && c.side === 'me';
   strike(c, t, p.dmg, p.kind, { color: p.meteor ? '#ffe9a8' : null });
   if (!mine || !c) return;
   if (p.poison && alive(t)) {
-    const cap = has(c, 1) && id === 'sco' ? 3 : 1;
+    const e = E(c, 'poisonStack'), cap = e ? e.max : 1;
     const st = t.dot && t.dot.stacks ? Math.min(cap, t.dot.stacks + 1) : 1;
-    t.dot = { dps: p.poison * st, t: 4, stacks: st };
+    t.dot = { dps: p.poison * st, t: 4, stacks: st, burn: p.burn };
   }
+  afterHit(c, t, p.dmg, p.bounced, p);
+}
+// On-hit awakenings shared by projectiles and beams
+function afterHit(c, t, dmg, bounced, p) {
+  if (!c || c.side !== 'me') return;
+  let e;
   if (!t.isPlanet && alive(t)) {
-    if (has(c, 1) && id === 'cap' && chance(.2)) { t.stun = Math.max(t.stun, 1); say(t.x, t.y - 22, '기절', '#d58bff', .6); }
-    if (has(c, 2) && id === 'psc') t.shred = Math.min(40, (t.shred || 0) + 10);
-    if (has(c, 2) && id === 'cnc') t.slow = 3;
+    if ((e = E(c, 'stun')) && chance(e.p)) { t.stun = Math.max(t.stun, e.dur); say(t.x, t.y - 22, '기절', '#d58bff', .6); }
+    if ((e = E(c, 'shred'))) t.shred = Math.min(e.max, (t.shred || 0) + e.v);
+    if ((e = E(c, 'slow'))) { t.slow = e.dur; t.slowV = e.v; }
   }
-  if (has(c, 1) && id === 'aqr') {
+  if ((e = E(c, 'applyPoison')) && alive(t) && (!e.planetOnly || t.isPlanet)) t.dot = { dps: conAtk(c) * e.v, t: 4, stacks: 1, burn: !!e.burn };
+  if ((e = E(c, 'splash'))) {
     const [x, y] = posOf(t);
-    for (const o of other(c.side).cons) if (!o.dead && o !== t && Math.hypot(o.x - x, o.y - y) < 80) strike(c, o, p.dmg * .5, 'magic');
-    G.fx.push(...Array.from({ length: 8 }, () => ({ x, y, vx: rnd(-60, 60), vy: rnd(-30, 30), t: .4, c: '#9fb8ff' })));
+    for (const o of other(c.side).cons) if (!o.dead && o !== t && Math.hypot(o.x - x, o.y - y) < 80) strike(c, o, dmg * e.v, 'magic');
+    G.fx.push(...Array.from({ length: 8 }, () => ({ x, y, vx: rnd(-60, 60), vy: rnd(-30, 30), t: .4, c: c.skin.pal.proj })));
   }
-  if (has(c, 3) && id === 'psc' && !p.bounced) {
+  if ((e = E(c, 'bounce')) && p && !bounced) {
     const n = randomOtherEnemy(c, t);
-    if (n) { const [x, y] = posOf(t); G.proj.push(Object.assign({}, p, { x, y, t: n, dmg: p.dmg * .6, bounced: true })); }
+    if (n) { const [x, y] = posOf(t); G.proj.push(Object.assign({}, p, { x, y, t: n, dmg: dmg * e.v, bounced: true })); }
   }
-  const enemyP = other(c.side).planet;
-  if (has(c, 2) && id === 'sgr' && !t.isPlanet) applyDamage(enemyP, p.dmg * .25, 'phys', { src: c, silent: true });
-  if (has(c, 3) && id === 'gem' && p.twinMagic && !t.isPlanet) applyDamage(enemyP, p.dmg * .3, 'magic', { src: c, silent: true });
+  if ((e = E(c, 'planetChip')) && !t.isPlanet) applyDamage(other(c.side).planet, dmg * e.v, c.kind === 'magic' ? 'magic' : 'phys', { src: c, silent: true });
 }
 
 /* ---------- Skills ---------- */
@@ -481,6 +492,19 @@ function tickDot(t, dt) {
   if (t.hp <= 0) { t.hp = 0; if (t.isPlanet) { const [x, y] = posOf(t); burst(x, y, 60, '#ffb27a'); onPlanetDown(t.side); } else killCon(t, null); }
   if (t.dot && t.dot.t <= 0) t.dot = null;
 }
+function periodic(c, sys, dt) {
+  const tick = (type, fn) => { const e = c.fxOn[type]; if (!e) return; c.fxT[type] = (c.fxT[type] || 0) + dt; if (c.fxT[type] >= e.every) { c.fxT[type] = 0; fn(e); } };
+  tick('roar', e => { G.roar = e.dur; G.roarV = e.v; say(c.x, c.y - 24, '포효', '#f5c451', 1); });
+  tick('cleanse', e => { for (const a of sys.cons) if (!a.dead) { a.stun = 0; a.dot = null; heal(a, a.maxHp * e.heal); } say(c.x, c.y - 24, '정화', '#9fb8ff', 1); });
+  tick('quake', e => { say(c.x, c.y - 24, '지진', '#f5c451', 1); for (const x of G.foe.cons) if (!x.dead) strike(c, x, conAtk(c) * e.mul, 'phys'); });
+  tick('shieldPulse', e => { const P = sys.planet; G.pShield = Math.min(P.maxHp * .3, G.pShield + P.maxHp * e.v); say(sys.cx, sys.cy - sys.pr - 12, '보호막', '#8cf2c6', 1); });
+  tick('energyPulse', () => { G.energy = Math.min(G.maxEnergy, G.energy + 1); say(c.x, c.y - 24, '기력 +1', '#f5c451', 1); });
+  tick('meteorCall', e => {
+    const t = G.focus && alive(G.focus) ? G.focus : pickTarget(c); if (!alive(t)) return;
+    const [tx] = posOf(t);
+    for (let i = 0; i < e.n; i++) G.proj.push({ x: tx + rnd(-50, 50) - 70, y: -20 - i * 40, t, src: c, sp: 680, dmg: conAtk(c) * e.mul, kind: 'magic', col: '#ffe9a8', w: 4, len: 24, meteor: true, bounced: true });
+  });
+}
 function updateSystem(sys, dt) {
   const n = sys.cons.length, dir = sys.side === 'me' ? 1 : -1, fighting = G.state === 'fight';
   sys.phase += sys.speed * dt;
@@ -500,18 +524,10 @@ function updateSystem(sys, dt) {
     tickDot(c, dt); if (c.dead) return;
     if (c.stun > 0) { c.stun -= dt; return; }
     // periodic awakenings
-    if (c.side === 'me') {
-      c.tA += dt;
-      if (has(c, 1) && c.def.id === 'leo' && c.tA >= 10) { c.tA = 0; G.roar = 4; say(c.x, c.y - 24, '포효', '#f5c451', 1); }
-      if (has(c, 2) && c.def.id === 'aqr' && c.tA >= 8) { c.tA = 0; for (const a of sys.cons) if (!a.dead) { a.stun = 0; a.dot = null; heal(a, a.maxHp * .08); } say(c.x, c.y - 24, '정화의 비', '#9fb8ff', 1); }
-      if (has(c, 2) && c.def.id === 'tau' && c.tA >= 6) {
-        c.tA = 0; say(c.x, c.y - 24, '지진', '#f5c451', 1);
-        for (const e of G.foe.cons) if (!e.dead) strike(c, e, conAtk(c) * 2, 'phys');
-      }
-    }
+    if (c.side === 'me') periodic(c, sys, dt);
     let rate = c.rate * (1 + c.m.rate) * (sys.side === 'me' ? sys.planet.rateMul : 1);
     if (sys.side === 'me' && G.nova > 0) rate *= 2;
-    if (c.slow > 0) rate *= .7;
+    if (c.slow > 0) rate *= 1 - (c.slowV || .3);
     c.cd -= dt * rate;
     if (c.cd <= 0) { c.cd += 1; fire(c); }
   });
@@ -717,7 +733,7 @@ function drawCon(sys, c, t) {
   if (c.alpha <= 0) return;
   const k = conSize(sys) * c.s, pts = c.def.sh.pts.map(([px, py]) => [c.x + px * k, c.y + py * k * .85]);
   const mine = c.side === 'me';
-  const lineC = c.def.special ? '213,139,255' : mine ? '245,196,81' : '255,123,138';
+  const lineC = mine ? c.skin.pal.line : '255,123,138';
   ctx.globalAlpha = c.alpha * (c.stun > 0 ? .55 : 1);
   ctx.lineCap = 'round';
   const glowW = mine && c.chain ? 5 + c.chain * 2 : 5;
@@ -727,14 +743,14 @@ function drawCon(sys, c, t) {
     for (const [i, j] of c.def.sh.edges) { ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[j][0], pts[j][1]); }
     ctx.stroke();
   }
-  ctx.fillStyle = c.flash > 0 ? '#ffffff' : '#fff1c2';
+  ctx.fillStyle = c.flash > 0 ? '#ffffff' : mine ? c.skin.pal.star : '#fff1c2';
   for (const [px, py] of pts) { ctx.beginPath(); ctx.arc(px, py, 2.1 * c.s, 0, TAU); ctx.fill(); }
   const [kx, ky] = pts[c.def.sh.key];
   ctx.strokeStyle = c.def.special ? '#c35bff' : mine ? '#ff5a6e' : '#ff9a5a'; ctx.lineWidth = 1.6;
   ctx.beginPath(); ctx.arc(kx, ky, 6 * c.s, 0, TAU); ctx.stroke();
   if (c.invuln > 0) { ctx.strokeStyle = 'rgba(169,193,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(c.x, c.y, k * 1.1, 0, TAU); ctx.stroke(); }
   if (c.stun > 0) { ctx.strokeStyle = 'rgba(195,91,255,.8)'; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.arc(c.x, c.y, k * 1.15, t * 3, t * 3 + TAU); ctx.stroke(); ctx.setLineDash([]); }
-  if (c.dot) { ctx.fillStyle = 'rgba(157,255,106,.9)'; for (let i = 0; i < (c.dot.stacks || 1); i++) { ctx.beginPath(); ctx.arc(c.x + k + i * 5, c.y - k * .6, 2.3, 0, TAU); ctx.fill(); } }
+  if (c.dot) { ctx.fillStyle = c.dot.burn ? 'rgba(255,138,74,.95)' : 'rgba(157,255,106,.9)'; for (let i = 0; i < (c.dot.stacks || 1); i++) { ctx.beginPath(); ctx.arc(c.x + k + i * 5, c.y - k * .6, 2.3, 0, TAU); ctx.fill(); } }
   if (G.state === 'home') { ctx.globalAlpha = 1; return; }
   const bw = k * 1.7, bx = c.x - bw / 2, by = c.y + k * .95;
   ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(bx, by, bw, 3);

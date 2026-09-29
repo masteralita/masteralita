@@ -16,7 +16,13 @@ function freshSave() {
     settings: { glow: true, fps: 60, sfx: true, bgm: true, push: true },
   };
 }
-function newCon(g) { return { g, slots: {} }; }
+function newCon(g) { return { g, slots: {}, skins: [], skin: null }; }
+// Every constellation owns its classic skin; others are bought with Star Piece in the 별자리 tab
+const equippedSkin = id => (save.cons[id] && save.cons[id].skin) || id;
+const ownsSkin = (id, sid) => sid === id || !!(save.cons[id] && (save.cons[id].skins || []).includes(sid));
+const STYLE_LABEL = { arrow:'화살', shot:'탄환', orb:'구체', beam:'레이저', heal:'회복', poison:'독침', twin:'쌍탄' };
+const KIND_LABEL = { phys:'물리', magic:'마법', both:'물리·마법' };
+const skinStyle = sk => { const d = CON[sk.con]; return `${STYLE_LABEL[sk.style || d.style]} · ${KIND_LABEL[sk.kind || d.kind]}`; };
 let save = (() => {
   try { const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if (v && v.v === 1) return Object.assign(freshSave(), v); } catch {}
   return freshSave();
@@ -280,11 +286,11 @@ function showGachaResult(list, title, extra = []) {
     <div class="mbtns"><button class="cta sm" data-act="ok" type="button">확인</button></div>`, () => { closeModal(); if (tab !== 'home') setTab(tab); else renderHome(); });
 }
 function conSvg(id, size, opts = {}) {
-  const d = CON[id], sh = d.sh;
+  const d = CON[id], sh = d.sh, sk = SKIN[opts.skin || (save.cons[id] ? equippedSkin(id) : id)];
   const P = sh.pts.map(([x, y]) => [x * 40, y * 34]);
   const lines = sh.edges.map(([a, b]) => `<line x1="${P[a][0]}" y1="${P[a][1]}" x2="${P[b][0]}" y2="${P[b][1]}"/>`).join('');
   const dots = P.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.2"/>`).join('');
-  return `<svg class="csvg${opts.dim ? ' dim' : ''}" viewBox="-50 -44 100 88" width="${size}" height="${Math.round(size * .88)}" aria-hidden="true"><g class="ln">${lines}</g><g class="dt">${dots}</g></svg>`;
+  return `<svg class="csvg${opts.dim ? ' dim' : ''}" style="--ln:rgb(${sk.pal.line});--st:${sk.pal.star}" viewBox="-50 -44 100 88" width="${size}" height="${Math.round(size * .88)}" aria-hidden="true"><g class="ln">${lines}</g><g class="dt">${dots}</g></svg>`;
 }
 
 /* ---------- 상점 (Store) ---------- */
@@ -389,13 +395,14 @@ $('pane-planets').addEventListener('click', e => {
 });
 
 /* ---------- 별자리 (Stars) — 컨셉 이미지 23·24 ---------- */
-let starSel = null, slotSel = null;
+let starSel = null, slotSel = null, skinSel = null;
 function renderStars() {
   const owned = ALL_CONS.filter(c => save.cons[c.id]);
   if (!starSel || !CON[starSel]) starSel = (owned[0] || ALL_CONS[0]).id;
   const d = CON[starSel], o = save.cons[starSel];
   if (slotSel == null || slotSel >= d.sh.pts.length) slotSel = d.sh.key;
-  const b = conBonus(starSel);
+  const b = conBonus(starSel), eq = SKIN[equippedSkin(starSel)];
+  if (!skinSel || SKIN[skinSel].con !== starSel) skinSel = eq.id;
   const strip = ALL_CONS.map(c => {
     const oc = save.cons[c.id];
     return `<button class="scard" type="button" data-sid="${c.id}" aria-pressed="${c.id === starSel}" style="--g:${oc ? GRADES[oc.g].col : '#3a4270'}">
@@ -414,11 +421,11 @@ function renderStars() {
   $('pane-stars').innerHTML = `
     <div class="strip">${strip}</div>
     <section class="star-stage">
-      <svg class="graph" viewBox="${-sw / 2} -125 ${sw} 250" role="img" aria-label="${d.name}자리 별 슬롯">
+      <svg class="graph" style="--ln:rgb(${eq.pal.line})" viewBox="${-sw / 2} -125 ${sw} 250" role="img" aria-label="${d.name}자리 별 슬롯">
         <g class="ln">${d.sh.edges.map(([a, c]) => `<line x1="${P[a][0]}" y1="${P[a][1]}" x2="${P[c][0]}" y2="${P[c][1]}"/>`).join('')}</g>
         ${slotsSvg}
       </svg>
-      <div class="sname"><b>${d.name}자리</b> ${o ? gradeChip(o.g) : '<span class="gchip" style="--g:#59608a">미보유</span>'}</div>
+      <div class="sname"><b>${eq.id === starSel ? d.name + '자리' : eq.name}</b> ${o ? gradeChip(o.g) : '<span class="gchip" style="--g:#59608a">미보유</span>'}</div>
     </section>
     <div class="statbar">
       <span title="공격력">⚔ ${(d.atk * b.atk).toFixed(1)}</span>
@@ -427,9 +434,37 @@ function renderStars() {
       <span class="pw">전투력 ${fmt(conPower(starSel))}</span>
     </div>
     <div class="legend"><i style="--c:${SLOT.act.col}"></i>액티브 · 공격력 <i style="--c:${SLOT.pas.col}"></i>패시브 · HP <i style="--c:${SLOT.lim.col}"></i>한정 · 공격속도</div>
+    ${skinSection(starSel, o)}
     <section class="slot-panel" id="slotPanel">${o ? slotPanel(d, o) : `
       <p class="mtxt">아직 없는 별자리예요. 상점 뽑기나 로비 상자에서 얻을 수 있어요.</p>
       <button class="cta sm" data-sact="store" type="button">상점으로</button>`}</section>`;
+}
+function skinSection(id, o) {
+  const list = SKINS[id], sel = SKIN[skinSel], eq = equippedSkin(id);
+  const owned = ownsSkin(id, sel.id), isEq = sel.id === eq;
+  const action = !o ? '<button class="ghost sm" type="button" disabled>별자리를 먼저 얻어야 해요</button>'
+    : isEq ? '<button class="ghost sm" type="button" disabled>장착 중</button>'
+    : owned ? `<button class="cta sm" data-kact="equip" type="button">장착</button>`
+    : `<button class="cta sm" data-kact="buy" type="button">구매 <b class="piece">${fmt(SKIN_TIER[sel.tier].price)}</b></button>`;
+  return `<section class="skins">
+    <div class="sec-h"><h2>스킨</h2><span>스킨마다 공격 방식과 스킬셋이 달라요</span></div>
+    <div class="skin-row">${list.map(sk => `
+      <button class="skin-card tier-${sk.tier}" type="button" data-skin="${sk.id}" aria-pressed="${sk.id === skinSel}" style="--ln:rgb(${sk.pal.line})">
+        ${conSvg(id, 54, { skin: sk.id, dim: !ownsSkin(id, sk.id) })}
+        <b>${sk.name}</b><span class="mini">${SKIN_TIER[sk.tier].name} · ${skinStyle(sk)}</span>
+        ${sk.id === eq && o ? '<em class="eq">장착</em>' : ownsSkin(id, sk.id) ? '' : `<em class="piece">${fmt(SKIN_TIER[sk.tier].price)}</em>`}
+      </button>`).join('')}</div>
+    <div class="detail">${perkList(sel)}${action}</div>
+  </section>`;
+}
+function perkList(sk) {
+  const mods = sk.mod ? Object.entries(sk.mod).map(([k, v]) => `${{ atk:'공격력', rate:'공격속도', hp:'HP' }[k]} ${v >= 1 ? '+' : ''}${Math.round((v - 1) * 100)}%`).join(' · ') : '';
+  return `<h3>${sk.name} <small>${SKIN_TIER[sk.tier].name} 스킨 · ${skinStyle(sk)}</small></h3>
+    <div class="sig">${sk.sig}${mods ? ` <b class="mods">${mods}</b>` : ''} 아케이드 레벨업 때 아래 능력이 카드로 나와요.</div>
+    <ul class="chain">
+      ${sk.stats.map(([k, n]) => `<li><span class="tier stat">×3</span><div><b>${n}</b><span>${STAT[k].txt(STAT[k].v)} · 최대 3번 중첩</span></div></li>`).join('')}
+      ${sk.chain.map((ch, i) => `<li><span class="tier">${ROMAN[i + 1]}</span><div><b>각성 ${ROMAN[i + 1]} · ${ch.name}</b><span>${ch.desc}</span></div></li>`).join('')}
+    </ul>`;
 }
 function slotPanel(d, o) {
   const i = slotSel, t = slotType(d, i), S = SLOT[t], s = o.slots[i];
@@ -461,8 +496,18 @@ function slotPanel(d, o) {
     </div>`;
 }
 $('pane-stars').addEventListener('click', e => {
-  const c = e.target.closest('[data-sid]'); if (c) { starSel = c.dataset.sid; slotSel = null; renderStars(); return; }
+  const c = e.target.closest('[data-sid]'); if (c) { starSel = c.dataset.sid; slotSel = null; skinSel = null; renderStars(); return; }
   const sl = e.target.closest('[data-slot]'); if (sl) { slotSel = +sl.dataset.slot; renderStars(); return; }
+  const sk = e.target.closest('[data-skin]'); if (sk) { skinSel = sk.dataset.skin; renderStars(); return; }
+  const ka = e.target.closest('[data-kact]');
+  if (ka) {
+    const o = save.cons[starSel], S = SKIN[skinSel];
+    if (ka.dataset.kact === 'buy') {
+      if (!spend('piece', SKIN_TIER[S.tier].price)) return;
+      o.skins = [...(o.skins || []), S.id]; o.skin = S.id; toast(`${S.name} 스킨을 얻고 장착했어요`);
+    } else { o.skin = S.id; toast(`${S.name} 스킨 장착`); }
+    persist(); enterHomeSystemOnly(); renderStars(); return;
+  }
   const a = e.target.closest('[data-sact]'); if (!a) return;
   const act = a.dataset.sact;
   if (act === 'store') { setTab('store'); return; }
@@ -504,7 +549,7 @@ function renderTeam() {
     <div class="team-slots">
       ${slots.map((id, i) => id ? `
         <button class="tslot" type="button" data-tid="${id}" style="--g:${GRADES[save.cons[id].g].col}">
-          ${conSvg(id, 48)}<b>${CON[id].name}</b><span class="mini">${fmt(conPower(id))}</span></button>`
+          ${conSvg(id, 48)}<b>${SKIN[equippedSkin(id)].name}</b><span class="mini">${fmt(conPower(id))}</span></button>`
         : `<div class="tslot empty"><span class="mini">빈 칸 ${i + 1}</span></div>`).join('')}
     </div>
     <p class="fine">전투력 합계 <b>${fmt(teamPower())}</b> · 아래 보유 별자리를 눌러 넣거나 빼세요</p>
@@ -518,17 +563,11 @@ function renderTeam() {
   renderPerkDetail(teamDetail);
 }
 function renderPerkDetail(id) {
-  const d = CON[id], P = PERKS[id];
-  $('conDetail').innerHTML = `
-    <h3>${d.name}자리 <small>${d.en.toUpperCase()}</small></h3>
-    <div class="sig">${d.sig} 아케이드에서 레벨업할 때 아래 능력이 카드로 나와요.</div>
-    <ul class="chain">
-      ${P.stats.map(([k, n]) => `<li><span class="tier stat">×3</span><div><b>${n}</b><span>${STAT[k].txt(STAT[k].v)} · 최대 3번 중첩</span></div></li>`).join('')}
-      ${P.chain.map(([n, t], i) => `<li><span class="tier">${ROMAN[i + 1]}</span><div><b>각성 ${ROMAN[i + 1]} · ${n}</b><span>${t}</span></div></li>`).join('')}
-    </ul>`;
+  $('conDetail').innerHTML = perkList(SKIN[equippedSkin(id)]) + `<button class="ghost sm" data-tact="skin" data-id="${id}" type="button">스킨 바꾸기</button>`;
 }
 $('pane-team').addEventListener('click', e => {
   if (e.target.closest('[data-tact="planet"]')) { planetSel = save.mainPlanet; setTab('planets'); return; }
+  const sb = e.target.closest('[data-tact="skin"]'); if (sb) { starSel = sb.dataset.id; skinSel = null; setTab('stars'); return; }
   const t = e.target.closest('[data-tid]'); if (t) { save.team = save.team.filter(x => x !== t.dataset.tid); teamDetail = t.dataset.tid; persist(); renderTeam(); return; }
   const c = e.target.closest('[data-cid]'); if (!c) return;
   const id = c.dataset.cid, slots = PLANET[save.mainPlanet].slots;
