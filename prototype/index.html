@@ -327,6 +327,21 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .ccard .ce{color:var(--g,var(--dim))}
 
 /* modal / toast / pause */
+.adsim{position:absolute;inset:0;display:grid;align-content:center;justify-items:center;gap:10px;padding-inline:16px;text-align:center;background:linear-gradient(160deg,#1b0f3a,#05030d);z-index:40}
+.adsim .ad-tag{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));left:16px;font-family:var(--f-disp);font-size:11px;padding:2px 8px;border-radius:4px;background:#ffd23f;color:#1d1403;font-weight:700}
+.adsim b{font-size:20px}
+.adsim .gauge{width:min(280px,80%)}
+.adsim .ad-count{font-family:var(--f-disp);color:var(--gold)}
+.adsim .ghost{min-width:200px}
+.ad-art{position:relative;width:140px;height:140px}
+.ad-art i{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(245,196,81,.5);animation:adpulse 2s ease-out infinite}
+.ad-art i:nth-child(2){animation-delay:.6s}.ad-art i:nth-child(3){animation-delay:1.2s}
+@keyframes adpulse{from{transform:scale(.3);opacity:1}to{transform:scale(1);opacity:0}}
+.loot-art{display:grid;justify-items:center;gap:6px}
+.loot-art .box{width:84px;height:64px;border-radius:10px;background:linear-gradient(180deg,#ffe08a,#e39a1f 55%,#8a5208);box-shadow:0 0 30px rgba(255,200,80,.55);position:relative}
+.loot-art .box::before{content:"";position:absolute;left:0;right:0;top:22px;height:5px;background:#6b3c05}
+.loot-art .box::after{content:"";position:absolute;left:36px;top:16px;width:12px;height:16px;border-radius:3px;background:#fff1c2}
+.ad-note{font-size:11px;color:var(--dim);text-align:center}
 .modal{position:absolute;inset:0;display:grid;place-items:center;padding-inline:16px;padding-block:24px;background:rgba(3,5,14,.78);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:20}
 .modal-body{display:grid;gap:14px;width:min(420px,100%);max-height:100%;overflow-y:auto;padding:20px 18px;border-radius:18px;border:1px solid var(--line);background:linear-gradient(180deg,#141d45,#0b1130);box-sizing:border-box}
 .modal-body h3{margin:0;font-size:18px;text-align:center}
@@ -495,9 +510,20 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
   </section>
 
   <div class="modal" id="modal" hidden><div class="modal-body" id="modalBody" role="dialog" aria-modal="true"></div></div>
+  <section class="adsim" id="adSim" hidden aria-label="광고">
+    <span class="ad-tag">AD</span>
+    <div class="ad-art" aria-hidden="true"><i></i><i></i><i></i></div>
+    <b>갤럭시워 보상형 광고</b>
+    <span class="mini" id="adSimNet">Web · 테스트 보상형 광고</span>
+    <span class="mini" id="adSimUnit"></span>
+    <div class="gauge"><i id="adSimBar"></i></div>
+    <span class="ad-count" id="adSimCount">5초 후 보상</span>
+    <button class="ghost" id="adSimClose" type="button">광고 닫기</button>
+  </section>
   <div class="toast" id="toast" role="status"></div>
 </div>
 
 <script src="data.js"></script>
 <script src="battle.js"></script>
+<script src="ads.js"></script>
 <script src="app.js"></script>

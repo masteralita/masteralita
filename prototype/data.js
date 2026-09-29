@@ -329,3 +329,15 @@ const ZODIAC_DATES = [ // 생일 → 별자리 (별자리 시트 조건 열)
 function zodiacOf(m, d) { for (const [id, mm, dd] of ZODIAC_DATES) if (m < mm || (m === mm && d <= dd)) return id; return 'cap'; }
 const GHOST_NAMES = ['Gesut4565', 'NovaKatze', 'Orbiter77', '별헤는밤', 'Andromeda_J', '은하수산책', 'Halley86', 'ZENITH'];
 
+
+/* ---------- Ads (per OS) & lobby treasure chest ---------- */
+// Unit ids below are Google's public AdMob *test* ids — replace with the real ones before release.
+const AD_CONFIG = {
+  testMode: true,
+  simSeconds: 5,
+  ios:     { label:'iOS',     network:'AdMob', rewarded:{ default:'ca-app-pub-3940256099942544/1712485313', lobby_chest:'ca-app-pub-3940256099942544/1712485313' } },
+  android: { label:'Android', network:'AdMob', rewarded:{ default:'ca-app-pub-3940256099942544/5224354917', lobby_chest:'ca-app-pub-3940256099942544/5224354917' } },
+  web:     { label:'Web',     network:'테스트', rewarded:null },
+};
+// 로비 낙하 보물상자: falls among the meteors, needs `hp` hits, then opens via rewarded ad (or instantly with the ad pass)
+const AD_CHEST = { first:[8, 14], cd:[45, 90], hp:3, reward:[20, 40], life:40 };

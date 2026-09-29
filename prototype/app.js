@@ -9,7 +9,7 @@ const SAVE_KEY = 'gw.save.v1';
 function freshSave() {
   return {
     v: 1, name: '', title: 'Star Wanderer', lv: 1, xp: 0, dust: 30000, piece: 1500, birthday: null,
-    skins: [], lastCollect: Date.now(), chest: 0, best: 0, wins: 0, losses: 0, adsRemoved: false,
+    skins: [], lastCollect: Date.now(), chest: 0, best: 0, wins: 0, losses: 0, adPass: false,
     planets: { earth: { lv: 1 } }, mainPlanet: 'earth',
     cons: { sgr: newCon(0), leo: newCon(0), vir: newCon(0) },
     team: ['sgr', 'leo', 'vir'],
@@ -28,6 +28,7 @@ let save = (() => {
   try { const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if (v && v.v === 1) return Object.assign(freshSave(), v); } catch {}
   return freshSave();
 })();
+if (save.adsRemoved && !save.adPass) save.adPass = true; // older saves bought the previous ad item
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch {} }
 
 const fmt = n => Math.floor(n).toLocaleString('en-US');
@@ -160,12 +161,12 @@ function renderTopBar() {
 $('gearBtn').addEventListener('click', openSettings);
 
 /* ---------- Lobby (화면설계서 5–10p) ---------- */
-const HOME = { sys: null, rocks: [], shots: [], booms: [], spawn: 0, skyBottom: 0 };
+const HOME = { sys: null, rocks: [], shots: [], booms: [], spawn: 0, skyBottom: 0, chestCd: rnd(...AD_CHEST.first), loot: null };
 function enterHome() {
   G.state = 'home'; G.me = null; G.foe = null; G.zone = ZONES[1]; G.shield = 0; G.pShield = 0;
   G.fx = []; G.texts = []; G.proj = []; G.beams = []; $('banner').classList.remove('show');
   const P = makePlayerPlanet(save.mainPlanet, save.planets[save.mainPlanet].lv);
-  HOME.sys = makeSystem('me', P, save.team.map(makeMyCon)); HOME.rocks = []; HOME.shots = []; HOME.booms = [];
+  HOME.sys = makeSystem('me', P, save.team.map(makeMyCon)); HOME.rocks = []; HOME.shots = []; HOME.booms = []; HOME.loot = null;
   setScreen('shell'); renderTopBar(); setTab(tab); layoutHome();
 }
 // The home system sits just above the lobby cards so meteors cross a tall stretch of open sky
@@ -234,13 +235,21 @@ function updateHome(dt) {
     const pts = Array.from({ length: 8 }, (_, i) => [Math.cos(i / 8 * TAU) * rnd(.72, 1), Math.sin(i / 8 * TAU) * rnd(.72, 1)]);
     HOME.rocks.push({ x, y: -24, vx: (tx - x) / ((s.cy + 24) / vy), vy, r: rnd(8, 15), rot: 0, vr: rnd(-1.2, 1.2), pts, hp: 1, locked: 0 });
   }
+  // 낙하 보물상자: at most one falling or waiting at a time
+  HOME.chestCd -= dt;
+  if (HOME.chestCd <= 0 && !HOME.loot && !HOME.rocks.some(r => r.kind === 'chest')) {
+    HOME.chestCd = rnd(...AD_CHEST.cd);
+    const x = rnd(W * .2, W * .8);
+    HOME.rocks.push({ kind: 'chest', x, y: -30, vx: (s.cx - x) / ((s.cy + 30) / 34), vy: 34, r: 15, rot: 0, vr: 0, hp: AD_CHEST.hp, locked: 0 });
+  }
+  if (HOME.loot && (HOME.loot.t += dt) > AD_CHEST.life) { HOME.loot = null; } // unclaimed chest drifts away
   const sky = HOME.skyBottom || H * .5;
   for (const c of s.cons) {
     c.cd -= dt * c.rate * .55;
     if (c.cd > 0) continue;
     // aim only at meteors that are well inside the open sky and not already locked by two shots
     const skyTop = 70 + (sky - 70) * .35; // let meteors fall into view first
-    const cand = HOME.rocks.filter(r => r.hp > 0 && r.y > skyTop && r.y < sky && r.locked < 2);
+    const cand = HOME.rocks.filter(r => r.hp > 0 && r.y > skyTop && r.y < sky && r.locked < (r.kind === 'chest' ? r.hp : 2));
     if (!cand.length) { c.cd = .1; continue; }
     const t = cand.sort((a, b) => b.y - a.y)[0];
     t.locked += 1; c.cd = 1;
@@ -250,6 +259,12 @@ function updateHome(dt) {
     const p = HOME.shots[i], dx = p.t.x - p.x, dy = p.t.y - p.y, d = Math.hypot(dx, dy);
     p.trail.push([p.x, p.y]); if (p.trail.length > 6) p.trail.shift();
     if (p.t.hp <= 0) { HOME.shots.splice(i, 1); continue; }
+    if (d < p.t.r && p.t.kind === 'chest') {
+      HOME.shots.splice(i, 1); p.t.hp -= 1; p.t.locked -= 1; p.t.flash = .15;
+      burst(p.t.x, p.t.y, 8, '#ffe08a');
+      if (p.t.hp <= 0) chestBroken(p.t);
+      continue;
+    }
     if (d < p.t.r) {
       p.t.hp = 0; HOME.shots.splice(i, 1);
       burst(p.t.x, p.t.y, 16, '#ffb05a'); burst(p.t.x, p.t.y, 10, '#c9b89a');
@@ -260,11 +275,29 @@ function updateHome(dt) {
   }
   HOME.rocks = HOME.rocks.filter(r => {
     r.x += r.vx * dt; r.y += r.vy * dt; r.rot += r.vr * dt;
+    if (r.flash > 0) r.flash -= dt;
+    if (r.hp > 0 && r.kind === 'chest' && r.y > sky + 10) { chestBroken(r); return false; } // caught before it reaches the planet
     if (r.hp > 0 && Math.hypot(r.x - s.cx, r.y - s.cy) < s.pr) { burst(r.x, r.y, 10, '#9fb8ff'); return false; } // absorbed by the planet's field
     return r.hp > 0 && r.y < H + 30;
   });
   HOME.booms = HOME.booms.filter(b => (b.t -= dt) > 0);
   for (let i = G.fx.length - 1; i >= 0; i--) { const f = G.fx[i]; f.t -= dt; f.x += f.vx * dt; f.y += f.vy * dt; if (f.t <= 0) G.fx.splice(i, 1); }
+}
+function chestBroken(r) {
+  r.hp = 0;
+  const sky = HOME.skyBottom || H * .5;
+  HOME.loot = { x: clamp(r.x, 40, W - 40), y: clamp(r.y, 110, sky - 20), t: 0 };
+  burst(r.x, r.y, 26, '#ffd76a'); HOME.booms.push({ x: r.x, y: r.y, r: 18, t: .45, col: '#ffd76a' });
+}
+function drawChest(x, y, w, open, flash) {
+  const h = w * .72;
+  ctx.fillStyle = flash > 0 ? '#fff' : '#e39a1f';
+  const g = ctx.createLinearGradient(x, y - h / 2, x, y + h / 2);
+  g.addColorStop(0, '#ffe08a'); g.addColorStop(.55, '#e39a1f'); g.addColorStop(1, '#8a5208');
+  if (!flash || flash <= 0) ctx.fillStyle = g;
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - w / 2, y - h / 2, w, h, 5) : ctx.rect(x - w / 2, y - h / 2, w, h); ctx.fill();
+  ctx.fillStyle = '#6b3c05'; ctx.fillRect(x - w / 2, y - h / 2 + h * .32, w, h * .09);
+  ctx.fillStyle = '#fff1c2'; ctx.fillRect(x - w * .08, y - h / 2 + h * .22, w * .16, h * .3);
 }
 function drawHome(t) {
   drawBg(t);
@@ -277,6 +310,13 @@ function drawHome(t) {
       g.addColorStop(0, 'rgba(255,170,90,.55)'); g.addColorStop(1, 'rgba(255,120,60,0)');
       ctx.strokeStyle = g; ctx.lineWidth = r.r * 1.3; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x - ux * len, r.y - uy * len); ctx.stroke();
+    }
+    if (r.kind === 'chest') {
+      ctx.save(); ctx.globalAlpha = .35 + .15 * Math.sin(t * 6); ctx.fillStyle = '#ffd76a';
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r * 1.9, 0, TAU); ctx.fill(); ctx.restore();
+      drawChest(r.x, r.y + Math.sin(t * 3) * 2, r.r * 2, false, r.flash);
+      for (let i = 0; i < AD_CHEST.hp; i++) { ctx.fillStyle = i < r.hp ? '#ffd76a' : 'rgba(255,255,255,.2)'; ctx.fillRect(r.x - 12 + i * 9, r.y + r.r + 6, 7, 3); }
+      continue;
     }
     ctx.save(); ctx.translate(r.x, r.y); ctx.rotate(r.rot);
     const rg = ctx.createRadialGradient(-r.r * .3, -r.r * .3, 0, 0, 0, r.r);
@@ -300,6 +340,52 @@ function drawHome(t) {
   }
   for (const f of G.fx) { ctx.globalAlpha = clamp(f.t * 1.6, 0, 1); ctx.fillStyle = f.c; ctx.fillRect(f.x - 1.4, f.y - 1.4, 2.8, 2.8); }
   ctx.globalAlpha = 1;
+  const L = HOME.loot;
+  if (L) { // waiting reward chest: rays, bobbing box, call to action
+    const y = L.y + Math.sin(t * 2.4) * 4, fade = clamp((AD_CHEST.life - L.t) / 3, 0, 1);
+    ctx.globalAlpha = fade;
+    ctx.save(); ctx.translate(L.x, y); ctx.rotate(t * .6);
+    for (let i = 0; i < 10; i++) { ctx.rotate(TAU / 10); ctx.fillStyle = 'rgba(255,215,106,.16)'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-7, -46); ctx.lineTo(7, -46); ctx.fill(); }
+    ctx.restore();
+    drawChest(L.x, y, 38, false, 0);
+    ctx.font = '700 12px "Noto Sans KR", sans-serif'; ctx.textAlign = 'center';
+    const label = save.adPass ? '탭해서 열기' : '▶ 광고 보고 열기';
+    const tw = ctx.measureText(label).width + 20;
+    ctx.fillStyle = 'rgba(10,14,36,.85)'; ctx.strokeStyle = 'rgba(245,196,81,.7)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(L.x - tw / 2, y + 26, tw, 22, 11) : ctx.rect(L.x - tw / 2, y + 26, tw, 22); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#f5c451'; ctx.fillText(label, L.x, y + 41);
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* ---------- 광고 보상 상자 ---------- */
+$('shell').addEventListener('pointerdown', e => {
+  if (tab !== 'home' || !HOME.loot || e.target.closest('button, .hcard, .modes, .power, .topbar, .nav')) return;
+  const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  if (Math.hypot(x - HOME.loot.x, y - (HOME.loot.y + 18)) < 48) openAdChest();
+});
+function openAdChest() {
+  const pass = save.adPass;
+  openModal(`<div class="loot-art"><span class="box"></span></div>
+    <h3>보물 상자</h3>
+    <p class="mtxt">열면 <b class="piece">Star Piece ${AD_CHEST.reward[0]}~${AD_CHEST.reward[1]}개</b>를 받아요.</p>
+    <div class="mbtns">
+      <button class="ghost" data-act="later" type="button">나중에</button>
+      <button class="cta sm" data-act="open" type="button">${pass ? '바로 열기' : '▶ 광고 보고 열기'}</button>
+    </div>
+    <p class="ad-note">${pass ? '광고 무제한 패키지 적용 중 · 광고 없이 열려요' : `${Ads.label} · ${Ads.network} 보상형 광고${Ads.native ? '' : ' (프로토타입에서는 테스트 광고)'} · 광고 무제한 패키지를 사면 바로 열 수 있어요`}</p>`,
+  async act => {
+    if (act === 'later') { closeModal(); return; }
+    closeModal();
+    let ok = pass;
+    if (!pass) { const res = await Ads.showRewarded('lobby_chest'); ok = res.rewarded; if (!ok) { toast(res.error ? '광고를 불러오지 못했어요. 잠시 후 다시 시도해 주세요' : '광고를 끝까지 보면 보상을 받아요'); return; } }
+    if (!HOME.loot) return;
+    const n = Math.round(rnd(...AD_CHEST.reward));
+    const { x, y } = HOME.loot; HOME.loot = null;
+    burst(x, y, 30, '#c77dff'); HOME.booms.push({ x, y, r: 20, t: .45, col: '#c77dff' });
+    gain('piece', n);
+    showGachaResult([], '보물 상자', [`Star Piece +${fmt(n)}`]);
+  });
 }
 
 /* ---------- Gacha / constellation rewards ---------- */
@@ -377,8 +463,8 @@ function renderStore() {
         </section>`; }).join('')}
     </div>
     <section class="shop-card row-card">
-      <div><h3>광고 제거</h3><p class="mini">${save.adsRemoved ? '적용됨' : '보상형 광고를 제외한 모든 광고 제거'}</p></div>
-      <button class="buy fit" data-buy="ads" type="button" ${save.adsRemoved ? 'disabled' : ''}>${save.adsRemoved ? '구매 완료' : '₩5,500'}</button>
+      <div><h3>광고 무제한 패키지</h3><p class="mini">${save.adPass ? '적용 중 · 모든 광고 없이 바로 보상' : '모든 광고 제거 · 로비 보물 상자와 광고 보상을 광고 없이 바로 받아요'}</p></div>
+      <button class="buy fit" data-buy="ads" type="button" ${save.adPass ? 'disabled' : ''}>${save.adPass ? '구매 완료' : '₩9,900'}</button>
     </section>
     <section class="sec">
       <div class="sec-h"><h2>Star Piece 충전</h2></div>
@@ -401,7 +487,7 @@ $('pane-store').addEventListener('click', e => {
   const b = e.target.closest('[data-buy]'); if (!b) return;
   const k = b.dataset.buy;
   if (k === 'pkg') { const r = grantCon('oph', 4); save.piece += 500; showGachaResult([r], '특수 별자리 패키지', ['Star Piece +500', '테스트 지급']); }
-  else if (k === 'ads') { save.adsRemoved = true; persist(); toast('광고 제거를 적용했어요 (테스트 지급)'); renderStore(); }
+  else if (k === 'ads') { save.adPass = true; persist(); toast('광고 무제한 패키지를 적용했어요 (테스트 지급)'); renderStore(); }
   else if (k === 'piece') { gain('piece', +b.dataset.n); toast(`Star Piece ${fmt(+b.dataset.n)} 지급 (테스트)`); }
 });
 
