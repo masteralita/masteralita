@@ -145,6 +145,7 @@ function setTab(t) {
   document.querySelectorAll('.nav button').forEach(b => b.setAttribute('aria-current', b.dataset.tab === t ? 'page' : 'false'));
   $('shell').classList.toggle('see-through', t === 'home');
   ({ store: renderStore, planets: renderPlanets, home: renderHome, stars: renderStars, team: renderTeam })[t]();
+  if (t === 'home') requestAnimationFrame(layoutHome);
 }
 document.querySelector('.nav').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) setTab(b.dataset.tab); });
 
@@ -159,18 +160,24 @@ function renderTopBar() {
 $('gearBtn').addEventListener('click', openSettings);
 
 /* ---------- Lobby (화면설계서 5–10p) ---------- */
-const HOME = { sys: null, rocks: [], shots: [], spawn: 0 };
+const HOME = { sys: null, rocks: [], shots: [], booms: [], spawn: 0, skyBottom: 0 };
 function enterHome() {
   G.state = 'home'; G.me = null; G.foe = null; G.zone = ZONES[1]; G.shield = 0; G.pShield = 0;
   G.fx = []; G.texts = []; G.proj = []; G.beams = []; $('banner').classList.remove('show');
   const P = makePlayerPlanet(save.mainPlanet, save.planets[save.mainPlanet].lv);
-  HOME.sys = makeSystem('me', P, save.team.map(makeMyCon)); HOME.rocks = []; HOME.shots = [];
+  HOME.sys = makeSystem('me', P, save.team.map(makeMyCon)); HOME.rocks = []; HOME.shots = []; HOME.booms = [];
   setScreen('shell'); renderTopBar(); setTab(tab); layoutHome();
 }
+// The home system sits just above the lobby cards so meteors cross a tall stretch of open sky
 function layoutHome() {
   const s = HOME.sys; if (!s) return;
-  const top = 70, bot = 370, band = Math.max(180, H - top - bot);
-  s.cx = W / 2; s.cy = top + band * .5; s.R = Math.min(W * .36, band * .5); s.ry = s.R * .42; s.pr = s.R * .26;
+  const top = 70, cardEl = document.querySelector('#pane-home .power');
+  const cvTop = cv.getBoundingClientRect().top;
+  const cardTop = cardEl && !$('shell').hidden && tab === 'home' ? cardEl.getBoundingClientRect().top - cvTop : H - 370;
+  s.R = Math.min(W * .36, 150); s.ry = s.R * .42; s.pr = s.R * .26;
+  s.cx = W / 2;
+  s.cy = Math.max(top + (cardTop - top) * .55, cardTop - s.ry - s.R * .32 - 6);
+  HOME.skyBottom = s.cy - s.ry - s.R * .25; // interceptions happen above this line
 }
 function pendingIncome() {
   const hrs = Math.min(INCOME.capHours, (Date.now() - save.lastCollect) / 3600000);
@@ -221,40 +228,77 @@ function updateHome(dt) {
   const s = HOME.sys; if (!s) return;
   updateSystem(s, dt);
   HOME.spawn -= dt;
-  if (HOME.spawn <= 0) { // 소행성 요격 연출
-    HOME.spawn = rnd(.7, 1.4);
-    const x = rnd(W * .1, W * .9), pts = Array.from({ length: 7 }, (_, i) => [Math.cos(i / 7 * TAU) * rnd(.7, 1), Math.sin(i / 7 * TAU) * rnd(.7, 1)]);
-    HOME.rocks.push({ x, y: -20, vx: (s.cx - x) * .12, vy: rnd(28, 46), r: rnd(6, 13), rot: 0, vr: rnd(-1, 1), pts, hp: 1 });
+  if (HOME.spawn <= 0) { // 운석 요격 연출
+    HOME.spawn = rnd(.6, 1.1);
+    const x = rnd(W * .05, W * .95), tx = s.cx + rnd(-s.R, s.R), vy = rnd(38, 62);
+    const pts = Array.from({ length: 8 }, (_, i) => [Math.cos(i / 8 * TAU) * rnd(.72, 1), Math.sin(i / 8 * TAU) * rnd(.72, 1)]);
+    HOME.rocks.push({ x, y: -24, vx: (tx - x) / ((s.cy + 24) / vy), vy, r: rnd(8, 15), rot: 0, vr: rnd(-1.2, 1.2), pts, hp: 1, locked: 0 });
   }
+  const sky = HOME.skyBottom || H * .5;
   for (const c of s.cons) {
-    c.cd -= dt * c.rate * .6;
-    if (c.cd <= 0) {
-      c.cd = 1;
-      const t = HOME.rocks.filter(r => r.hp > 0 && r.y > 20).sort((a, b) => Math.hypot(a.x - c.x, a.y - c.y) - Math.hypot(b.x - c.x, b.y - c.y))[0];
-      if (t) HOME.shots.push({ x: c.x, y: c.y, t, col: c.def.special ? '#d58bff' : '#ffd76a' });
-    }
+    c.cd -= dt * c.rate * .55;
+    if (c.cd > 0) continue;
+    // aim only at meteors that are well inside the open sky and not already locked by two shots
+    const skyTop = 70 + (sky - 70) * .35; // let meteors fall into view first
+    const cand = HOME.rocks.filter(r => r.hp > 0 && r.y > skyTop && r.y < sky && r.locked < 2);
+    if (!cand.length) { c.cd = .1; continue; }
+    const t = cand.sort((a, b) => b.y - a.y)[0];
+    t.locked += 1; c.cd = 1;
+    HOME.shots.push({ x: c.x, y: c.y, t, col: c.skin ? c.skin.pal.proj : '#ffd76a', trail: [] });
   }
   for (let i = HOME.shots.length - 1; i >= 0; i--) {
     const p = HOME.shots[i], dx = p.t.x - p.x, dy = p.t.y - p.y, d = Math.hypot(dx, dy);
+    p.trail.push([p.x, p.y]); if (p.trail.length > 6) p.trail.shift();
     if (p.t.hp <= 0) { HOME.shots.splice(i, 1); continue; }
-    if (d < 10) { p.t.hp = 0; burst(p.t.x, p.t.y, 12, '#c9b89a'); HOME.shots.splice(i, 1); continue; }
-    p.vx = dx / d; p.vy = dy / d; p.x += p.vx * 480 * dt; p.y += p.vy * 480 * dt;
+    if (d < p.t.r) {
+      p.t.hp = 0; HOME.shots.splice(i, 1);
+      burst(p.t.x, p.t.y, 16, '#ffb05a'); burst(p.t.x, p.t.y, 10, '#c9b89a');
+      HOME.booms.push({ x: p.t.x, y: p.t.y, r: p.t.r, t: .45, col: p.col });
+      continue;
+    }
+    p.vx = dx / d; p.vy = dy / d; p.x += p.vx * 420 * dt; p.y += p.vy * 420 * dt;
   }
-  HOME.rocks = HOME.rocks.filter(r => { r.x += r.vx * dt * .2; r.y += r.vy * dt; r.rot += r.vr * dt; return r.hp > 0 && r.y < H + 30; });
+  HOME.rocks = HOME.rocks.filter(r => {
+    r.x += r.vx * dt; r.y += r.vy * dt; r.rot += r.vr * dt;
+    if (r.hp > 0 && Math.hypot(r.x - s.cx, r.y - s.cy) < s.pr) { burst(r.x, r.y, 10, '#9fb8ff'); return false; } // absorbed by the planet's field
+    return r.hp > 0 && r.y < H + 30;
+  });
+  HOME.booms = HOME.booms.filter(b => (b.t -= dt) > 0);
   for (let i = G.fx.length - 1; i >= 0; i--) { const f = G.fx[i]; f.t -= dt; f.x += f.vx * dt; f.y += f.vy * dt; if (f.t <= 0) G.fx.splice(i, 1); }
 }
 function drawHome(t) {
   drawBg(t);
   const s = HOME.sys; if (!s) return;
   for (const r of HOME.rocks) {
+    // fiery entry trail, then the rock itself
+    const sp = Math.hypot(r.vx, r.vy), ux = r.vx / sp, uy = r.vy / sp, len = r.r * 4.5;
+    if (save.settings.glow) {
+      const g = ctx.createLinearGradient(r.x, r.y, r.x - ux * len, r.y - uy * len);
+      g.addColorStop(0, 'rgba(255,170,90,.55)'); g.addColorStop(1, 'rgba(255,120,60,0)');
+      ctx.strokeStyle = g; ctx.lineWidth = r.r * 1.3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x - ux * len, r.y - uy * len); ctx.stroke();
+    }
     ctx.save(); ctx.translate(r.x, r.y); ctx.rotate(r.rot);
-    ctx.fillStyle = '#6f6678'; ctx.strokeStyle = '#a99fb5'; ctx.lineWidth = 1;
+    const rg = ctx.createRadialGradient(-r.r * .3, -r.r * .3, 0, 0, 0, r.r);
+    rg.addColorStop(0, '#b3a7bf'); rg.addColorStop(1, '#4e4658');
+    ctx.fillStyle = rg; ctx.strokeStyle = 'rgba(255,190,130,.6)'; ctx.lineWidth = 1.2;
     ctx.beginPath(); r.pts.forEach(([px, py], i) => i ? ctx.lineTo(px * r.r, py * r.r) : ctx.moveTo(px * r.r, py * r.r)); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
+    if (r.locked) { ctx.strokeStyle = 'rgba(245,196,81,.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(r.x, r.y, r.r + 5, 0, TAU); ctx.stroke(); }
   }
   drawSystem(s, t);
-  for (const p of HOME.shots) { ctx.strokeStyle = p.col; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(p.x - (p.vx || 0) * 10, p.y - (p.vy || 0) * 10); ctx.lineTo(p.x, p.y); ctx.stroke(); }
-  for (const f of G.fx) { ctx.globalAlpha = clamp(f.t * 1.6, 0, 1); ctx.fillStyle = f.c; ctx.fillRect(f.x - 1.2, f.y - 1.2, 2.4, 2.4); }
+  for (const p of HOME.shots) {
+    ctx.strokeStyle = p.col; ctx.lineCap = 'round';
+    p.trail.forEach(([x, y], i) => { if (!i) return; const [x0, y0] = p.trail[i - 1]; ctx.globalAlpha = i / p.trail.length; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x, y); ctx.stroke(); });
+    ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, TAU); ctx.fill();
+  }
+  for (const b of HOME.booms) {
+    const k = 1 - b.t / .45;
+    ctx.globalAlpha = 1 - k; ctx.strokeStyle = b.col; ctx.lineWidth = 2.5 * (1 - k) + .5;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r + k * 26, 0, TAU); ctx.stroke();
+    ctx.fillStyle = `rgba(255,230,180,${.6 * (1 - k)})`; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (1 - k) + 2, 0, TAU); ctx.fill();
+  }
+  for (const f of G.fx) { ctx.globalAlpha = clamp(f.t * 1.6, 0, 1); ctx.fillStyle = f.c; ctx.fillRect(f.x - 1.4, f.y - 1.4, 2.8, 2.8); }
   ctx.globalAlpha = 1;
 }
 
