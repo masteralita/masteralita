@@ -1,0 +1,767 @@
+<title>갤럭시워 아케이드</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* Layout: one portrait stage — enemy system top, my system bottom, HUD docked to the edges over a full-bleed canvas */
+:root{
+  --void:#060a1a;      /* deep space ground */
+  --panel:#0f1634;     /* HUD / card surface */
+  --line:#26305f;      /* hairlines on panels */
+  --gold:#f5c451;      /* constellation gold, primary accent */
+  --ink:#eaedff;       /* main text */
+  --dim:#8d96c4;       /* secondary text */
+  --act:#ff5a6e;       /* active slot / enemy */
+  --pas:#5b8cff;       /* passive slot / shield */
+  --lim:#c35bff;       /* limited / special */
+  --ok:#52e3a4;        /* heal / hp */
+  --f-disp:"Chakra Petch","Noto Sans KR",system-ui,sans-serif;
+  --f-body:"Noto Sans KR",system-ui,-apple-system,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:var(--void);color:var(--ink);font-family:var(--f-body);overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#app{position:relative;height:100%;max-width:520px;margin:0 auto;overflow:hidden;background:var(--void)}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+/* ---------- HUD ---------- */
+.hud{position:absolute;left:0;right:0;padding-inline:16px;pointer-events:none}
+.hud-top{top:0;padding-top:12px;display:grid;gap:8px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.wave{font-family:var(--f-disp);font-weight:700;font-size:20px;letter-spacing:.06em}
+.wave small{font-size:12px;color:var(--dim);letter-spacing:.14em;margin-right:6px}
+.timer{font-family:var(--f-disp);font-variant-numeric:tabular-nums;font-size:16px;color:var(--ink);padding:2px 10px;border:1px solid var(--line);border-radius:999px;background:rgba(15,22,52,.7)}
+.timer.rage{color:var(--act);border-color:var(--act)}
+.bar-wrap{display:grid;gap:4px}
+.bar-label{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}
+.bar-label b{color:var(--ink);font-weight:500}
+.bar-label .num{font-family:var(--f-disp);font-variant-numeric:tabular-nums}
+.bar{height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}
+.bar i{display:block;height:100%;width:100%;transform-origin:left;transition:transform .12s linear}
+.bar.foe i{background:linear-gradient(90deg,#ff3d5a,#ff8a6a)}
+.bar.me i{background:linear-gradient(90deg,#2fcf8f,#8cf2c6)}
+.hud-bot{bottom:0;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));display:grid;gap:10px;background:linear-gradient(0deg,rgba(6,10,26,.95) 55%,rgba(6,10,26,0))}
+.energy{display:flex;align-items:center;gap:8px}
+.energy .lbl{font-size:12px;color:var(--dim);white-space:nowrap}
+.pips{display:flex;gap:4px;flex:1}
+.pips span{flex:1;height:10px;border-radius:2px;background:rgba(245,196,81,.12);border:1px solid rgba(245,196,81,.25)}
+.pips span.on{background:var(--gold);border-color:var(--gold);box-shadow:0 0 8px rgba(245,196,81,.6)}
+.skills{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;pointer-events:auto}
+.skill{position:relative;display:grid;gap:2px;justify-items:center;padding:10px 4px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel);text-align:center;overflow:hidden}
+.skill .ic{font-family:var(--f-disp);font-size:18px;line-height:1}
+.skill .nm{font-size:13px;font-weight:700}
+.skill .cs{font-family:var(--f-disp);font-size:11px;color:var(--gold)}
+.skill:disabled{opacity:.42;cursor:default}
+.skill.ready{border-color:rgba(245,196,81,.6)}
+.skill .dur{position:absolute;left:0;bottom:0;height:3px;background:var(--gold);width:0}
+.hint{font-size:12px;color:var(--dim);text-align:center;line-height:1.5}
+.hint b{color:var(--gold);font-weight:500}
+.pause{pointer-events:auto;border:1px solid var(--line);background:rgba(15,22,52,.7);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--dim)}
+
+/* ---------- Screens ---------- */
+.screen{position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;background:radial-gradient(120% 70% at 50% 0%,rgba(40,52,120,.55),rgba(6,10,26,.96) 60%),var(--void)}
+.wrap{display:grid;gap:22px;padding-inline:16px;padding-block:28px 40px}
+.brand{display:grid;gap:4px}
+.brand .eyebrow{font-family:var(--f-disp);font-size:12px;letter-spacing:.3em;color:var(--gold)}
+.brand h1{margin:0;font-family:var(--f-disp);font-weight:700;font-size:34px;letter-spacing:.04em;line-height:1.1;text-wrap:balance}
+.brand p{margin:0;color:var(--dim);font-size:14px;line-height:1.6;max-width:36em}
+.sec{display:grid;gap:10px}
+.sec-h{display:flex;justify-content:space-between;align-items:baseline}
+.sec-h h2{margin:0;font-size:15px;font-weight:700}
+.sec-h span{font-family:var(--f-disp);font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums}
+.planets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pcard{display:grid;justify-items:center;gap:6px;padding:14px 6px 12px;border-radius:14px;border:1px solid var(--line);background:rgba(15,22,52,.75);text-align:center}
+.pcard[aria-pressed="true"]{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
+.orb{width:44px;height:44px;border-radius:50%}
+.orb.earth{background:radial-gradient(circle at 35% 30%,#9fd0ff,#2f6be8 45%,#0b1f5a 80%);box-shadow:0 0 18px rgba(80,150,255,.5)}
+.orb.sun{background:radial-gradient(circle at 40% 35%,#fff6c4,#ffb02e 45%,#e2531a 85%);box-shadow:0 0 26px rgba(255,160,40,.75)}
+.orb.moon{background:radial-gradient(circle at 35% 30%,#f2f2f6,#a3a6b8 50%,#4b4e63 90%);box-shadow:0 0 14px rgba(200,200,230,.35)}
+.pcard .pn{font-weight:700;font-size:14px}
+.pcard .pd{font-size:11px;color:var(--dim);line-height:1.45}
+.cons{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.ccard{display:grid;gap:2px;justify-items:start;padding:10px;border-radius:12px;border:1px solid var(--line);background:rgba(15,22,52,.75);text-align:left;min-width:0}
+.ccard .cn{font-weight:700;font-size:14px}
+.ccard .ce{font-family:var(--f-disp);font-size:10px;letter-spacing:.08em;color:var(--dim);text-transform:uppercase}
+.ccard .cst{font-size:11px;color:var(--gold)}
+.ccard[aria-pressed="true"]{border-color:var(--gold);background:rgba(245,196,81,.1)}
+.ccard.special .cst{color:var(--lim)}
+.ccard.special[aria-pressed="true"]{border-color:var(--lim);background:rgba(195,91,255,.12)}
+.rules{display:grid;gap:6px;padding:14px;border-radius:12px;border:1px dashed var(--line);font-size:13px;color:var(--dim);line-height:1.6}
+.rules b{color:var(--ink);font-weight:500}
+.cta{justify-self:stretch;padding:16px;border:0;border-radius:14px;background:linear-gradient(180deg,#ffd978,#e9a92f);color:#1d1403;font-family:var(--f-disp);font-weight:700;font-size:18px;letter-spacing:.12em}
+.cta:disabled{opacity:.4}
+.best{font-size:12px;color:var(--dim);text-align:center;font-family:var(--f-disp)}
+.result{display:grid;align-content:center;justify-items:center;gap:14px;text-align:center;min-height:100%;padding-inline:16px;box-sizing:border-box}
+.result .eyebrow{font-family:var(--f-disp);letter-spacing:.3em;font-size:12px;color:var(--act)}
+.result h2{margin:0;font-family:var(--f-disp);font-size:44px;letter-spacing:.04em}
+.result p{margin:0;color:var(--dim);font-size:14px;line-height:1.6}
+.btns{display:grid;gap:10px;width:min(320px,100%)}
+.ghost{padding:14px;border-radius:14px;border:1px solid var(--line);background:var(--panel);font-weight:700}
+.banner{position:absolute;left:16px;right:16px;top:42%;text-align:center;font-family:var(--f-disp);font-weight:700;font-size:28px;letter-spacing:.1em;color:var(--gold);text-shadow:0 0 18px rgba(245,196,81,.6);pointer-events:none;opacity:0;transition:opacity .3s}
+.banner.show{opacity:1}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}.banner{transition:none}}
+</style>
+
+<div id="app">
+  <canvas id="cv" aria-label="전투 화면"></canvas>
+
+  <div class="hud hud-top" id="hudTop" hidden>
+    <div class="row">
+      <div class="wave"><small>WAVE</small><span id="waveNo">1</span></div>
+      <div class="row" style="gap:8px">
+        <div class="timer" id="timer">40.0</div>
+        <button class="pause" id="pauseBtn" type="button">일시정지</button>
+      </div>
+    </div>
+    <div class="bar-wrap">
+      <div class="bar-label"><b id="foeName">화성</b><span class="num" id="foeHpTxt">0</span></div>
+      <div class="bar foe"><i id="foeHp"></i></div>
+    </div>
+  </div>
+
+  <div class="hud hud-bot" id="hudBot" hidden>
+    <div class="bar-wrap">
+      <div class="bar-label"><b id="myName">지구</b><span class="num" id="myHpTxt">0</span></div>
+      <div class="bar me"><i id="myHp"></i></div>
+    </div>
+    <div class="energy"><span class="lbl">기력</span><div class="pips" id="pips"></div></div>
+    <div class="skills">
+      <button class="skill" id="skMeteor" type="button"><span class="ic">✦✦</span><span class="nm">유성우</span><span class="cs">기력 3</span><i class="dur"></i></button>
+      <button class="skill" id="skShield" type="button"><span class="ic">◯</span><span class="nm">성운 방패</span><span class="cs">기력 2</span><i class="dur" id="durShield"></i></button>
+      <button class="skill" id="skNova" type="button"><span class="ic">✺</span><span class="nm">초신성 가속</span><span class="cs">기력 4</span><i class="dur" id="durNova"></i></button>
+    </div>
+    <div class="hint" id="hint">적 별자리 탭 <b>집중 공격</b> · 내 별자리 탭 <b>레벨업 (기력 1)</b></div>
+  </div>
+
+  <div class="banner" id="banner"></div>
+
+  <section class="screen" id="lobby">
+    <div class="wrap">
+      <header class="brand">
+        <span class="eyebrow">GALAXY WAR · ARCADE</span>
+        <h1>행성계 편성</h1>
+        <p>중심 행성을 고르고 공전시킬 별자리를 배치하세요. 별자리가 적 별자리를 모두 부수면 적 행성을 공격해요. 적 행성의 HP를 0으로 만들면 다음 웨이브로 넘어가요.</p>
+      </header>
+
+      <div class="sec">
+        <div class="sec-h"><h2>중심 행성</h2></div>
+        <div class="planets" id="planetList"></div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h"><h2>별자리</h2><span id="slotCount">0 / 3</span></div>
+        <div class="cons" id="conList"></div>
+      </div>
+
+      <div class="rules">
+        <div><b>기력</b> 별자리가 궤도를 한 바퀴 돌 때마다 1개 생겨요 (최대 10).</div>
+        <div><b>특수 별자리</b> 뱀주인자리는 적 별자리를 무시하고 행성을 바로 공격해요.</div>
+        <div><b>보스</b> 5웨이브마다 등장하고, 내 별자리를 기절시켜요. 전갈자리가 기절 시간을 줄여줘요.</div>
+        <div><b>제한 시간</b> 웨이브마다 40초. 넘기면 적이 폭주해서 공격력이 50% 올라가요.</div>
+      </div>
+
+      <button class="cta" id="startBtn" type="button">전투 시작</button>
+      <div class="best" id="bestTxt"></div>
+    </div>
+  </section>
+
+  <section class="screen" id="resultScr" hidden>
+    <div class="result">
+      <span class="eyebrow">PLANET DESTROYED</span>
+      <h2 id="resWave">WAVE 1</h2>
+      <p id="resTxt"></p>
+      <div class="btns">
+        <button class="cta" id="retryBtn" type="button">다시 도전</button>
+        <button class="ghost" id="lobbyBtn" type="button">편성으로 돌아가기</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+'use strict';
+const TAU = Math.PI * 2;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const $ = id => document.getElementById(id);
+
+/* ---------- Data (from 갤럭시워.xlsx: 별자리 / 행성 파츠 시트) ---------- */
+function shape(pts, edges, key) {
+  return { pts, edges: edges.split(' ').map(e => e.split('-').map(Number)), key };
+}
+const ZODIAC = [
+  { id:'sgr', name:'궁수', en:'Sagittarius', stat:'공격속도', kind:'phys', style:'arrow', hp:240, atk:8,  rate:2.4, def:10, mdef:10,
+    sh: shape([[-.9,.5],[-.5,.1],[-.1,.3],[.2,-.1],[.6,.1],[.5,-.5],[.1,-.6],[-.3,-.3],[.9,-.3]], '0-1 1-2 2-3 3-4 4-5 5-6 6-7 7-1 3-7 4-8', 3) },
+  { id:'cap', name:'염소', en:'Capricorn', stat:'물리 공격', kind:'phys', style:'shot', hp:260, atk:24, rate:.9, def:12, mdef:8,
+    sh: shape([[-.9,-.3],[-.3,-.1],[.3,-.4],[.9,-.5],[.6,.3],[.1,.6],[-.5,.3]], '0-1 1-2 2-3 3-4 4-5 5-6 6-0', 2) },
+  { id:'aqr', name:'물병', en:'Aquarius', stat:'마법 방어', kind:'magic', style:'orb', hp:300, atk:13, rate:1, def:10, mdef:45,
+    sh: shape([[-.9,-.6],[-.5,-.2],[-.1,-.5],[.2,-.1],[.5,-.4],[.3,.3],[.7,.6],[-.2,.5]], '0-1 1-2 2-3 3-4 3-5 5-6 5-7', 3) },
+  { id:'psc', name:'물고기', en:'Pisces', stat:'마법 공격', kind:'magic', style:'orb', hp:230, atk:22, rate:.95, def:8, mdef:15,
+    sh: shape([[-.9,-.7],[-.6,-.2],[-.3,.3],[0,.7],[.4,.4],[.8,.2],[.9,.6],[.6,.7]], '0-1 1-2 2-3 3-4 4-5 5-6 6-7 7-5', 3) },
+  { id:'ari', name:'양', en:'Aries', stat:'방어력', kind:'phys', style:'shot', hp:300, atk:12, rate:1, def:45, mdef:10,
+    sh: shape([[-.8,-.3],[-.2,-.5],[.4,-.2],[.8,.4]], '0-1 1-2 2-3', 1) },
+  { id:'tau', name:'황소', en:'Taurus', stat:'HP', kind:'phys', style:'shot', hp:520, atk:11, rate:.9, def:15, mdef:15,
+    sh: shape([[-.9,-.7],[-.4,-.2],[0,0],[.3,.2],[.9,-.1],[.2,.6],[-.3,.3]], '0-1 1-2 2-3 3-4 2-6 6-5 3-5', 2) },
+  { id:'gem', name:'쌍둥이', en:'Gemini', stat:'물리·마법 공격', kind:'both', style:'twin', hp:240, atk:11, rate:1, def:10, mdef:10,
+    sh: shape([[-.6,-.9],[-.5,-.3],[-.6,.3],[-.8,.8],[.3,-.9],[.4,-.3],[.3,.3],[.5,.8]], '0-1 1-2 2-3 4-5 5-6 6-7 1-5', 0) },
+  { id:'cnc', name:'게', en:'Cancer', stat:'물리 방어', kind:'phys', style:'shot', hp:320, atk:12, rate:1, def:40, mdef:12,
+    sh: shape([[0,-.2],[-.5,-.8],[.1,.2],[-.6,.7],[.7,.5]], '0-1 0-2 2-3 2-4', 0) },
+  { id:'leo', name:'사자', en:'Leo', stat:'공격력', kind:'phys', style:'beam', hp:260, atk:30, rate:.7, def:14, mdef:10,
+    sh: shape([[-.9,.4],[-.3,.3],[.2,.4],[.5,-.1],[.3,-.5],[.6,-.8],[.9,-.5],[-.2,-.1]], '0-1 1-2 2-3 3-4 4-5 5-6 1-7 7-3', 2) },
+  { id:'vir', name:'처녀', en:'Virgo', stat:'HP 회복', kind:'magic', style:'heal', hp:250, atk:9, rate:.8, def:10, mdef:18,
+    sh: shape([[-.9,-.2],[-.4,0],[0,-.3],[.4,-.1],[.8,-.5],[.1,.3],[.4,.8],[-.3,.6]], '0-1 1-2 2-3 3-4 2-5 5-6 5-7', 6) },
+  { id:'lib', name:'천칭', en:'Libra', stat:'물리·마법 방어', kind:'magic', style:'orb', hp:300, atk:12, rate:1, def:30, mdef:30,
+    sh: shape([[0,-.8],[-.6,-.1],[.6,-.2],[-.4,.7],[.5,.6]], '0-1 0-2 1-2 1-3 2-4', 0) },
+  { id:'sco', name:'전갈', en:'Scorpio', stat:'상태이상 감소', kind:'phys', style:'poison', hp:260, atk:10, rate:1, def:14, mdef:14,
+    sh: shape([[-.9,-.8],[-.7,-.4],[-.8,0],[-.4,.1],[0,.2],[.3,.5],[.6,.8],[.9,.5],[.8,.1]], '0-1 1-2 1-3 3-4 4-5 5-6 6-7 7-8', 3) },
+];
+const SPECIAL = { id:'oph', name:'뱀주인', en:'Ophiuchus', stat:'행성 직접 타격', kind:'magic', style:'beam', hp:220, atk:18, rate:.6, def:10, mdef:10, special:true,
+  sh: shape([[-.5,-.9],[.3,-.8],[.7,0],[.4,.8],[-.3,.8],[-.7,.1],[0,-.1]], '0-1 1-2 2-3 3-4 4-5 5-0 6-0 6-3', 6) };
+const ALL_CONS = [...ZODIAC, SPECIAL];
+
+const PLANETS = [
+  { id:'earth', name:'지구', hp:2400, slots:3, rateMul:1,    regen:0, desc:'HP 높음\n별자리 3' },
+  { id:'sun',   name:'태양', hp:1800, slots:5, rateMul:1.15, regen:0, desc:'공격속도 +15%\n별자리 5' },
+  { id:'moon',  name:'달',   hp:2000, slots:4, rateMul:1,    regen:8, desc:'초당 HP 8 회복\n별자리 4' },
+];
+const FOES = [
+  { name:'화성',   c1:'#ffb199', c2:'#c2391b', c3:'#3d0c05', glow:'255,90,60' },
+  { name:'해왕성', c1:'#b9d6ff', c2:'#2d57d8', c3:'#0a1450', glow:'80,120,255' },
+  { name:'수성',   c1:'#e8d9c9', c2:'#8d7663', c3:'#2c2119', glow:'220,180,140' },
+  { name:'천왕성', c1:'#cffcff', c2:'#3fb9c9', c3:'#0b3a44', glow:'90,220,230' },
+  { name:'명왕성', c1:'#f3e3d6', c2:'#a07c6a', c3:'#3a2820', glow:'230,190,170' },
+];
+const BOSS = { name:'흑성 네메시스', c1:'#e0b6ff', c2:'#6a1fc2', c3:'#12032b', glow:'170,80,255' };
+
+/* ---------- Persistent per-viewer convenience ---------- */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('gw.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('gw.' + k, JSON.stringify(v)); } catch {} },
+};
+
+/* ---------- Lobby ---------- */
+let pickPlanet = store.get('planet', 'earth');
+let pickCons = store.get('cons', ['sgr', 'leo', 'vir']);
+if (!PLANETS.some(p => p.id === pickPlanet)) pickPlanet = 'earth';
+pickCons = pickCons.filter(id => ALL_CONS.some(c => c.id === id));
+
+function renderLobby() {
+  const pl = PLANETS.find(p => p.id === pickPlanet);
+  if (pickCons.length > pl.slots) pickCons = pickCons.slice(0, pl.slots);
+  $('planetList').innerHTML = PLANETS.map(p => `
+    <button class="pcard" type="button" data-p="${p.id}" aria-pressed="${p.id === pickPlanet}">
+      <span class="orb ${p.id}"></span><span class="pn">${p.name}</span>
+      <span class="pd">${p.desc.replace('\n', '<br>')}</span>
+    </button>`).join('');
+  $('conList').innerHTML = ALL_CONS.map(c => `
+    <button class="ccard${c.special ? ' special' : ''}" type="button" data-c="${c.id}" aria-pressed="${pickCons.includes(c.id)}">
+      <span class="cn">${c.name}</span><span class="ce">${c.en}</span><span class="cst">${c.stat}</span>
+    </button>`).join('');
+  $('slotCount').textContent = `${pickCons.length} / ${pl.slots}`;
+  $('startBtn').disabled = pickCons.length === 0;
+  const best = store.get('best', 0);
+  $('bestTxt').textContent = best ? `최고 기록 WAVE ${best}` : '';
+}
+$('planetList').addEventListener('click', e => {
+  const b = e.target.closest('[data-p]'); if (!b) return;
+  pickPlanet = b.dataset.p; store.set('planet', pickPlanet); renderLobby();
+});
+$('conList').addEventListener('click', e => {
+  const b = e.target.closest('[data-c]'); if (!b) return;
+  const id = b.dataset.c, pl = PLANETS.find(p => p.id === pickPlanet);
+  if (pickCons.includes(id)) pickCons = pickCons.filter(x => x !== id);
+  else if (pickCons.length < pl.slots) pickCons.push(id);
+  else { pickCons.shift(); pickCons.push(id); }
+  store.set('cons', pickCons); renderLobby();
+});
+
+/* ---------- Canvas ---------- */
+const cv = $('cv'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1, stars = [];
+function makeStars() {
+  const n = Math.round(W * H / 2600);
+  return Array.from({ length: n }, () => ({ x: Math.random() * W, y: Math.random() * H, r: Math.random() < .12 ? rnd(1, 1.7) : rnd(.3, .9), tw: rnd(0, TAU), sp: rnd(.6, 2) }));
+}
+function resize() {
+  const r = cv.getBoundingClientRect();
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = r.width; H = r.height;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  stars = makeStars();
+  if (G.me) layout();
+}
+addEventListener('resize', resize);
+
+/* ---------- Game state ---------- */
+const G = {
+  state: 'lobby', wave: 1, timer: 40, energy: 2, maxEnergy: 10, focus: null, me: null, foe: null,
+  proj: [], beams: [], fx: [], texts: [], shield: 0, nova: 0, enraged: false, stunCd: 6, paused: false, clearT: 0, time: 0,
+};
+const SHIELD_T = 6, NOVA_T = 6;
+
+function makeCon(def, side, mult) {
+  const hp = Math.round(def.hp * mult.hp);
+  return { def, side, hp, maxHp: hp, atkBase: def.atk * mult.atk, rate: def.rate, dArmor: def.def, mArmor: def.mdef,
+    lv: 1, cd: rnd(.2, 1.2), dead: false, stun: 0, dot: null, x: 0, y: 0, s: 1, flash: 0, alpha: 1 };
+}
+function makeSystem(side, planet, cons) {
+  return { side, planet, cons, phase: rnd(0, TAU), speed: TAU / (side === 'me' ? 7 : 8.5), orbits: 0, cx: 0, cy: 0, R: 0, ry: 0, pr: 0 };
+}
+function layout() {
+  const top = 104, bot = 196, band = Math.max(200, H - top - bot);
+  const R = Math.min(W * .38, band * .4);
+  for (const [sys, f] of [[G.foe, .25], [G.me, .74]]) {
+    if (!sys) continue;
+    sys.cx = W / 2; sys.cy = top + band * f; sys.R = R; sys.ry = R * .42;
+    sys.pr = R * (sys.planet.boss ? .3 : .24);
+  }
+}
+
+function startRun() {
+  const pl = PLANETS.find(p => p.id === pickPlanet);
+  const cons = pickCons.map(id => makeCon(ALL_CONS.find(c => c.id === id), 'me', { hp: 1, atk: 1 }));
+  G.me = makeSystem('me', { isPlanet: true, kind: pl.id, name: pl.name, hp: pl.hp, maxHp: pl.hp, dArmor: 20, mArmor: 20, regen: pl.regen, rateMul: pl.rateMul, flash: 0, dot: null, side: 'me' }, cons);
+  G.wave = 1; G.energy = 2; G.shield = 0; G.nova = 0; G.proj = []; G.beams = []; G.fx = []; G.texts = [];
+  $('myName').textContent = pl.name;
+  $('lobby').hidden = true; $('resultScr').hidden = true; $('hudTop').hidden = false; $('hudBot').hidden = false;
+  G.paused = false; $('pauseBtn').textContent = '일시정지';
+  startWave();
+}
+function startWave() {
+  const n = G.wave, boss = n % 5 === 0, m = Math.pow(1.16, n - 1);
+  const look = boss ? BOSS : FOES[(n - 1) % FOES.length];
+  const count = boss ? 3 : Math.min(1 + Math.ceil(n / 2), 5);
+  const pool = [...ZODIAC].sort(() => Math.random() - .5).slice(0, count);
+  const pHp = Math.round(900 * Math.pow(1.22, n - 1) * (boss ? 2.2 : 1));
+  G.foe = makeSystem('foe', { isPlanet: true, kind: 'rock', boss, look, name: look.name, hp: pHp, maxHp: pHp, dArmor: 15 + n * 2, mArmor: 15 + n * 2, flash: 0, dot: null, side: 'foe' },
+    pool.map(d => makeCon(d, 'foe', { hp: .9 * m, atk: .8 * m })));
+  // my constellations revive each wave; planet keeps damage but recovers 15%
+  for (const c of G.me.cons) { c.dead = false; c.hp = c.maxHp; c.alpha = 1; c.stun = 0; c.dot = null; }
+  const P = G.me.planet; if (n > 1) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * .15);
+  G.timer = 40; G.enraged = false; G.stunCd = 5; G.focus = null; G.proj = []; G.beams = [];
+  G.state = 'fight';
+  $('foeName').textContent = (boss ? 'BOSS · ' : '') + look.name;
+  $('waveNo').textContent = n;
+  layout();
+  banner(boss ? `BOSS WAVE ${n}` : `WAVE ${n}`, 1.4);
+}
+
+/* ---------- Helpers ---------- */
+let bannerT = 0;
+function banner(txt, t) { $('banner').textContent = txt; $('banner').classList.add('show'); bannerT = t; }
+function sysOf(side) { return side === 'me' ? G.me : G.foe; }
+function other(side) { return side === 'me' ? G.foe : G.me; }
+function posOf(t) { if (t.isPlanet) { const s = sysOf(t.side); return [s.cx, s.cy]; } return [t.x, t.y]; }
+function alive(t) { return t && (t.isPlanet ? t.hp > 0 : !t.dead); }
+function conAtk(c) { return c.atkBase * (1 + .3 * (c.lv - 1)); }
+
+function pickTarget(c) {
+  const enemy = other(c.side);
+  if (c.def.special) return enemy.planet;
+  if (c.side === 'me' && G.focus && !G.focus.isPlanet && alive(G.focus)) return G.focus;
+  const live = enemy.cons.filter(x => !x.dead);
+  if (!live.length) return enemy.planet;
+  let best = null, bd = 1e9;
+  for (const t of live) { const d = Math.hypot(t.x - c.x, t.y - c.y); if (d < bd) { bd = d; best = t; } }
+  return best;
+}
+
+function dealDamage(t, dmg, kind, color) {
+  if (!alive(t)) return;
+  const armor = kind === 'magic' ? t.mArmor : t.dArmor;
+  let d = dmg * 100 / (100 + armor);
+  if (t.side === 'me' && G.shield > 0) d *= .3;
+  if (t.side === 'me' && G.enraged) d *= 1.5;
+  t.hp -= d; t.flash = .12;
+  const [x, y] = posOf(t);
+  G.texts.push({ x: x + rnd(-10, 10), y: y - 14, v: Math.max(1, Math.round(d)), c: color || (t.side === 'me' ? '#ff8a9a' : '#fff4cf'), t: .8 });
+  if (t.hp <= 0) {
+    t.hp = 0;
+    if (t.isPlanet) { burst(x, y, 60, t.side === 'me' ? '#8cf2c6' : '#ffb27a'); onPlanetDown(t.side); }
+    else { t.dead = true; burst(x, y, 26, '#f5c451'); if (G.focus === t) G.focus = null; }
+  }
+}
+function heal(t, v) {
+  if (!alive(t)) return;
+  const before = t.hp; t.hp = Math.min(t.maxHp, t.hp + v);
+  const got = Math.round(t.hp - before);
+  if (got > 0) { const [x, y] = posOf(t); G.texts.push({ x, y: y - 16, v: '+' + got, c: '#8cf2c6', t: .8 }); }
+}
+function burst(x, y, n, c) {
+  for (let i = 0; i < n; i++) { const a = rnd(0, TAU), v = rnd(30, 170); G.fx.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v * .6, t: rnd(.4, .9), c }); }
+}
+function onPlanetDown(side) {
+  if (side === 'foe') {
+    G.state = 'clear'; G.clearT = 1.6; G.proj = [];
+    banner('CLEAR', 1.2);
+  } else {
+    G.state = 'over'; G.proj = [];
+    const best = Math.max(store.get('best', 0), G.wave); store.set('best', best);
+    setTimeout(() => {
+      $('resWave').textContent = `WAVE ${G.wave}`;
+      $('resTxt').textContent = `${G.me.planet.name} 행성계가 ${G.wave}웨이브에서 무너졌어요. 최고 기록은 WAVE ${best}예요.`;
+      $('hudTop').hidden = true; $('hudBot').hidden = true; $('resultScr').hidden = false;
+    }, 1100);
+  }
+}
+
+/* ---------- Firing ---------- */
+function fire(c) {
+  const sys = sysOf(c.side), t = pickTarget(c);
+  if (!alive(t)) return;
+  const atk = conAtk(c) * (c.side === 'me' && G.nova > 0 ? 1 : 1);
+  const mine = c.side === 'me';
+  const col = c.def.special ? '#d58bff' : mine ? '#ffd76a' : '#ff7b8a';
+  const [tx, ty] = posOf(t);
+  switch (c.def.style) {
+    case 'arrow': G.proj.push({ x: c.x, y: c.y, t, sp: 520, dmg: atk, kind: 'phys', col, w: 1.6, len: 12 }); break;
+    case 'shot':  G.proj.push({ x: c.x, y: c.y, t, sp: 360, dmg: atk, kind: c.def.kind, col, w: 3, len: 6 }); break;
+    case 'orb':   G.proj.push({ x: c.x, y: c.y, t, sp: 240, dmg: atk, kind: 'magic', col: mine ? '#9fb8ff' : '#ff8ad0', w: 4.5, len: 0, orb: true }); break;
+    case 'twin':
+      G.proj.push({ x: c.x - 4, y: c.y, t, sp: 380, dmg: atk, kind: 'phys', col, w: 2.4, len: 8 });
+      G.proj.push({ x: c.x + 4, y: c.y, t, sp: 300, dmg: atk, kind: 'magic', col: '#9fb8ff', w: 3.5, len: 0, orb: true }); break;
+    case 'beam':
+      G.beams.push({ x1: c.x, y1: c.y, x2: tx, y2: ty, t: .18, c: col, w: c.def.special ? 3 : 2.4 });
+      dealDamage(t, atk, c.def.kind, c.def.special ? '#e7b6ff' : null); break;
+    case 'poison':
+      G.proj.push({ x: c.x, y: c.y, t, sp: 300, dmg: atk * .6, kind: 'phys', col: '#9dff6a', w: 3, len: 5, poison: atk * .5 }); break;
+    case 'heal': {
+      const P = sys.planet;
+      G.beams.push({ x1: c.x, y1: c.y, x2: sys.cx, y2: sys.cy, t: .25, c: '#8cf2c6', w: 2 });
+      heal(P, atk * 4);
+      const hurt = sys.cons.filter(x => !x.dead && x.hp < x.maxHp).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0];
+      if (hurt) heal(hurt, atk * 2.5);
+      G.proj.push({ x: c.x, y: c.y, t, sp: 300, dmg: atk * .5, kind: 'magic', col: '#8cf2c6', w: 3, len: 0, orb: true });
+      break;
+    }
+  }
+}
+
+/* ---------- Skills ---------- */
+function useSkill(kind) {
+  if (G.state !== 'fight' || G.paused) return;
+  const cost = { meteor: 3, shield: 2, nova: 4 }[kind];
+  if (G.energy < cost) return;
+  G.energy -= cost;
+  if (kind === 'meteor') {
+    let t = G.focus && alive(G.focus) ? G.focus : null;
+    if (!t) { const live = G.foe.cons.filter(c => !c.dead); t = live.length ? live[0] : G.foe.planet; }
+    const [tx, ty] = posOf(t);
+    for (let i = 0; i < 5; i++) {
+      G.proj.push({ x: tx + rnd(-60, 60) - 90, y: -20 - i * 40, t, sp: 700, dmg: 40 + t.maxHp * .07, kind: 'magic', col: '#ffe9a8', w: 4, len: 26, meteor: true, pierce: true });
+    }
+    banner('유성우', .7);
+  } else if (kind === 'shield') { G.shield = SHIELD_T; banner('성운 방패', .7); }
+  else { G.nova = NOVA_T; banner('초신성 가속', .7); }
+}
+$('skMeteor').addEventListener('click', () => useSkill('meteor'));
+$('skShield').addEventListener('click', () => useSkill('shield'));
+$('skNova').addEventListener('click', () => useSkill('nova'));
+
+/* ---------- Tap targeting / level up ---------- */
+cv.addEventListener('pointerdown', e => {
+  if (G.state !== 'fight' || G.paused) return;
+  const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  const hitCon = (sys) => sys.cons.find(c => !c.dead && Math.hypot(c.x - x, c.y - y) < conSize(sys) * c.s * 1.25);
+  const mine = hitCon(G.me);
+  if (mine) {
+    if (mine.lv >= 5) { G.texts.push({ x: mine.x, y: mine.y - 24, v: 'MAX', c: '#f5c451', t: .8 }); return; }
+    if (G.energy < 1) { G.texts.push({ x: mine.x, y: mine.y - 24, v: '기력 부족', c: '#8d96c4', t: .8 }); return; }
+    G.energy -= 1; mine.lv += 1; mine.maxHp = Math.round(mine.def.hp * (1 + .15 * (mine.lv - 1))); mine.hp = Math.min(mine.maxHp, mine.hp + mine.def.hp * .3);
+    G.texts.push({ x: mine.x, y: mine.y - 24, v: 'Lv ' + mine.lv, c: '#f5c451', t: 1 }); burst(mine.x, mine.y, 14, '#f5c451');
+    return;
+  }
+  const foe = hitCon(G.foe);
+  if (foe) { G.focus = foe; return; }
+  if (Math.hypot(G.foe.cx - x, G.foe.cy - y) < G.foe.pr * 1.4) {
+    G.focus = G.foe.planet;
+    if (G.foe.cons.some(c => !c.dead)) G.texts.push({ x: G.foe.cx, y: G.foe.cy - G.foe.pr - 10, v: '별자리를 먼저 부숴야 해요', c: '#8d96c4', t: 1.2 });
+  }
+});
+
+/* ---------- Update ---------- */
+function conSize(sys) { return sys.R * .25; }
+function updateSystem(sys, dt) {
+  const n = sys.cons.length, dir = sys.side === 'me' ? 1 : -1;
+  sys.phase += sys.speed * dt;
+  if (sys.side === 'me') {
+    const o = Math.floor(sys.phase / TAU);
+    if (o > sys.orbits) { sys.orbits = o; if (G.state === 'fight') { G.energy = Math.min(G.maxEnergy, G.energy + 1); } }
+  }
+  sys.cons.forEach((c, i) => {
+    const a = dir * sys.phase + i * TAU / n;
+    c.x = sys.cx + sys.R * Math.cos(a); c.y = sys.cy + sys.ry * Math.sin(a);
+    c.s = .8 + .2 * Math.sin(a); c.depth = Math.sin(a);
+    if (c.flash > 0) c.flash -= dt;
+    if (c.dead) { c.alpha = Math.max(0, c.alpha - dt * 2); return; }
+    if (c.dot) { c.dot.t -= dt; c.hp -= c.dot.dps * dt; if (c.hp <= 0) { c.hp = 0; c.dead = true; burst(c.x, c.y, 20, '#9dff6a'); if (G.focus === c) G.focus = null; } if (c.dot && c.dot.t <= 0) c.dot = null; }
+    if (c.stun > 0) { c.stun -= dt; return; }
+    if (G.state !== 'fight') return;
+    let rate = c.rate * (sys.side === 'me' ? sys.planet.rateMul : 1);
+    if (sys.side === 'me' && G.nova > 0) rate *= 2;
+    c.cd -= dt * rate;
+    if (c.cd <= 0) { c.cd += 1; fire(c); }
+  });
+  const P = sys.planet;
+  if (P.flash > 0) P.flash -= dt;
+  if (P.regen && G.state === 'fight') heal2(P, P.regen * dt);
+  if (P.dot && G.state === 'fight') { P.dot.t -= dt; dealSilent(P, P.dot.dps * dt); if (P.dot && P.dot.t <= 0) P.dot = null; }
+}
+function heal2(P, v) { P.hp = Math.min(P.maxHp, P.hp + v); }
+function dealSilent(t, v) { if (!alive(t)) return; t.hp -= v; if (t.hp <= 0) { t.hp = 0; const [x, y] = posOf(t); burst(x, y, 60, '#ffb27a'); onPlanetDown(t.side); } }
+
+function update(dt) {
+  G.time += dt;
+  if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) $('banner').classList.remove('show'); }
+  if (!G.me) return;
+  updateSystem(G.me, dt); updateSystem(G.foe, dt);
+
+  if (G.state === 'fight') {
+    G.timer -= dt;
+    if (G.timer <= 0 && !G.enraged) { G.enraged = true; banner('적 폭주 · 공격력 +50%', 1.2); }
+    if (G.shield > 0) G.shield -= dt;
+    if (G.nova > 0) G.nova -= dt;
+    if (G.foe.planet.boss) {
+      G.stunCd -= dt;
+      if (G.stunCd <= 0) {
+        G.stunCd = 6;
+        const live = G.me.cons.filter(c => !c.dead);
+        if (live.length) {
+          const c = live[Math.floor(Math.random() * live.length)];
+          const hasSco = G.me.cons.some(x => x.def.id === 'sco' && !x.dead);
+          c.stun = hasSco ? 1.3 : 2.6;
+          G.beams.push({ x1: G.foe.cx, y1: G.foe.cy, x2: c.x, y2: c.y, t: .4, c: '#c35bff', w: 3, zig: true });
+          G.texts.push({ x: c.x, y: c.y - 24, v: '기절', c: '#d58bff', t: 1 });
+        }
+      }
+    }
+  } else if (G.state === 'clear') {
+    G.clearT -= dt;
+    if (G.clearT <= 0) { G.wave += 1; startWave(); }
+  }
+
+  for (let i = G.proj.length - 1; i >= 0; i--) {
+    const p = G.proj[i];
+    if (!alive(p.t)) { G.proj.splice(i, 1); continue; }
+    const [tx, ty] = posOf(p.t);
+    const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
+    const step = p.sp * dt;
+    if (d <= step + 6) {
+      dealDamage(p.t, p.dmg, p.kind, p.meteor ? '#ffe9a8' : null);
+      if (p.poison && alive(p.t)) p.t.dot = { dps: p.poison, t: 4 };
+      if (p.meteor) burst(tx, ty, 10, '#ffe9a8');
+      G.proj.splice(i, 1); continue;
+    }
+    p.vx = dx / d; p.vy = dy / d; p.x += p.vx * step; p.y += p.vy * step;
+  }
+  for (let i = G.beams.length - 1; i >= 0; i--) { G.beams[i].t -= dt; if (G.beams[i].t <= 0) G.beams.splice(i, 1); }
+  for (let i = G.fx.length - 1; i >= 0; i--) { const f = G.fx[i]; f.t -= dt; f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= .96; f.vy *= .96; if (f.t <= 0) G.fx.splice(i, 1); }
+  for (let i = G.texts.length - 1; i >= 0; i--) { const t = G.texts[i]; t.t -= dt; t.y -= 26 * dt; if (t.t <= 0) G.texts.splice(i, 1); }
+}
+
+/* ---------- Draw ---------- */
+function drawBg(t) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#0a0f2a'); g.addColorStop(.5, '#070b1f'); g.addColorStop(1, '#0b1030');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const neb = ctx.createRadialGradient(W * .8, H * .15, 0, W * .8, H * .15, W * .8);
+  neb.addColorStop(0, 'rgba(110,60,190,.18)'); neb.addColorStop(1, 'rgba(110,60,190,0)');
+  ctx.fillStyle = neb; ctx.fillRect(0, 0, W, H);
+  const neb2 = ctx.createRadialGradient(W * .1, H * .8, 0, W * .1, H * .8, W * .7);
+  neb2.addColorStop(0, 'rgba(40,110,200,.14)'); neb2.addColorStop(1, 'rgba(40,110,200,0)');
+  ctx.fillStyle = neb2; ctx.fillRect(0, 0, W, H);
+  for (const s of stars) {
+    const a = .45 + .55 * Math.sin(t * s.sp + s.tw) ** 2;
+    ctx.globalAlpha = a; ctx.fillStyle = '#dfe6ff';
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawPlanet(sys, t) {
+  const P = sys.planet, x = sys.cx, y = sys.cy, r = sys.pr;
+  let c1, c2, c3, glow;
+  if (P.kind === 'earth') { c1 = '#bfe0ff'; c2 = '#2f6be8'; c3 = '#081a4d'; glow = '80,150,255'; }
+  else if (P.kind === 'sun') { c1 = '#fff8d0'; c2 = '#ffae2e'; c3 = '#d8461a'; glow = '255,160,40'; }
+  else if (P.kind === 'moon') { c1 = '#f6f6fa'; c2 = '#a6a9bb'; c3 = '#3e4156'; glow = '200,205,235'; }
+  else ({ c1, c2, c3, glow } = P.look);
+  // halo
+  const hr = r * (P.kind === 'sun' ? 2.8 + .15 * Math.sin(t * 2) : 2.1);
+  const hg = ctx.createRadialGradient(x, y, r * .6, x, y, hr);
+  hg.addColorStop(0, `rgba(${glow},${P.kind === 'sun' ? .55 : .32})`); hg.addColorStop(1, `rgba(${glow},0)`);
+  ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(x, y, hr, 0, TAU); ctx.fill();
+  // boss ring (back half)
+  if (P.boss) drawRing(x, y, r, t, true);
+  // body
+  const bg = ctx.createRadialGradient(x - r * .35, y - r * .4, r * .1, x, y, r);
+  bg.addColorStop(0, c1); bg.addColorStop(.55, c2); bg.addColorStop(1, c3);
+  ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+  ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.clip();
+  if (P.kind === 'earth') {
+    ctx.fillStyle = 'rgba(70,170,90,.75)';
+    const o = (t * 8) % (r * 4);
+    for (const [bx, by, br] of [[-.3, -.1, .35], [.35, .25, .28], [.1, -.5, .2], [-.5, .45, .22]]) {
+      const px = x + ((bx * r + o) % (r * 2.4)) - r * .2;
+      ctx.beginPath(); ctx.ellipse(px, y + by * r, br * r * 1.3, br * r, .4, 0, TAU); ctx.fill();
+    }
+  } else if (P.kind === 'moon') {
+    ctx.fillStyle = 'rgba(60,62,80,.35)';
+    for (const [bx, by, br] of [[-.3, -.2, .18], [.25, .15, .22], [-.05, .5, .12], [.4, -.4, .1]]) { ctx.beginPath(); ctx.arc(x + bx * r, y + by * r, br * r, 0, TAU); ctx.fill(); }
+  } else if (P.kind === 'sun') {
+    ctx.fillStyle = 'rgba(255,240,180,.25)';
+    for (let i = 0; i < 6; i++) { const a = t * .4 + i; ctx.beginPath(); ctx.arc(x + Math.cos(a) * r * .5, y + Math.sin(a * 1.3) * r * .4, r * .18, 0, TAU); ctx.fill(); }
+  } else {
+    ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = r * .08;
+    for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.ellipse(x, y + i * r * .32, r, r * .1, 0, 0, TAU); ctx.stroke(); }
+  }
+  // terminator shadow for the 2.5D read
+  if (P.kind !== 'sun') {
+    const sh = ctx.createLinearGradient(x - r * .6, y - r * .6, x + r, y + r);
+    sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(.55, 'rgba(0,0,10,.05)'); sh.addColorStop(1, 'rgba(0,0,15,.6)');
+    ctx.fillStyle = sh; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  if (P.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${P.flash * 3})`; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
+  ctx.restore();
+  if (P.boss) drawRing(x, y, r, t, false);
+  if (sys.side === 'me' && G.shield > 0) {
+    ctx.strokeStyle = `rgba(91,140,255,${.35 + .25 * Math.sin(t * 8)})`; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, r * 1.45, 0, TAU); ctx.stroke();
+  }
+  if (P.dot) { ctx.strokeStyle = 'rgba(157,255,106,.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r * 1.15, 0, TAU); ctx.stroke(); }
+}
+function drawRing(x, y, r, t, back) {
+  ctx.save(); ctx.strokeStyle = 'rgba(210,160,255,.55)'; ctx.lineWidth = r * .12;
+  ctx.beginPath(); ctx.ellipse(x, y, r * 1.8, r * .45, -.25, back ? Math.PI : 0, back ? TAU : Math.PI); ctx.stroke(); ctx.restore();
+}
+function drawMoonSat(sys, t, front) {
+  if (sys.planet.kind !== 'earth') return;
+  const a = t * .9, sx = sys.cx + Math.cos(a) * sys.pr * 1.75, sy = sys.cy + Math.sin(a) * sys.pr * .55;
+  if ((Math.sin(a) > 0) !== front) return;
+  const r = sys.pr * .22, g = ctx.createRadialGradient(sx - r * .3, sy - r * .3, 0, sx, sy, r);
+  g.addColorStop(0, '#f4f4f8'); g.addColorStop(1, '#5a5d70');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, r, 0, TAU); ctx.fill();
+}
+
+function drawCon(sys, c, t) {
+  if (c.alpha <= 0) return;
+  const k = conSize(sys) * c.s, pts = c.def.sh.pts.map(([px, py]) => [c.x + px * k, c.y + py * k * .85]);
+  const mine = c.side === 'me';
+  const lineC = c.def.special ? '213,139,255' : mine ? '245,196,81' : '255,123,138';
+  ctx.globalAlpha = c.alpha * (c.stun > 0 ? .55 : 1);
+  ctx.lineCap = 'round';
+  for (const [w, a] of [[5 * c.s, .18], [1.5 * c.s, .95]]) {
+    ctx.strokeStyle = `rgba(${lineC},${a})`; ctx.lineWidth = w;
+    ctx.beginPath();
+    for (const [i, j] of c.def.sh.edges) { ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[j][0], pts[j][1]); }
+    ctx.stroke();
+  }
+  ctx.fillStyle = c.flash > 0 ? '#ffffff' : '#fff1c2';
+  for (const [px, py] of pts) { ctx.beginPath(); ctx.arc(px, py, 2.1 * c.s, 0, TAU); ctx.fill(); }
+  const [kx, ky] = pts[c.def.sh.key];
+  ctx.strokeStyle = c.def.special ? '#c35bff' : mine ? '#ff5a6e' : '#ff9a5a'; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.arc(kx, ky, 6 * c.s, 0, TAU); ctx.stroke();
+  if (c.stun > 0) { ctx.strokeStyle = 'rgba(195,91,255,.8)'; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.arc(c.x, c.y, k * 1.15, t * 3, t * 3 + TAU); ctx.stroke(); ctx.setLineDash([]); }
+  if (c.dot) { ctx.fillStyle = 'rgba(157,255,106,.9)'; ctx.beginPath(); ctx.arc(c.x + k, c.y - k * .6, 2.5, 0, TAU); ctx.fill(); }
+  // hp bar + level
+  const bw = k * 1.7, bx = c.x - bw / 2, by = c.y + k * .95;
+  ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(bx, by, bw, 3);
+  ctx.fillStyle = mine ? '#52e3a4' : '#ff5a6e'; ctx.fillRect(bx, by, bw * clamp(c.hp / c.maxHp, 0, 1), 3);
+  if (mine && c.lv > 1) {
+    ctx.font = `700 ${Math.round(10 * c.s + 1)}px "Chakra Petch", sans-serif`; ctx.fillStyle = '#f5c451'; ctx.textAlign = 'left';
+    ctx.fillText('Lv' + c.lv, bx + bw + 3, by + 4);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawSystem(sys, t) {
+  ctx.save(); ctx.strokeStyle = sys.side === 'me' ? 'rgba(245,196,81,.22)' : 'rgba(255,123,138,.2)';
+  ctx.lineWidth = 1; ctx.setLineDash([2, 6]);
+  ctx.beginPath(); ctx.ellipse(sys.cx, sys.cy, sys.R, sys.ry, 0, 0, TAU); ctx.stroke(); ctx.restore();
+  const back = sys.cons.filter(c => c.depth < 0).sort((a, b) => a.y - b.y);
+  const front = sys.cons.filter(c => c.depth >= 0).sort((a, b) => a.y - b.y);
+  back.forEach(c => drawCon(sys, c, t));
+  drawMoonSat(sys, t, false);
+  drawPlanet(sys, t);
+  drawMoonSat(sys, t, true);
+  front.forEach(c => drawCon(sys, c, t));
+}
+function drawReticle(t) {
+  if (!G.focus || !alive(G.focus) || G.state !== 'fight') return;
+  const [x, y] = posOf(G.focus);
+  const r = (G.focus.isPlanet ? G.foe.pr * 1.3 : conSize(G.foe) * G.focus.s * 1.3) + 2 * Math.sin(t * 6);
+  ctx.strokeStyle = '#f5c451'; ctx.lineWidth = 1.8;
+  for (let i = 0; i < 4; i++) { const a = i * TAU / 4 + t; ctx.beginPath(); ctx.arc(x, y, r, a, a + .7); ctx.stroke(); }
+}
+function draw(t) {
+  drawBg(t);
+  if (!G.me) return;
+  drawSystem(G.foe, t); drawSystem(G.me, t);
+  drawReticle(t);
+  for (const b of G.beams) {
+    ctx.globalAlpha = clamp(b.t * 6, 0, 1); ctx.strokeStyle = b.c; ctx.lineWidth = b.w;
+    ctx.beginPath(); ctx.moveTo(b.x1, b.y1);
+    if (b.zig) { for (let i = 1; i < 8; i++) { const f = i / 8; ctx.lineTo(b.x1 + (b.x2 - b.x1) * f + rnd(-8, 8), b.y1 + (b.y2 - b.y1) * f + rnd(-8, 8)); } }
+    ctx.lineTo(b.x2, b.y2); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  for (const p of G.proj) {
+    ctx.strokeStyle = p.col; ctx.fillStyle = p.col; ctx.lineWidth = p.w; ctx.lineCap = 'round';
+    if (p.orb) { ctx.beginPath(); ctx.arc(p.x, p.y, p.w, 0, TAU); ctx.fill(); ctx.globalAlpha = .3; ctx.beginPath(); ctx.arc(p.x, p.y, p.w * 2.2, 0, TAU); ctx.fill(); ctx.globalAlpha = 1; }
+    else { const vx = p.vx || 0, vy = p.vy || 1; ctx.beginPath(); ctx.moveTo(p.x - vx * p.len, p.y - vy * p.len); ctx.lineTo(p.x, p.y); ctx.stroke(); }
+  }
+  for (const f of G.fx) { ctx.globalAlpha = clamp(f.t * 1.6, 0, 1); ctx.fillStyle = f.c; ctx.fillRect(f.x - 1.2, f.y - 1.2, 2.4, 2.4); }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center';
+  for (const tx of G.texts) {
+    ctx.globalAlpha = clamp(tx.t * 2, 0, 1); ctx.fillStyle = tx.c;
+    ctx.font = typeof tx.v === 'number' ? '700 13px "Chakra Petch", sans-serif' : '700 12px "Noto Sans KR", sans-serif';
+    ctx.fillText(tx.v, tx.x, tx.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ---------- HUD ---------- */
+const pipEls = [];
+for (let i = 0; i < 10; i++) { const s = document.createElement('span'); $('pips').appendChild(s); pipEls.push(s); }
+function hud() {
+  if (!G.me || $('hudTop').hidden) return;
+  const fp = G.foe.planet, mp = G.me.planet;
+  $('foeHp').style.transform = `scaleX(${clamp(fp.hp / fp.maxHp, 0, 1)})`;
+  $('myHp').style.transform = `scaleX(${clamp(mp.hp / mp.maxHp, 0, 1)})`;
+  $('foeHpTxt').textContent = `${Math.ceil(fp.hp).toLocaleString()} / ${fp.maxHp.toLocaleString()}`;
+  $('myHpTxt').textContent = `${Math.ceil(mp.hp).toLocaleString()} / ${mp.maxHp.toLocaleString()}`;
+  const tm = $('timer');
+  tm.textContent = G.enraged ? '폭주' : Math.max(0, G.timer).toFixed(1);
+  tm.classList.toggle('rage', G.enraged);
+  pipEls.forEach((p, i) => p.classList.toggle('on', i < G.energy));
+  for (const [id, cost] of [['skMeteor', 3], ['skShield', 2], ['skNova', 4]]) {
+    const b = $(id), ok = G.energy >= cost && G.state === 'fight';
+    b.disabled = !ok; b.classList.toggle('ready', ok);
+  }
+  $('durShield').style.width = `${clamp(G.shield / SHIELD_T, 0, 1) * 100}%`;
+  $('durNova').style.width = `${clamp(G.nova / NOVA_T, 0, 1) * 100}%`;
+}
+
+/* ---------- Loop ---------- */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (!G.paused) update(dt);
+  draw(now / 1000);
+  hud();
+  requestAnimationFrame(frame);
+}
+$('pauseBtn').addEventListener('click', () => { G.paused = !G.paused; $('pauseBtn').textContent = G.paused ? '계속' : '일시정지'; });
+document.addEventListener('visibilitychange', () => { if (document.hidden && G.state === 'fight') { G.paused = true; $('pauseBtn').textContent = '계속'; } });
+$('startBtn').addEventListener('click', startRun);
+$('retryBtn').addEventListener('click', startRun);
+$('lobbyBtn').addEventListener('click', () => { $('resultScr').hidden = true; $('lobby').hidden = false; G.me = null; G.state = 'lobby'; renderLobby(); });
+
+renderLobby();
+resize();
+requestAnimationFrame(frame);
+})();
+</script>
