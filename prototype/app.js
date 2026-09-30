@@ -594,6 +594,7 @@ function renderStars() {
   }).join('');
   $('pane-stars').innerHTML = `
     <div class="strip">${strip}</div>
+    ${skinSection(starSel, o)}
     <section class="star-stage">
       <svg class="graph" style="--ln:rgb(${eq.pal.line})" viewBox="${-sw / 2} -125 ${sw} 250" role="img" aria-label="${d.name}자리 별 슬롯">
         <g class="ln">${d.sh.edges.map(([a, c]) => `<line x1="${P[a][0]}" y1="${P[a][1]}" x2="${P[c][0]}" y2="${P[c][1]}"/>`).join('')}</g>
@@ -601,6 +602,9 @@ function renderStars() {
       </svg>
       <div class="sname"><b>${eq.id === starSel ? d.name + '자리' : eq.name}</b> ${o ? gradeChip(o.g) : '<span class="gchip" style="--g:#59608a">미보유</span>'}</div>
     </section>
+    <section class="slot-panel" id="slotPanel">${o ? slotPanel(d, o) : `
+      <p class="mtxt">아직 없는 별자리예요. 상점 뽑기나 로비 상자에서 얻을 수 있어요.</p>
+      <button class="cta sm" data-sact="store" type="button">상점으로</button>`}</section>
     <div class="statbar">
       <span title="공격력">⚔ ${(d.atk * b.atk).toFixed(1)}</span>
       <span title="HP">♥ ${fmt(d.hp * b.hp)}</span>
@@ -608,10 +612,7 @@ function renderStars() {
       <span class="pw">전투력 ${fmt(conPower(starSel))}</span>
     </div>
     <div class="legend"><i style="--c:${SLOT.act.col}"></i>액티브 · 공격력 <i style="--c:${SLOT.pas.col}"></i>패시브 · HP <i style="--c:${SLOT.lim.col}"></i>한정 · 공격속도</div>
-    ${skinSection(starSel, o)}
-    <section class="slot-panel" id="slotPanel">${o ? slotPanel(d, o) : `
-      <p class="mtxt">아직 없는 별자리예요. 상점 뽑기나 로비 상자에서 얻을 수 있어요.</p>
-      <button class="cta sm" data-sact="store" type="button">상점으로</button>`}</section>`;
+    <div class="detail">${perkList(eq)}</div>`;
 }
 function skinSection(id, o) {
   const list = SKINS[id], eq = equippedSkin(id);
@@ -623,7 +624,6 @@ function skinSection(id, o) {
         <b>${sk.name}</b><span class="mini">${SKIN_TIER[sk.tier].name} · ${skinStyle(sk)}</span>
         ${sk.id === eq && o ? '<em class="eq">장착</em>' : ownsSkin(id, sk.id) ? '<em class="own">보유</em>' : SKIN_TIER[sk.tier].src === 'chest' ? '<em>상자</em>' : `<em class="piece">${fmt(SKIN_TIER[sk.tier].price)}</em>`}
       </button>`).join('')}</div>
-    <div class="detail">${perkList(SKIN[eq])}</div>
   </section>`;
 }
 function perkList(sk) {
