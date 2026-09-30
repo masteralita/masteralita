@@ -745,15 +745,11 @@ function openSkinPopup(kind, id, k) {
 }
 
 /* ---------- 팀 (Team formation): planet → orbits → constellations ---------- */
-let teamTarget = null; // orbit the next tapped constellation goes to
 const statChips = o => [o.atk && `공격력 +${Math.round(o.atk * 100)}%`, o.rate && `공격속도 +${Math.round(o.rate * 100)}%`, o.hp && `HP +${Math.round(o.hp * 100)}%`].filter(Boolean).map(x => `<span class="schip">${x}</span>`).join('');
 const skinOrb = (pid, sk) => `<span class="orb" style="${orbStyle(pid)}">${PSKIN[sk] && PSKIN[sk].tint ? `<i style="background:rgba(${PSKIN[sk].tint},.6)"></i>` : ''}</span>`;
 function renderTeam() {
   normalizeForm();
   const pid = save.mainPlanet, pd = PLANET[pid], ps = save.planets[pid], n = pd.orbits, cap = teamCap(pid);
-  const owned = ALL_CONS.filter(c => save.cons[c.id]);
-  if (teamTarget != null && (teamTarget >= n || save.form[teamTarget].length >= ORBIT_CAP)) teamTarget = null;
-  const where = id => save.form.findIndex(a => a.includes(id));
   const chips = (list, cur, kind, k) => list.map(sk => {
     const own = (kind === 'p' ? save.pSkins : save.oSkins).includes(sk.id);
     return `<button class="chip" type="button" data-sk="${kind}" data-id="${sk.id}"${k != null ? ` data-k="${k}"` : ''} aria-pressed="${sk.id === cur}">
@@ -770,22 +766,16 @@ function renderTeam() {
       <div class="chips-row"><span class="lbl">행성 스킨</span><div class="chips">${chips(PLANET_SKINS, ps.skin, 'p')}</div></div>
     </section>
     ${Array.from({ length: n }, (_, k) => { const os = orbitStats(pid, k), a = save.form[k]; return `
-    <section class="orbit-card${teamTarget === k ? ' target' : ''}">
+    <section class="orbit-card">
       <div class="oc-head"><b>${n === 1 ? os.name : `궤도 ${k + 1} · ${os.name}`}</b><span class="schips">${statChips(os)}</span></div>
       <div class="oslots">
         ${Array.from({ length: ORBIT_CAP }, (_, j) => a[j] ? `
-          <button class="oslot" type="button" data-rm="${a[j]}" aria-label="${CON[a[j]].name}자리 빼기">${conSvg(a[j], 44)}<b>${SKIN[equippedSkin(a[j])].name}</b><span class="x">빼기</span></button>`
-          : `<button class="oslot empty" type="button" data-target="${k}" aria-pressed="${teamTarget === k}"><span>+</span><span class="mini">${teamTarget === k ? '아래에서 고르세요' : '빈 자리'}</span></button>`).join('')}
+          <button class="oslot" type="button" data-slot="${k}:${j}" aria-label="${CON[a[j]].name}자리 변경">${conSvg(a[j], 44)}<b>${SKIN[equippedSkin(a[j])].name}</b><span class="x">변경</span></button>`
+          : `<button class="oslot empty" type="button" data-slot="${k}:${j}"><span>+</span><span class="mini">빈 자리</span></button>`).join('')}
       </div>
       <div class="chips-row"><span class="lbl">궤도 스킨</span><div class="chips">${chips(ORBIT_SKINS, ps.orbitSkins[k] || 'dash', 'o', k)}</div></div>
     </section>`; }).join('')}
-    <p class="fine">별자리 <b>${save.team.length} / ${cap}</b> · 최소 ${TEAM_MIN}개 · 궤도마다 최대 ${ORBIT_CAP}개${n === 1 ? ' · 궤도가 1개인 행성은 궤도 능력치가 더 높아요' : ''}</p>
-    <div class="sec-h"><h2>보유 별자리</h2><span>${owned.length}개</span></div>
-    <div class="con-grid">
-      ${owned.map(c => { const w = where(c.id); return `
-        <button class="con-pick${c.special ? ' special' : ''}" type="button" data-cid="${c.id}" aria-pressed="${w >= 0}">
-          ${conSvg(c.id, 46)}<b>${c.name}</b>${w >= 0 ? `<em>궤도 ${n === 1 ? '' : w + 1}</em>` : ''}</button>`; }).join('')}
-    </div>`;
+    <p class="fine">별자리 <b>${save.team.length} / ${cap}</b> · 최소 ${TEAM_MIN}개 · 궤도마다 최대 ${ORBIT_CAP}개 · 칸을 눌러 별자리를 등록하거나 바꿔요${n === 1 ? ' · 궤도가 1개인 행성은 궤도 능력치가 더 높아요' : ''}</p>`;
 }
 $('pane-team').addEventListener('click', e => {
   const pid = save.mainPlanet, ps = save.planets[pid];
@@ -795,25 +785,48 @@ $('pane-team').addEventListener('click', e => {
     openSkinPopup(sk.dataset.sk, sk.dataset.id, sk.dataset.k != null ? +sk.dataset.k : null);
     return;
   }
-  const rm = e.target.closest('[data-rm]');
-  if (rm) {
-    if (save.team.length <= TEAM_MIN) { toast(`별자리는 최소 ${TEAM_MIN}개 편성해야 해요`); return; }
-    save.form = save.form.map(a => a.filter(x => x !== rm.dataset.rm)); persist(); renderTeam(); enterHomeSystemOnly(); return;
-  }
-  const tg = e.target.closest('[data-target]'); if (tg) { const k = +tg.dataset.target; teamTarget = teamTarget === k ? null : k; renderTeam(); return; }
-  const c = e.target.closest('[data-cid]'); if (!c) return;
-  const id = c.dataset.cid, n = PLANET[pid].orbits;
-  if (save.team.includes(id)) {
-    if (save.team.length <= TEAM_MIN) { toast(`별자리는 최소 ${TEAM_MIN}개 편성해야 해요`); return; }
-    save.form = save.form.map(a => a.filter(x => x !== id));
-  } else {
-    if (save.team.length >= teamCap(pid)) { toast(`별자리는 최대 ${teamCap(pid)}개까지 편성할 수 있어요`); return; }
-    const k = teamTarget != null ? teamTarget : [0, 1].slice(0, n).find(i => save.form[i].length < ORBIT_CAP);
-    if (k == null) { toast('빈 궤도 자리가 없어요'); return; }
-    save.form[k] = [...save.form[k], id]; teamTarget = null;
-  }
-  persist(); renderTeam(); enterHomeSystemOnly();
+  const sl = e.target.closest('[data-slot]'); if (!sl) return;
+  const [k, j] = sl.dataset.slot.split(':').map(Number), cur = save.form[k][j];
+  if (cur) confirmBox('별자리 변경', `${CON[cur].name}자리를 변경하시겠습니까?`, '변경', () => pickConPopup(k, j));
+  else pickConPopup(k, j);
 });
+// 별자리 선택 팝업: 해제 + owned constellations, confirm to register into orbit k, slot j
+function pickConPopup(k, j) {
+  const pid = save.mainPlanet, n = PLANET[pid].orbits, cur = save.form[k][j] || null;
+  let sel = cur;
+  const where = id => save.form.findIndex(a => a.includes(id));
+  const owned = ALL_CONS.filter(c => save.cons[c.id]);
+  openModal(`
+    <h3>${n === 1 ? '' : `궤도 ${k + 1} · `}별자리 선택</h3>
+    <div class="pick-grid" role="radiogroup" aria-label="별자리 선택">
+      <button class="con-pick none" type="button" role="radio" data-pick="" aria-checked="${sel == null}"><span class="none-ic">∅</span><b>해제</b></button>
+      ${owned.map(c => { const w = where(c.id); return `
+        <button class="con-pick${c.special ? ' special' : ''}" type="button" role="radio" data-pick="${c.id}" aria-checked="${sel === c.id}">
+          ${conSvg(c.id, 46)}<b>${SKIN[equippedSkin(c.id)].name}</b>${w >= 0 ? `<em>${c.id === cur ? '현재' : n === 1 ? '편성 중' : `궤도 ${w + 1}`}</em>` : ''}</button>`; }).join('')}
+    </div>
+    <p class="ad-note">다른 칸에 있는 별자리를 고르면 이 칸으로 옮겨져요.</p>
+    <div class="mbtns"><button class="ghost" data-act="close" type="button">취소</button><button class="cta sm" data-act="ok" type="button">확인</button></div>`,
+  (act, el) => {
+    if (act === 'close') { closeModal(); return; }
+    if (act !== 'ok') return;
+    if (sel === cur) { closeModal(); return; }
+    const inTeam = sel && save.team.includes(sel);
+    if (sel == null && save.team.length <= TEAM_MIN) { toast(`별자리는 최소 ${TEAM_MIN}개 편성해야 해요`); return; }
+    if (sel && !inTeam && !cur && save.team.length >= teamCap(pid)) { toast(`별자리는 최대 ${teamCap(pid)}개까지 편성할 수 있어요`); return; }
+    const f = save.form.map(a => a.filter(x => x !== sel)); // lift the pick out of any other slot
+    const row = f[k], at = cur ? row.indexOf(cur) : -1;
+    if (sel == null) row.splice(at, 1);
+    else if (at >= 0) row[at] = sel;
+    else row.push(sel);
+    save.form = f; persist(); closeModal(); renderTeam(); enterHomeSystemOnly();
+    toast(sel ? `${CON[sel].name}자리를 등록했어요` : '별자리를 해제했어요');
+  });
+  $('modalBody').querySelector('.pick-grid').addEventListener('click', e => {
+    const b = e.target.closest('[data-pick]'); if (!b) return;
+    sel = b.dataset.pick || null;
+    $('modalBody').querySelectorAll('[data-pick]').forEach(x => x.setAttribute('aria-checked', x === b));
+  });
+}
 function enterHomeSystemOnly() { // refresh the orbiting lobby system after formation or skin changes
   HOME.sys = buildMySystem(); layoutHome();
 }

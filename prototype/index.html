@@ -358,6 +358,10 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .con-pick[aria-pressed="true"]{border-color:var(--gold);background:rgba(245,196,81,.08)}
 .con-pick.special .csvg .ln line{stroke:#d58bff}
 
+.pick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-height:52vh;overflow-y:auto;padding:2px}
+.con-pick[aria-checked="true"]{border-color:var(--gold);background:rgba(245,196,81,.12);box-shadow:inset 0 0 0 1px var(--gold)}
+.con-pick.none{align-content:center;min-height:88px}
+.con-pick .none-ic{font-size:26px;line-height:1.4;color:var(--dim)}
 /* team (legacy) */
 .team-head{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(15,22,52,.8)}
 .team-head .orb{width:44px;height:44px}
