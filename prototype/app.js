@@ -175,7 +175,7 @@ function layoutHome() {
   const top = 70, cardEl = document.querySelector('#pane-home .power');
   const cvTop = cv.getBoundingClientRect().top;
   const cardTop = cardEl && !$('shell').hidden && tab === 'home' ? cardEl.getBoundingClientRect().top - cvTop : H - 370;
-  s.R = Math.min(W * .36, 150); s.ry = s.R * .42; s.pr = s.R * .26;
+  s.R = Math.min(W * .36, 150); s.ry = s.R * ORBIT_TILT; s.pr = s.R * PLANET_RF[0];
   s.cx = W / 2;
   s.cy = Math.max(top + (cardTop - top) * .55, cardTop - s.ry - s.R * .32 - 6);
   HOME.skyBottom = s.cy - s.ry - s.R * .25; // interceptions happen above this line

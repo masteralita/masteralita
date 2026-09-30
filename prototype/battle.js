@@ -19,12 +19,14 @@ addEventListener('resize', resize);
 
 /* ---------- Game state ---------- */
 const G = {
-  state: 'title', mode: 'arcade', ghost: null, kills: 0, wave: 1, timer: 40, energy: 2, maxEnergy: 10, focus: null, me: null, foe: null, zone: ZONES[0],
+  state: 'title', shake: 0, mode: 'arcade', ghost: null, kills: 0, wave: 1, timer: 40, energy: 2, maxEnergy: 10, focus: null, me: null, foe: null, zone: ZONES[0],
   proj: [], beams: [], fx: [], texts: [], shield: 0, nova: 0, roar: 0, roarV: .3, pShield: 0, enraged: false, bossCd: 6, bossCd2: 8,
   paused: false, choosing: false, clearT: 0, lv: 1, xp: 0, pendingLv: 0, taken: [],
   T: { armor: 0, marmor: 0, evade: 0, dmgRed: 0, planetRed: 0 },
 };
 const SHIELD_T = 6, NOVA_T = 6;
+const SHAKE_MAX = 4.5; // px — kept small on purpose
+const REDUCED_MOTION = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const xpNeed = lv => 30 + 18 * (lv - 1);
 
 function makeCon(def, side, mult) {
@@ -35,23 +37,26 @@ function makeCon(def, side, mult) {
     shots: 0, heals: 0, focusStack: 0, lastT: null, revived: false, molted: false,
     skin: SKIN[def.id], style: def.style, kind: def.kind, fxOn: {}, fxT: {} };
 }
-// Constellations are dealt round-robin onto up to 3 separate orbits (inner → outer), each with its own period.
+// Constellations are dealt round-robin onto up to 2 separate orbits (inner → outer), each with its own period.
 // sys.phase is a separate 7s clock that only drives energy (기력), so energy pacing stays the same.
-const ORBIT_RF = [[1], [.74, 1], [.64, .82, 1]];                       // ring radius as a share of R
-const ORBIT_PERIOD = { me: [[8], [6, 10], [5.5, 8, 11.5]], foe: [[9.5], [7, 11.5], [6.5, 9.5, 13]] }; // seconds per lap
+const ORBIT_RF = [[1], [.56, 1]];                                        // ring radius as a share of R
+const ORBIT_PERIOD = { me: [[8], [6.5, 10]], foe: [[9.5], [7.5, 11.5]] }; // seconds per lap
+const PLANET_RF = [.2, .25, .29];                                        // planet radius share of R: normal / mid boss / zone boss
+const ORBIT_TILT = .45;                                                  // ry = R × tilt (2.5D ellipse)
 function makeSystem(side, planet, cons) {
-  const n = clamp(cons.length, 1, 3);
+  const n = clamp(cons.length, 1, ORBIT_RF.length);
   const rings = ORBIT_RF[n - 1].map((rf, k) => ({ rf, phase: rnd(0, TAU), speed: TAU / ORBIT_PERIOD[side][n - 1][k], cons: [] }));
   cons.forEach((c, i) => { const r = rings[i % n]; c.ring = i % n; c.slot = r.cons.length; r.cons.push(c); });
   return { side, planet, cons, rings, phase: rnd(0, TAU), speed: TAU / (side === 'me' ? 7 : 8.5), orbits: 0, cx: 0, cy: 0, R: 0, ry: 0, pr: 0 };
 }
 function layout() {
   const top = 104, bot = 224, band = Math.max(200, H - top - bot);
-  const R = Math.min(W * .38, band * .4);
-  for (const [sys, f] of [[G.foe, .25], [G.me, .74]]) {
+  const R = Math.min(W * .38, band * .4), ry = R * ORBIT_TILT;
+  const margin = ry + R * .25 * .95; // outer ring plus a constellation's half-height
+  for (const [sys, cy] of [[G.foe, top + margin], [G.me, H - bot - margin]]) {
     if (!sys) continue;
-    sys.cx = W / 2; sys.cy = top + band * f; sys.R = R; sys.ry = R * .42;
-    sys.pr = R * (sys.planet.bossTier === 2 ? .34 : sys.planet.bossTier === 1 ? .29 : .24);
+    sys.cx = W / 2; sys.cy = cy; sys.R = R; sys.ry = ry;
+    sys.pr = R * PLANET_RF[sys.planet.bossTier || 0];
   }
 }
 // Active awakening effect of a given type on one of my constellations (null if the skin hasn't unlocked it)
@@ -200,6 +205,7 @@ function applyDamage(t, dmg, kind, { src = null, tier = 0, color = null, silent 
   let d = dmg * 100 / (100 + armor);
   if (t.isPlanet && t.side === 'me' && G.pShield > 0) { const a = Math.min(G.pShield, d); G.pShield -= a; d -= a; }
   t.hp -= d; t.flash = .12;
+  if (t.side === 'me' && t.isPlanet && d > 0 && !REDUCED_MOTION) G.shake = Math.min(SHAKE_MAX, G.shake + 1 + 40 * d / t.maxHp);
   if (!silent) {
     const big = tier >= 1;
     say(x + rnd(-10, 10), y - 14, Math.max(1, Math.round(d)), color || (t.side === 'me' ? '#ff8a9a' : CRIT_COL[tier]), big ? 1 : .8, big ? 13 + tier * 2 : 13);
@@ -577,6 +583,7 @@ function bossAct(dt) {
 }
 
 function update(dt) {
+  G.shake = Math.max(0, G.shake - dt * 16);
   if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) $('banner').classList.remove('show'); }
   if (!G.me) return;
   if (G.state === 'fight' && G.pendingLv > 0 && !G.choosing) { openLevelUp(); return; }
@@ -790,6 +797,12 @@ function drawReticle(t) {
   for (let i = 0; i < 4; i++) { const a = i * TAU / 4 + t; ctx.beginPath(); ctx.arc(x, y, r, a, a + .7); ctx.stroke(); }
 }
 function draw(t) {
+  const sk = G.shake > .05 && G.me && !G.paused && !G.choosing;
+  if (sk) { ctx.save(); ctx.translate(rnd(-1, 1) * G.shake, rnd(-1, 1) * G.shake * .7); }
+  drawScene(t);
+  if (sk) ctx.restore();
+}
+function drawScene(t) {
   drawBg(t);
   if (!G.me) return;
   drawSystem(G.foe, t); drawSystem(G.me, t);
