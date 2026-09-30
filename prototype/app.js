@@ -43,12 +43,18 @@ function normalizeForm() {
   save.form = [o0, o1]; save.team = [...o0, ...o1];
   const ps = save.planets[pid]; if (ps) { ps.skin = ps.skin || 'basic'; ps.orbitSkins = ps.orbitSkins || []; }
 }
-function buildMySystem() {
+// ov (skin previews): pskin = planet skin, oskin = { orbit: skin }, onlyCon + conSkin = one constellation in a given skin
+function buildMySystem(ov = {}) {
   normalizeForm();
   const pid = save.mainPlanet, ps = save.planets[pid];
-  const P = makePlayerPlanet(pid, ps.lv, { skin: ps.skin, orbitSkins: ps.orbitSkins });
-  const cons = [], ringOf = [];
-  save.form.forEach((a, k) => a.forEach(id => { cons.push(makeMyCon(id, orbitStats(pid, k))); ringOf.push(k); }));
+  const oSk = [0, 1].map(k => (ov.oskin && ov.oskin[k]) || ps.orbitSkins[k] || 'dash');
+  const P = makePlayerPlanet(pid, ps.lv, { skin: ov.pskin || ps.skin, orbitSkins: oSk });
+  const cons = [], ringOf = [], form = ov.onlyCon ? [[ov.onlyCon], []] : save.form;
+  form.forEach((a, k) => a.forEach(id => {
+    const os = orbitStats(pid, k), ob = OSKIN[oSk[k]].bonus;
+    cons.push(makeMyCon(id, { atk: os.atk + (ob.atk || 0), rate: os.rate + (ob.rate || 0), hp: os.hp + (ob.hp || 0) }, ov.onlyCon ? ov.conSkin : null));
+    ringOf.push(k);
+  }));
   return makeSystem('me', P, cons, ringOf);
 }
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch {} }
@@ -608,24 +614,16 @@ function renderStars() {
       <button class="cta sm" data-sact="store" type="button">상점으로</button>`}</section>`;
 }
 function skinSection(id, o) {
-  const list = SKINS[id], sel = SKIN[skinSel], eq = equippedSkin(id);
-  const owned = ownsSkin(id, sel.id), isEq = sel.id === eq;
-  const src = SKIN_TIER[sel.tier].src, have = !!o;
-  const action = isEq && have ? '<button class="ghost sm" type="button" disabled>장착 중</button>'
-    : owned && !have ? '<button class="ghost sm" type="button" disabled>보유 중 · 별자리를 얻으면 장착할 수 있어요</button>'
-    : owned ? `<button class="cta sm" data-kact="equip" type="button">장착</button>`
-    : src === 'chest' ? `<button class="ghost sm" type="button" disabled>로비 보물 상자에서 ${Math.round(CHEST_ODDS.skin * 100)}% 확률로 획득</button>`
-    : !have ? '<button class="ghost sm" type="button" disabled>별자리를 먼저 얻어야 구매할 수 있어요</button>'
-    : `<button class="cta sm" data-kact="buy" type="button">스페셜 스킨 구매 <b class="piece">${fmt(SKIN_TIER[sel.tier].price)}</b></button>`;
+  const list = SKINS[id], eq = equippedSkin(id);
   return `<section class="skins">
-    <div class="sec-h"><h2>스킨</h2><span>스킨마다 공격 방식과 스킬셋이 달라요</span></div>
+    <div class="sec-h"><h2>스킨</h2><span>눌러서 미리보기 · 스킨마다 공격 방식과 스킬셋이 달라요</span></div>
     <div class="skin-row">${list.map(sk => `
-      <button class="skin-card tier-${sk.tier}" type="button" data-skin="${sk.id}" aria-pressed="${sk.id === skinSel}" style="--ln:rgb(${sk.pal.line})">
+      <button class="skin-card tier-${sk.tier}" type="button" data-skin="${sk.id}" aria-pressed="${sk.id === eq}" style="--ln:rgb(${sk.pal.line})">
         ${conSvg(id, 54, { skin: sk.id, dim: !ownsSkin(id, sk.id) })}
         <b>${sk.name}</b><span class="mini">${SKIN_TIER[sk.tier].name} · ${skinStyle(sk)}</span>
         ${sk.id === eq && o ? '<em class="eq">장착</em>' : ownsSkin(id, sk.id) ? '<em class="own">보유</em>' : SKIN_TIER[sk.tier].src === 'chest' ? '<em>상자</em>' : `<em class="piece">${fmt(SKIN_TIER[sk.tier].price)}</em>`}
       </button>`).join('')}</div>
-    <div class="detail">${perkList(sel)}${action}</div>
+    <div class="detail">${perkList(SKIN[eq])}</div>
   </section>`;
 }
 function perkList(sk) {
@@ -669,16 +667,7 @@ function slotPanel(d, o) {
 $('pane-stars').addEventListener('click', e => {
   const c = e.target.closest('[data-sid]'); if (c) { starSel = c.dataset.sid; slotSel = null; skinSel = null; renderStars(); return; }
   const sl = e.target.closest('[data-slot]'); if (sl) { slotSel = +sl.dataset.slot; renderStars(); return; }
-  const sk = e.target.closest('[data-skin]'); if (sk) { skinSel = sk.dataset.skin; renderStars(); return; }
-  const ka = e.target.closest('[data-kact]');
-  if (ka) {
-    const o = save.cons[starSel], S = SKIN[skinSel];
-    if (ka.dataset.kact === 'buy') {
-      if (!spend('piece', SKIN_TIER[S.tier].price)) return;
-      addSkin(S.id); o.skin = S.id; toast(`${S.name} 스킨을 얻고 장착했어요`);
-    } else { o.skin = S.id; toast(`${S.name} 스킨 장착`); }
-    persist(); enterHomeSystemOnly(); renderStars(); return;
-  }
+  const sk = e.target.closest('[data-skin]'); if (sk) { openSkinPopup('c', sk.dataset.skin); return; }
   const a = e.target.closest('[data-sact]'); if (!a) return;
   const act = a.dataset.sact;
   if (act === 'store') { setTab('store'); return; }
@@ -703,6 +692,57 @@ $('pane-stars').addEventListener('click', e => {
   else if (act === 'promote') { const p = s.part; if (spend('piece', promoteCost(p))) { p.g += 1; p.en = 0; toast(`${GRADES[p.g].name} 등급으로 승급`); } }
   persist(); renderStars();
 });
+
+/* ---------- 스킨 팝업: live preview + stats + buy / equip / cancel ---------- */
+let PREVIEW = null; // { canvas, sys } while a skin popup is open
+function skinBonusText(kind, b) {
+  const who = { p: { hp: '행성 HP', atk: '모든 별자리 공격력', dmgRed: '행성이 받는 피해' }, o: { hp: '이 궤도 별자리 HP', atk: '이 궤도 별자리 공격력', rate: '이 궤도 별자리 공격속도' } }[kind];
+  const out = Object.entries(b).map(([k, v]) => `<li>${who[k]} <b>${k === 'dmgRed' ? '-' : '+'}${Math.round(v * 100)}%</b></li>`);
+  return out.length ? `<ul class="sk-stats">${out.join('')}</ul>` : '<p class="mtxt">추가 능력치가 없는 기본 스킨이에요.</p>';
+}
+function openSkinPopup(kind, id, k) {
+  const pid = save.mainPlanet, ps = save.planets[pid];
+  let name, tag, body, owned, equipped, price = 0, lock = '', ov;
+  if (kind === 'c') {
+    const sk = SKIN[id], con = sk.con, have = !!save.cons[con], src = SKIN_TIER[sk.tier].src;
+    name = sk.name; tag = `${CON[con].name}자리 · ${SKIN_TIER[sk.tier].name} 스킨`;
+    body = `<div class="detail">${perkList(sk)}</div>`;
+    owned = ownsSkin(con, id); equipped = have && equippedSkin(con) === id; price = SKIN_TIER[sk.tier].price;
+    if (!owned && src === 'chest') lock = `로비 보물 상자에서 ${Math.round(CHEST_ODDS.skin * 100)}% 확률로 얻을 수 있어요.`;
+    else if (!have) lock = owned ? '보유 중이에요. 별자리를 얻으면 장착할 수 있어요.' : '별자리를 먼저 얻어야 구매할 수 있어요.';
+    ov = { onlyCon: con, conSkin: id };
+  } else {
+    const def = kind === 'p' ? PSKIN[id] : OSKIN[id];
+    name = def.name; tag = kind === 'p' ? '행성 스킨 · 모든 행성에 사용' : `궤도 스킨 · ${PLANET[pid].orbits === 1 ? '단일 궤도' : `궤도 ${k + 1}`}에 적용`;
+    body = `<p class="mtxt">${def.flavor}</p>${skinBonusText(kind, def.bonus)}`;
+    owned = (kind === 'p' ? save.pSkins : save.oSkins).includes(id);
+    equipped = kind === 'p' ? ps.skin === id : (ps.orbitSkins[k] || 'dash') === id;
+    price = def.price;
+    ov = kind === 'p' ? { pskin: id } : { oskin: { [k]: id } };
+  }
+  const btns = equipped ? '<button class="ghost" data-act="close" type="button">닫기</button><button class="cta sm" type="button" disabled>장착 중</button>'
+    : lock ? '<button class="ghost" data-act="close" type="button">닫기</button>'
+    : owned ? '<button class="ghost" data-act="close" type="button">취소</button><button class="cta sm" data-act="equip" type="button">장착</button>'
+    : `<button class="ghost" data-act="close" type="button">취소</button><button class="cta sm" data-act="buy" type="button">구매 <b class="piece">${fmt(price)}</b></button>`;
+  openModal(`
+    <div class="sk-preview"><canvas id="pvCv" aria-label="${name} 미리보기"></canvas><span class="sk-badge">미리보기</span></div>
+    <div class="sk-head"><h3>${name}</h3><span class="mini">${tag}</span></div>
+    ${body}
+    ${lock ? `<p class="ad-note">${lock}</p>` : ''}
+    <div class="mbtns">${btns}</div>`,
+  act => {
+    if (act === 'close') { closeModal(); return; }
+    if (act === 'buy') {
+      if (!spend('piece', price)) return;
+      if (kind === 'c') addSkin(id); else save[kind === 'p' ? 'pSkins' : 'oSkins'].push(id);
+    }
+    if (kind === 'c') save.cons[SKIN[id].con].skin = id;
+    else if (kind === 'p') ps.skin = id; else ps.orbitSkins[k] = id;
+    persist(); closeModal(); toast(`${name} 스킨을 ${act === 'buy' ? '구매하고 ' : ''}장착했어요`);
+    enterHomeSystemOnly(); if (tab === 'team') renderTeam(); else if (tab === 'stars') renderStars();
+  });
+  PREVIEW = { canvas: $('pvCv'), sys: buildMySystem(ov) };
+}
 
 /* ---------- 팀 (Team formation): planet → orbits → constellations ---------- */
 let teamTarget = null; // orbit the next tapped constellation goes to
@@ -752,14 +792,7 @@ $('pane-team').addEventListener('click', e => {
   if (e.target.closest('[data-tact="planet"]')) { planetSel = pid; setTab('planets'); return; }
   const sk = e.target.closest('[data-sk]');
   if (sk) {
-    const kind = sk.dataset.sk, id = sk.dataset.id, k = sk.dataset.k != null ? +sk.dataset.k : null;
-    const list = kind === 'p' ? PLANET_SKINS : ORBIT_SKINS, def = list.find(x => x.id === id), ownList = kind === 'p' ? 'pSkins' : 'oSkins';
-    const apply = () => { if (kind === 'p') ps.skin = id; else { ps.orbitSkins[k] = id; } persist(); renderTeam(); enterHomeSystemOnly(); };
-    if (save[ownList].includes(id)) { apply(); return; }
-    confirmBox(`${def.name} ${kind === 'p' ? '행성' : '궤도'} 스킨`, `Star Piece ${fmt(def.price)}로 구매하면 모든 ${kind === 'p' ? '행성' : '궤도'}에 쓸 수 있어요.`, `구매 · ${fmt(def.price)}`, () => {
-      if (!spend('piece', def.price)) return;
-      save[ownList] = [...save[ownList], id]; toast(`${def.name} 스킨을 얻었어요`); apply();
-    });
+    openSkinPopup(sk.dataset.sk, sk.dataset.id, sk.dataset.k != null ? +sk.dataset.k : null);
     return;
   }
   const rm = e.target.closest('[data-rm]');
@@ -876,6 +909,7 @@ function frame(now) {
   const fps = save.settings.fps;
   if (fps < 60 && now - lastDraw < 1000 / fps - 2) { requestAnimationFrame(frame); return; }
   const ddt = Math.min(.05, (now - (lastDraw || now)) / 1000) || dt; lastDraw = now;
+  if (PREVIEW) { if ($('modal').hidden) PREVIEW = null; else drawPreview(PREVIEW.canvas, PREVIEW.sys, now / 1000, ddt); }
   if (G.state === 'home') {
     updateHome(ddt); drawHome(now / 1000);
     incT += ddt; if (incT > 1 && tab === 'home') { incT = 0; renderHome(); }

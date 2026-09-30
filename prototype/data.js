@@ -297,19 +297,24 @@ const ORBIT_CAP = 2, TEAM_MIN = 1, TEAM_MAX = 3;
 const orbitStats = (pid, k) => (PLANET[pid].orbits === 1 ? ORBIT_BASE.single : ORBIT_BASE.dual)[k];
 const teamCap = pid => Math.min(TEAM_MAX, PLANET[pid].orbits * ORBIT_CAP);
 
-/* ---------- Planet & orbit skins (cosmetic, bought once and usable on every planet / orbit) ---------- */
+/* ---------- Planet & orbit skins: bought once, usable on every planet / orbit, each with a small bonus ---------- */
+// planet bonus: hp (planet max HP), atk (all constellations), dmgRed (planet damage cut)
+// orbit bonus: atk / rate / hp for the constellations riding that orbit
 const PLANET_SKINS = [
-  { id:'basic',   name:'기본',   price:0 },
-  { id:'aurora',  name:'오로라', price:800,  tint:'110,255,210' },
-  { id:'eclipse', name:'일식',   price:800,  tint:'255,70,120' },
-  { id:'gold',    name:'황금',   price:1200, tint:'255,205,80' },
+  { id:'basic',   name:'기본',   price:0,    bonus:{},                    flavor:'행성 본래의 모습이에요.' },
+  { id:'aurora',  name:'오로라', price:800,  bonus:{ hp:.06 },            flavor:'극지방의 빛이 행성을 감싸요.', tint:'110,255,210' },
+  { id:'eclipse', name:'일식',   price:800,  bonus:{ atk:.05 },           flavor:'붉은 그림자가 드리운 행성이에요.', tint:'255,70,120' },
+  { id:'gold',    name:'황금',   price:1200, bonus:{ hp:.05, dmgRed:.05 }, flavor:'황금빛 대기로 뒤덮인 행성이에요.', tint:'255,205,80' },
 ];
 const ORBIT_SKINS = [
-  { id:'dash',   name:'기본 점선', price:0 },
-  { id:'dust',   name:'별먼지',    price:400 },
-  { id:'aurora', name:'오로라 띠', price:400 },
-  { id:'comet',  name:'유성 고리', price:600 },
+  { id:'dash',   name:'기본 점선', price:0,   bonus:{},          flavor:'가장 기본적인 궤도선이에요.' },
+  { id:'dust',   name:'별먼지',    price:400, bonus:{ rate:.04 }, flavor:'반짝이는 별먼지가 궤도를 따라 흘러요.' },
+  { id:'aurora', name:'오로라 띠', price:400, bonus:{ hp:.06 },   flavor:'빛나는 오로라 띠가 궤도를 감싸요.' },
+  { id:'comet',  name:'유성 고리', price:600, bonus:{ atk:.06 },  flavor:'유성 세 개가 궤도를 따라 달려요.' },
 ];
+const OSKIN = Object.fromEntries(ORBIT_SKINS.map(s => [s.id, s]));
+const BONUS_TXT = { hp:'HP', atk:'공격력', rate:'공격속도', dmgRed:'받는 피해' };
+const bonusLines = (b, who) => Object.entries(b).map(([k, v]) => `${who} ${BONUS_TXT[k]} ${k === 'dmgRed' ? '-' : '+'}${Math.round(v * 100)}%`);
 const PSKIN = Object.fromEntries(PLANET_SKINS.map(s => [s.id, s]));
 
 const PLANET_MAX_LV = 10, planetHpMul = lv => 1 + .08 * (lv - 1), planetUpCost = lv => 1500 * lv;

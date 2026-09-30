@@ -1,6 +1,7 @@
 'use strict';
 /* ---------- Canvas ---------- */
-const cv = $('cv'), ctx = cv.getContext('2d');
+const cv = $('cv'), mainCtx = cv.getContext('2d');
+let ctx = mainCtx; // swapped to a preview canvas by drawPreview()
 let W = 0, H = 0, DPR = 1, stars = [];
 function makeStars() {
   const n = Math.round(W * H / 2600);
@@ -67,16 +68,17 @@ const myCons = id => G.me ? G.me.cons.filter(c => c.def.id === id) : [];
 
 // Builds the player's center planet object from its definition + planet level (행성 탭)
 function makePlayerPlanet(pid, lv, cos = {}) {
-  const d = PLANET[pid], t = d.trait, hp = Math.round(d.hp * planetHpMul(lv));
+  const d = PLANET[pid], t = d.trait, sb = (PSKIN[cos.skin] || PSKIN.basic).bonus;
+  const hp = Math.round(d.hp * planetHpMul(lv) * (1 + (sb.hp || 0)));
   return { isPlanet: true, kind: d.kind, look: d.look, name: d.name, hp, maxHp: hp, baseHp: hp, dArmor: 20, mArmor: 20,
     orbits: d.orbits, skin: cos.skin || 'basic', orbitSkins: cos.orbitSkins || [],
-    regen: t.regen || 0, rateMul: t.rateMul || 1, atkMul: t.atkMul || 1, crit: t.crit || 0, dmgRed: t.dmgRed || 0, energy: t.energy || 0,
+    regen: t.regen || 0, rateMul: t.rateMul || 1, atkMul: (t.atkMul || 1) * (1 + (sb.atk || 0)), crit: t.crit || 0, dmgRed: (t.dmgRed || 0) + (sb.dmgRed || 0), energy: t.energy || 0,
     flash: 0, dot: null, side: 'me' };
 }
 // Constellation with account-side bonuses (grade + star parts from 별자리 탭)
 // os = base stats of the orbit it sits on (궤도 능력치)
-function makeMyCon(id, os = { atk: 0, rate: 0, hp: 0 }) {
-  const b = conBonus(id), sk = SKIN[equippedSkin(id)], mod = sk.mod || {};
+function makeMyCon(id, os = { atk: 0, rate: 0, hp: 0 }, skinId) {
+  const b = conBonus(id), sk = SKIN[skinId || equippedSkin(id)], mod = sk.mod || {};
   const c = makeCon(CON[id], 'me', { hp: b.hp * (mod.hp || 1) * (1 + os.hp), atk: b.atk * (mod.atk || 1) * (1 + os.atk) });
   c.m.rate = b.rate * (mod.rate || 1) * (1 + os.rate) - 1; c.grade = b.grade;
   c.skin = sk; c.style = sk.style || CON[id].style; c.kind = sk.kind || CON[id].kind;
@@ -813,6 +815,20 @@ function drawOrbit(sys, r, t) {
     ctx.beginPath(); ctx.ellipse(sys.cx, sys.cy, rx, ry, 0, 0, TAU); ctx.stroke();
   }
   ctx.restore();
+}
+// Renders a small live system (skin preview) onto another canvas with the same drawing code
+function drawPreview(canvas, sys, t, dt) {
+  const r = canvas.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (!r.width) return;
+  if (canvas.width !== Math.round(r.width * dpr)) { canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.height * dpr); }
+  const c2 = canvas.getContext('2d'); c2.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const g = c2.createRadialGradient(r.width / 2, r.height / 2, 0, r.width / 2, r.height / 2, r.width * .7);
+  g.addColorStop(0, '#16204a'); g.addColorStop(1, '#05070f');
+  c2.fillStyle = g; c2.fillRect(0, 0, r.width, r.height);
+  sys.R = Math.min(r.width * .38, (r.height / 2 - 14) / (ORBIT_TILT + .2)); sys.ry = sys.R * ORBIT_TILT; sys.pr = sys.R * .2;
+  sys.cx = r.width / 2; sys.cy = r.height / 2;
+  updateSystem(sys, dt);
+  ctx = c2; try { drawSystem(sys, t); } finally { ctx = mainCtx; }
 }
 function drawSystem(sys, t) {
   for (const r of sys.rings) drawOrbit(sys, r, t);
