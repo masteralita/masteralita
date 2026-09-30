@@ -35,8 +35,15 @@ function makeCon(def, side, mult) {
     shots: 0, heals: 0, focusStack: 0, lastT: null, revived: false, molted: false,
     skin: SKIN[def.id], style: def.style, kind: def.kind, fxOn: {}, fxT: {} };
 }
+// Constellations are dealt round-robin onto up to 3 separate orbits (inner → outer), each with its own period.
+// sys.phase is a separate 7s clock that only drives energy (기력), so energy pacing stays the same.
+const ORBIT_RF = [[1], [.74, 1], [.64, .82, 1]];                       // ring radius as a share of R
+const ORBIT_PERIOD = { me: [[8], [6, 10], [5.5, 8, 11.5]], foe: [[9.5], [7, 11.5], [6.5, 9.5, 13]] }; // seconds per lap
 function makeSystem(side, planet, cons) {
-  return { side, planet, cons, phase: rnd(0, TAU), speed: TAU / (side === 'me' ? 7 : 8.5), orbits: 0, cx: 0, cy: 0, R: 0, ry: 0, pr: 0 };
+  const n = clamp(cons.length, 1, 3);
+  const rings = ORBIT_RF[n - 1].map((rf, k) => ({ rf, phase: rnd(0, TAU), speed: TAU / ORBIT_PERIOD[side][n - 1][k], cons: [] }));
+  cons.forEach((c, i) => { const r = rings[i % n]; c.ring = i % n; c.slot = r.cons.length; r.cons.push(c); });
+  return { side, planet, cons, rings, phase: rnd(0, TAU), speed: TAU / (side === 'me' ? 7 : 8.5), orbits: 0, cx: 0, cy: 0, R: 0, ry: 0, pr: 0 };
 }
 function layout() {
   const top = 104, bot = 224, band = Math.max(200, H - top - bot);
@@ -506,15 +513,16 @@ function periodic(c, sys, dt) {
   });
 }
 function updateSystem(sys, dt) {
-  const n = sys.cons.length, dir = sys.side === 'me' ? 1 : -1, fighting = G.state === 'fight';
+  const dir = sys.side === 'me' ? 1 : -1, fighting = G.state === 'fight';
   sys.phase += sys.speed * dt;
   if (sys.side === 'me') {
     const o = Math.floor(sys.phase / TAU);
     if (o > sys.orbits) { sys.orbits = o; if (fighting) G.energy = Math.min(G.maxEnergy, G.energy + 1); }
   }
-  sys.cons.forEach((c, i) => {
-    const a = dir * sys.phase + i * TAU / n;
-    c.x = sys.cx + sys.R * Math.cos(a); c.y = sys.cy + sys.ry * Math.sin(a);
+  for (const r of sys.rings) r.phase += r.speed * dt;
+  sys.cons.forEach(c => {
+    const r = sys.rings[c.ring], a = dir * r.phase + c.slot * TAU / r.cons.length;
+    c.x = sys.cx + sys.R * r.rf * Math.cos(a); c.y = sys.cy + sys.ry * r.rf * Math.sin(a);
     c.s = .8 + .2 * Math.sin(a); c.depth = Math.sin(a);
     if (c.flash > 0) c.flash -= dt;
     if (c.dead) { c.alpha = Math.max(0, c.alpha - dt * 2); return; }
@@ -764,7 +772,8 @@ function drawCon(sys, c, t) {
 function drawSystem(sys, t) {
   ctx.save(); ctx.strokeStyle = sys.side === 'me' ? 'rgba(245,196,81,.22)' : 'rgba(255,123,138,.2)';
   ctx.lineWidth = 1; ctx.setLineDash([2, 6]);
-  ctx.beginPath(); ctx.ellipse(sys.cx, sys.cy, sys.R, sys.ry, 0, 0, TAU); ctx.stroke(); ctx.restore();
+  for (const r of sys.rings) { ctx.beginPath(); ctx.ellipse(sys.cx, sys.cy, sys.R * r.rf, sys.ry * r.rf, 0, 0, TAU); ctx.stroke(); }
+  ctx.restore();
   const back = sys.cons.filter(c => c.depth < 0).sort((a, b) => a.y - b.y);
   const front = sys.cons.filter(c => c.depth >= 0).sort((a, b) => a.y - b.y);
   back.forEach(c => drawCon(sys, c, t));
