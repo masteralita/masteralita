@@ -12,7 +12,8 @@ function freshSave() {
     skins: [], lastCollect: Date.now(), chest: 0, best: 0, wins: 0, losses: 0, adPass: false,
     planets: { earth: { lv: 1 } }, mainPlanet: 'earth',
     cons: { sgr: newCon(0), leo: newCon(0), vir: newCon(0) },
-    team: ['sgr', 'leo', 'vir'],
+    team: ['sgr', 'leo', 'vir'], form: [['sgr', 'leo'], ['vir']],
+    pSkins: ['basic'], oSkins: ['dash'],
     settings: { glow: true, fps: 60, sfx: true, bgm: true, push: true },
   };
 }
@@ -25,10 +26,31 @@ const STYLE_LABEL = { arrow:'화살', shot:'탄환', orb:'구체', beam:'레이�
 const KIND_LABEL = { phys:'물리', magic:'마법', both:'물리·마법' };
 const skinStyle = sk => { const d = CON[sk.con]; return `${STYLE_LABEL[sk.style || d.style]} · ${KIND_LABEL[sk.kind || d.kind]}`; };
 let save = (() => {
-  try { const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if (v && v.v === 1) return Object.assign(freshSave(), v); } catch {}
+  try { const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if (v && v.v === 1) { const o = Object.assign(freshSave(), v); if (!v.form) o.form = [v.team || [], []]; return o; } } catch {}
   return freshSave();
 })();
 if (save.adsRemoved && !save.adPass) save.adPass = true; // older saves bought the previous ad item
+// Team formation (팀업): save.form[k] = constellations on orbit k of the main planet.
+// Keeps 1 orbit's worth on single-orbit planets, ≤ ORBIT_CAP per orbit and ≤ TEAM_MAX in total; save.team mirrors it flat.
+function normalizeForm() {
+  const pid = save.mainPlanet, n = PLANET[pid].orbits, seen = new Set();
+  const src = save.form || [save.team || [], []];
+  let [o0, o1] = [0, 1].map(k => (src[k] || []).filter(id => save.cons[id] && !seen.has(id) && seen.add(id)));
+  if (n === 1) { o0 = [...o0, ...o1]; o1 = []; }
+  if (o0.length > ORBIT_CAP) { const extra = o0.splice(ORBIT_CAP); if (n === 2) o1 = [...extra, ...o1]; }
+  o1 = o1.slice(0, ORBIT_CAP);
+  while (o0.length + o1.length > TEAM_MAX) (o1.length ? o1 : o0).pop();
+  save.form = [o0, o1]; save.team = [...o0, ...o1];
+  const ps = save.planets[pid]; if (ps) { ps.skin = ps.skin || 'basic'; ps.orbitSkins = ps.orbitSkins || []; }
+}
+function buildMySystem() {
+  normalizeForm();
+  const pid = save.mainPlanet, ps = save.planets[pid];
+  const P = makePlayerPlanet(pid, ps.lv, { skin: ps.skin, orbitSkins: ps.orbitSkins });
+  const cons = [], ringOf = [];
+  save.form.forEach((a, k) => a.forEach(id => { cons.push(makeMyCon(id, orbitStats(pid, k))); ringOf.push(k); }));
+  return makeSystem('me', P, cons, ringOf);
+}
 function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch {} }
 
 const fmt = n => Math.floor(n).toLocaleString('en-US');
@@ -118,7 +140,7 @@ function showTitle() {
       const id = zodiacOf(+m.value, +d.value);
       save.birthday = [+m.value, +d.value];
       save.cons[id] = Object.assign(save.cons[id] || newCon(0), { g: 4 });
-      save.team = [id, ...save.team.filter(x => x !== id)].slice(0, PLANET[save.mainPlanet].slots);
+      save.form = [[id, ...save.form[0].filter(x => x !== id)], save.form[1].filter(x => x !== id)]; normalizeForm();
     }
     save.lastCollect = Date.now(); persist();
     enterHome();
@@ -165,8 +187,7 @@ const HOME = { sys: null, rocks: [], shots: [], booms: [], spawn: 0, skyBottom: 
 function enterHome() {
   G.state = 'home'; G.me = null; G.foe = null; G.zone = ZONES[1]; G.shield = 0; G.pShield = 0;
   G.fx = []; G.texts = []; G.proj = []; G.beams = []; $('banner').classList.remove('show');
-  const P = makePlayerPlanet(save.mainPlanet, save.planets[save.mainPlanet].lv);
-  HOME.sys = makeSystem('me', P, save.team.map(makeMyCon)); HOME.rocks = []; HOME.shots = []; HOME.booms = []; HOME.loot = null;
+  HOME.sys = buildMySystem(); HOME.rocks = []; HOME.shots = []; HOME.booms = []; HOME.loot = null;
   setScreen('shell'); renderTopBar(); setTab(tab); layoutHome();
 }
 // The home system sits just above the lobby cards so meteors cross a tall stretch of open sky
@@ -175,7 +196,7 @@ function layoutHome() {
   const top = 70, cardEl = document.querySelector('#pane-home .power');
   const cvTop = cv.getBoundingClientRect().top;
   const cardTop = cardEl && !$('shell').hidden && tab === 'home' ? cardEl.getBoundingClientRect().top - cvTop : H - 370;
-  s.R = Math.min(W * .36, 150); s.ry = s.R * ORBIT_TILT; s.pr = s.R * PLANET_RF[0];
+  s.R = Math.min(W * .41, 165); s.ry = s.R * ORBIT_TILT; s.pr = s.R * PLANET_RF[0];
   s.cx = W / 2;
   s.cy = Math.max(top + (cardTop - top) * .55, cardTop - s.ry - s.R * .32 - 6);
   HOME.skyBottom = s.cy - s.ry - s.R * .25; // interceptions happen above this line
@@ -223,7 +244,7 @@ $('chestBtn').addEventListener('click', () => {
 });
 $('arcadeBtn').addEventListener('click', () => { if (checkTeam()) startRun('arcade'); });
 $('pvpBtn').addEventListener('click', () => { if (checkTeam()) startRun('pvp'); });
-function checkTeam() { if (!save.team.length) { toast('팀 탭에서 별자리를 1개 이상 편성해 주세요'); setTab('team'); return false; } return true; }
+function checkTeam() { normalizeForm(); if (save.team.length < TEAM_MIN) { toast('팀 탭에서 별자리를 1개 이상 편성해 주세요'); setTab('team'); return false; } return true; }
 
 function updateHome(dt) {
   const s = HOME.sys; if (!s) return;
@@ -506,7 +527,7 @@ function renderPlanets() {
         <p>${d.desc}</p>
         <dl class="stats">
           <div><dt>HP</dt><dd>${fmt(d.hp * planetHpMul(lv))}</dd></div>
-          <div><dt>별자리</dt><dd>${d.slots}</dd></div>
+          <div><dt>궤도</dt><dd>${d.orbits}개</dd></div>
           <div><dt>상태</dt><dd>${save.mainPlanet === planetSel ? '대표' : own ? '보유' : '미보유'}</dd></div>
         </dl>
       </div>
@@ -536,7 +557,7 @@ $('pane-planets').addEventListener('click', e => {
   else if (a.dataset.pact === 'up') { const o = save.planets[planetSel]; if (spend('dust', planetUpCost(o.lv))) { o.lv += 1; persist(); toast(`${d.name} Lv ${o.lv}`); renderPlanets(); } }
   else if (a.dataset.pact === 'main') {
     save.mainPlanet = planetSel;
-    if (save.team.length > d.slots) save.team = save.team.slice(0, d.slots);
+    normalizeForm();
     persist(); toast(`대표 행성을 ${d.name}(으)로 바꿨어요`); renderPlanets(); enterHome(); setTab('planets');
   }
 });
@@ -683,53 +704,85 @@ $('pane-stars').addEventListener('click', e => {
   persist(); renderStars();
 });
 
-/* ---------- 팀 (Team formation) ---------- */
-let teamDetail = null;
+/* ---------- 팀 (Team formation): planet → orbits → constellations ---------- */
+let teamTarget = null; // orbit the next tapped constellation goes to
+const statChips = o => [o.atk && `공격력 +${Math.round(o.atk * 100)}%`, o.rate && `공격속도 +${Math.round(o.rate * 100)}%`, o.hp && `HP +${Math.round(o.hp * 100)}%`].filter(Boolean).map(x => `<span class="schip">${x}</span>`).join('');
+const skinOrb = (pid, sk) => `<span class="orb" style="${orbStyle(pid)}">${PSKIN[sk] && PSKIN[sk].tint ? `<i style="background:rgba(${PSKIN[sk].tint},.6)"></i>` : ''}</span>`;
 function renderTeam() {
-  const pd = PLANET[save.mainPlanet], owned = ALL_CONS.filter(c => save.cons[c.id]);
-  save.team = save.team.filter(id => save.cons[id]).slice(0, pd.slots);
-  teamDetail = teamDetail && CON[teamDetail] ? teamDetail : (save.team[0] || owned[0].id);
-  const slots = Array.from({ length: pd.slots }, (_, i) => save.team[i]);
+  normalizeForm();
+  const pid = save.mainPlanet, pd = PLANET[pid], ps = save.planets[pid], n = pd.orbits, cap = teamCap(pid);
+  const owned = ALL_CONS.filter(c => save.cons[c.id]);
+  if (teamTarget != null && (teamTarget >= n || save.form[teamTarget].length >= ORBIT_CAP)) teamTarget = null;
+  const where = id => save.form.findIndex(a => a.includes(id));
+  const chips = (list, cur, kind, k) => list.map(sk => {
+    const own = (kind === 'p' ? save.pSkins : save.oSkins).includes(sk.id);
+    return `<button class="chip" type="button" data-sk="${kind}" data-id="${sk.id}"${k != null ? ` data-k="${k}"` : ''} aria-pressed="${sk.id === cur}">
+      ${sk.name}${own ? '' : ` <b class="piece">${fmt(sk.price)}</b>`}</button>`;
+  }).join('');
   $('pane-team').innerHTML = `
-    <section class="team-head">
-      <span class="orb" style="${orbStyle(save.mainPlanet)}"></span>
-      <div><b>${pd.name}</b><span class="mini">${pd.desc} · 별자리 ${pd.slots}칸</span></div>
-      <button class="ghost sm" data-tact="planet" type="button">행성 변경</button>
+    <section class="team-planet">
+      <div class="tp-head">
+        ${skinOrb(pid, ps.skin)}
+        <div class="tp-txt"><b>${pd.name} <small>Lv ${ps.lv}</small></b>
+          <span class="schips"><span class="schip">HP ${fmt(pd.hp * planetHpMul(ps.lv))}</span>${pd.desc !== 'HP가 높은 기본 행성' ? `<span class="schip">${pd.desc}</span>` : ''}<span class="schip">궤도 ${n}개</span></span></div>
+        <button class="ghost sm" data-tact="planet" type="button">행성 변경</button>
+      </div>
+      <div class="chips-row"><span class="lbl">행성 스킨</span><div class="chips">${chips(PLANET_SKINS, ps.skin, 'p')}</div></div>
     </section>
-    <div class="team-slots">
-      ${slots.map((id, i) => id ? `
-        <button class="tslot" type="button" data-tid="${id}" style="--g:${GRADES[save.cons[id].g].col}">
-          ${conSvg(id, 48)}<b>${SKIN[equippedSkin(id)].name}</b><span class="mini">${fmt(conPower(id))}</span></button>`
-        : `<div class="tslot empty"><span class="mini">빈 칸 ${i + 1}</span></div>`).join('')}
-    </div>
-    <p class="fine">전투력 합계 <b>${fmt(teamPower())}</b> · 아래 보유 별자리를 눌러 넣거나 빼세요</p>
-    <div class="cons">
-      ${owned.map(c => { const o = save.cons[c.id]; return `
-        <button class="ccard${c.special ? ' special' : ''}" type="button" data-cid="${c.id}" aria-pressed="${save.team.includes(c.id)}" style="--g:${GRADES[o.g].col}">
-          <span class="cn">${c.name}</span><span class="ce">${GRADES[o.g].name}</span><span class="cst">${c.stat}</span>
-        </button>`; }).join('')}
-    </div>
-    <div class="detail" id="conDetail"></div>`;
-  renderPerkDetail(teamDetail);
-}
-function renderPerkDetail(id) {
-  $('conDetail').innerHTML = perkList(SKIN[equippedSkin(id)]) + `<button class="ghost sm" data-tact="skin" data-id="${id}" type="button">스킨 바꾸기</button>`;
+    ${Array.from({ length: n }, (_, k) => { const os = orbitStats(pid, k), a = save.form[k]; return `
+    <section class="orbit-card${teamTarget === k ? ' target' : ''}">
+      <div class="oc-head"><b>${n === 1 ? os.name : `궤도 ${k + 1} · ${os.name}`}</b><span class="schips">${statChips(os)}</span></div>
+      <div class="oslots">
+        ${Array.from({ length: ORBIT_CAP }, (_, j) => a[j] ? `
+          <button class="oslot" type="button" data-rm="${a[j]}" aria-label="${CON[a[j]].name}자리 빼기">${conSvg(a[j], 44)}<b>${SKIN[equippedSkin(a[j])].name}</b><span class="x">빼기</span></button>`
+          : `<button class="oslot empty" type="button" data-target="${k}" aria-pressed="${teamTarget === k}"><span>+</span><span class="mini">${teamTarget === k ? '아래에서 고르세요' : '빈 자리'}</span></button>`).join('')}
+      </div>
+      <div class="chips-row"><span class="lbl">궤도 스킨</span><div class="chips">${chips(ORBIT_SKINS, ps.orbitSkins[k] || 'dash', 'o', k)}</div></div>
+    </section>`; }).join('')}
+    <p class="fine">별자리 <b>${save.team.length} / ${cap}</b> · 최소 ${TEAM_MIN}개 · 궤도마다 최대 ${ORBIT_CAP}개${n === 1 ? ' · 궤도가 1개인 행성은 궤도 능력치가 더 높아요' : ''}</p>
+    <div class="sec-h"><h2>보유 별자리</h2><span>${owned.length}개</span></div>
+    <div class="con-grid">
+      ${owned.map(c => { const w = where(c.id); return `
+        <button class="con-pick${c.special ? ' special' : ''}" type="button" data-cid="${c.id}" aria-pressed="${w >= 0}">
+          ${conSvg(c.id, 46)}<b>${c.name}</b>${w >= 0 ? `<em>궤도 ${n === 1 ? '' : w + 1}</em>` : ''}</button>`; }).join('')}
+    </div>`;
 }
 $('pane-team').addEventListener('click', e => {
-  if (e.target.closest('[data-tact="planet"]')) { planetSel = save.mainPlanet; setTab('planets'); return; }
-  const sb = e.target.closest('[data-tact="skin"]'); if (sb) { starSel = sb.dataset.id; skinSel = null; setTab('stars'); return; }
-  const t = e.target.closest('[data-tid]'); if (t) { save.team = save.team.filter(x => x !== t.dataset.tid); teamDetail = t.dataset.tid; persist(); renderTeam(); return; }
+  const pid = save.mainPlanet, ps = save.planets[pid];
+  if (e.target.closest('[data-tact="planet"]')) { planetSel = pid; setTab('planets'); return; }
+  const sk = e.target.closest('[data-sk]');
+  if (sk) {
+    const kind = sk.dataset.sk, id = sk.dataset.id, k = sk.dataset.k != null ? +sk.dataset.k : null;
+    const list = kind === 'p' ? PLANET_SKINS : ORBIT_SKINS, def = list.find(x => x.id === id), ownList = kind === 'p' ? 'pSkins' : 'oSkins';
+    const apply = () => { if (kind === 'p') ps.skin = id; else { ps.orbitSkins[k] = id; } persist(); renderTeam(); enterHomeSystemOnly(); };
+    if (save[ownList].includes(id)) { apply(); return; }
+    confirmBox(`${def.name} ${kind === 'p' ? '행성' : '궤도'} 스킨`, `Star Piece ${fmt(def.price)}로 구매하면 모든 ${kind === 'p' ? '행성' : '궤도'}에 쓸 수 있어요.`, `구매 · ${fmt(def.price)}`, () => {
+      if (!spend('piece', def.price)) return;
+      save[ownList] = [...save[ownList], id]; toast(`${def.name} 스킨을 얻었어요`); apply();
+    });
+    return;
+  }
+  const rm = e.target.closest('[data-rm]');
+  if (rm) {
+    if (save.team.length <= TEAM_MIN) { toast(`별자리는 최소 ${TEAM_MIN}개 편성해야 해요`); return; }
+    save.form = save.form.map(a => a.filter(x => x !== rm.dataset.rm)); persist(); renderTeam(); enterHomeSystemOnly(); return;
+  }
+  const tg = e.target.closest('[data-target]'); if (tg) { const k = +tg.dataset.target; teamTarget = teamTarget === k ? null : k; renderTeam(); return; }
   const c = e.target.closest('[data-cid]'); if (!c) return;
-  const id = c.dataset.cid, slots = PLANET[save.mainPlanet].slots;
-  teamDetail = id;
-  if (save.team.includes(id)) save.team = save.team.filter(x => x !== id);
-  else if (save.team.length < slots) save.team.push(id);
-  else { toast(`${PLANET[save.mainPlanet].name}에는 별자리를 ${slots}개까지 넣을 수 있어요`); renderPerkDetail(id); return; }
+  const id = c.dataset.cid, n = PLANET[pid].orbits;
+  if (save.team.includes(id)) {
+    if (save.team.length <= TEAM_MIN) { toast(`별자리는 최소 ${TEAM_MIN}개 편성해야 해요`); return; }
+    save.form = save.form.map(a => a.filter(x => x !== id));
+  } else {
+    if (save.team.length >= teamCap(pid)) { toast(`별자리는 최대 ${teamCap(pid)}개까지 편성할 수 있어요`); return; }
+    const k = teamTarget != null ? teamTarget : [0, 1].slice(0, n).find(i => save.form[i].length < ORBIT_CAP);
+    if (k == null) { toast('빈 궤도 자리가 없어요'); return; }
+    save.form[k] = [...save.form[k], id]; teamTarget = null;
+  }
   persist(); renderTeam(); enterHomeSystemOnly();
 });
-function enterHomeSystemOnly() { // refresh the orbiting lobby system after formation changes
-  const P = makePlayerPlanet(save.mainPlanet, save.planets[save.mainPlanet].lv);
-  HOME.sys = makeSystem('me', P, save.team.map(makeMyCon)); layoutHome();
+function enterHomeSystemOnly() { // refresh the orbiting lobby system after formation or skin changes
+  HOME.sys = buildMySystem(); layoutHome();
 }
 
 /* ---------- 설정 (필요 화면 시트: 설정) ---------- */

@@ -270,21 +270,48 @@ const ZONES = [
 function zoneOf(n) { return n >= 21 ? ZONES[2] : n >= 11 ? ZONES[1] : ZONES[0]; }
 
 /* ---------- Center planets (화면설계서 11p · 행성 파츠 시트) ---------- */
+// orbits: how many orbits (1–2) the planet carries; each orbit holds up to 2 constellations, a team 1–3 in total
 // trait fields: rateMul, regen (HP/s), atkMul, dmgRed (planet damage cut), energy (start), crit
 const PLANETS = [
-  { id:'earth',   name:'지구',   en:'Earth',   kind:'earth', hp:2400, slots:3, unlock:0,    trait:{},                 desc:'HP가 높은 기본 행성' },
-  { id:'moon',    name:'달',     en:'Moon',    kind:'moon',  hp:2000, slots:4, unlock:600,  trait:{ regen:8 },        desc:'초당 HP 8 회복' },
-  { id:'mercury', name:'수성',   en:'Mercury', kind:'rock',  hp:1700, slots:3, unlock:600,  trait:{ rateMul:1.25 },   desc:'공격속도 +25%', look:{ c:['#e8d9c9','#8d7663','#2c2119'], glow:'220,180,140' } },
-  { id:'venus',   name:'금성',   en:'Venus',   kind:'gas',   hp:2300, slots:3, unlock:800,  trait:{ dmgRed:.12 },     desc:'행성이 받는 피해 -12%', look:{ c:['#fff0c2','#e0a94a','#5e3a0e'], glow:'255,200,110' } },
-  { id:'mars',    name:'화성',   en:'Mars',    kind:'rock',  hp:2100, slots:4, unlock:1000, trait:{ atkMul:1.1 },     desc:'공격력 +10%', look:{ c:['#ffb199','#c2391b','#3d0c05'], glow:'255,90,60' } },
-  { id:'jupiter', name:'목성',   en:'Jupiter', kind:'gas',   hp:3400, slots:5, unlock:1500, trait:{ rateMul:.9 },     desc:'HP 최대 · 공격속도 -10%', look:{ c:['#ffe3c4','#c98a52','#4a2610'], glow:'230,160,100', bands:true } },
-  { id:'saturn',  name:'토성',   en:'Saturn',  kind:'gas',   hp:2600, slots:4, unlock:1500, trait:{ dmgRed:.2 },      desc:'고리 방어 · 받는 피해 -20%', look:{ c:['#fff2cc','#d9b56a','#5a4214'], glow:'240,210,130', ring:true } },
-  { id:'uranus',  name:'천왕성', en:'Uranus',  kind:'gas',   hp:2300, slots:4, unlock:1200, trait:{ energy:3 },       desc:'시작 기력 +3', look:{ c:['#cffcff','#3fb9c9','#0b3a44'], glow:'90,220,230' } },
-  { id:'neptune', name:'해왕성', en:'Neptune', kind:'gas',   hp:2300, slots:4, unlock:1200, trait:{ atkMul:1.15 },    desc:'공격력 +15%', look:{ c:['#b9d6ff','#2d57d8','#0a1450'], glow:'80,120,255' } },
-  { id:'pluto',   name:'명왕성', en:'Pluto',   kind:'rock',  hp:1500, slots:5, unlock:2000, trait:{ crit:.15 },       desc:'치명타율 +15% · HP 낮음', look:{ c:['#f3e3d6','#a07c6a','#3a2820'], glow:'230,190,170' } },
-  { id:'sun',     name:'태양',   en:'Sun',     kind:'sun',   hp:1800, slots:5, unlock:2500, trait:{ rateMul:1.15 },   desc:'공격속도 +15% · 별자리 5' },
+  { id:'earth',   name:'지구',   en:'Earth',   kind:'earth', hp:2400, orbits:2, unlock:0,    trait:{},                 desc:'HP가 높은 기본 행성' },
+  { id:'moon',    name:'달',     en:'Moon',    kind:'moon',  hp:2000, orbits:1, unlock:600,  trait:{ regen:8 },        desc:'초당 HP 8 회복' },
+  { id:'mercury', name:'수성',   en:'Mercury', kind:'rock',  hp:1700, orbits:1, unlock:600,  trait:{ rateMul:1.25 },   desc:'공격속도 +25%', look:{ c:['#e8d9c9','#8d7663','#2c2119'], glow:'220,180,140' } },
+  { id:'venus',   name:'금성',   en:'Venus',   kind:'gas',   hp:2300, orbits:1, unlock:800,  trait:{ dmgRed:.12 },     desc:'행성이 받는 피해 -12%', look:{ c:['#fff0c2','#e0a94a','#5e3a0e'], glow:'255,200,110' } },
+  { id:'mars',    name:'화성',   en:'Mars',    kind:'rock',  hp:2100, orbits:2, unlock:1000, trait:{ atkMul:1.1 },     desc:'공격력 +10%', look:{ c:['#ffb199','#c2391b','#3d0c05'], glow:'255,90,60' } },
+  { id:'jupiter', name:'목성',   en:'Jupiter', kind:'gas',   hp:3400, orbits:2, unlock:1500, trait:{ rateMul:.9 },     desc:'HP 최대 · 공격속도 -10%', look:{ c:['#ffe3c4','#c98a52','#4a2610'], glow:'230,160,100', bands:true } },
+  { id:'saturn',  name:'토성',   en:'Saturn',  kind:'gas',   hp:2600, orbits:2, unlock:1500, trait:{ dmgRed:.2 },      desc:'고리 방어 · 받는 피해 -20%', look:{ c:['#fff2cc','#d9b56a','#5a4214'], glow:'240,210,130', ring:true } },
+  { id:'uranus',  name:'천왕성', en:'Uranus',  kind:'gas',   hp:2300, orbits:2, unlock:1200, trait:{ energy:3 },       desc:'시작 기력 +3', look:{ c:['#cffcff','#3fb9c9','#0b3a44'], glow:'90,220,230' } },
+  { id:'neptune', name:'해왕성', en:'Neptune', kind:'gas',   hp:2300, orbits:2, unlock:1200, trait:{ atkMul:1.15 },    desc:'공격력 +15%', look:{ c:['#b9d6ff','#2d57d8','#0a1450'], glow:'80,120,255' } },
+  { id:'pluto',   name:'명왕성', en:'Pluto',   kind:'rock',  hp:1500, orbits:1, unlock:2000, trait:{ crit:.15 },       desc:'치명타율 +15% · HP 낮음', look:{ c:['#f3e3d6','#a07c6a','#3a2820'], glow:'230,190,170' } },
+  { id:'sun',     name:'태양',   en:'Sun',     kind:'sun',   hp:1800, orbits:2, unlock:2500, trait:{ rateMul:1.15 },   desc:'공격속도 +15%' },
 ];
 const PLANET = Object.fromEntries(PLANETS.map(p => [p.id, p]));
+/* ---------- Orbits (궤도): belong to the planet, carry their own base stats and skin ---------- */
+// A planet with a single orbit gets a stronger orbit to make up for fewer constellations.
+const ORBIT_BASE = {
+  single: [{ name:'단일 궤도', atk:.18, rate:.12, hp:.12 }],
+  dual:   [{ name:'안쪽 궤도', atk:0,   rate:.12, hp:0 },
+           { name:'바깥 궤도', atk:.1,  rate:0,   hp:.1 }],
+};
+const ORBIT_CAP = 2, TEAM_MIN = 1, TEAM_MAX = 3;
+const orbitStats = (pid, k) => (PLANET[pid].orbits === 1 ? ORBIT_BASE.single : ORBIT_BASE.dual)[k];
+const teamCap = pid => Math.min(TEAM_MAX, PLANET[pid].orbits * ORBIT_CAP);
+
+/* ---------- Planet & orbit skins (cosmetic, bought once and usable on every planet / orbit) ---------- */
+const PLANET_SKINS = [
+  { id:'basic',   name:'기본',   price:0 },
+  { id:'aurora',  name:'오로라', price:800,  tint:'110,255,210' },
+  { id:'eclipse', name:'일식',   price:800,  tint:'255,70,120' },
+  { id:'gold',    name:'황금',   price:1200, tint:'255,205,80' },
+];
+const ORBIT_SKINS = [
+  { id:'dash',   name:'기본 점선', price:0 },
+  { id:'dust',   name:'별먼지',    price:400 },
+  { id:'aurora', name:'오로라 띠', price:400 },
+  { id:'comet',  name:'유성 고리', price:600 },
+];
+const PSKIN = Object.fromEntries(PLANET_SKINS.map(s => [s.id, s]));
+
 const PLANET_MAX_LV = 10, planetHpMul = lv => 1 + .08 * (lv - 1), planetUpCost = lv => 1500 * lv;
 
 /* ---------- Grades (별자리 시트: 커먼 ~ 레전드) ---------- */

@@ -37,22 +37,24 @@ function makeCon(def, side, mult) {
     shots: 0, heals: 0, focusStack: 0, lastT: null, revived: false, molted: false,
     skin: SKIN[def.id], style: def.style, kind: def.kind, fxOn: {}, fxT: {} };
 }
-// Constellations are dealt round-robin onto up to 2 separate orbits (inner → outer), each with its own period.
+// Each system has 1–2 separate orbits (inner → outer), each with its own period. My orbits come from the planet
+// and the team formation (ringOf[i] = orbit of cons[i]); enemies are dealt round-robin.
 // sys.phase is a separate 7s clock that only drives energy (기력), so energy pacing stays the same.
-const ORBIT_RF = [[1], [.56, 1]];                                        // ring radius as a share of R
+const ORBIT_RF = [[.8], [.5, 1]];                                        // ring radius as a share of R
 const ORBIT_PERIOD = { me: [[8], [6.5, 10]], foe: [[9.5], [7.5, 11.5]] }; // seconds per lap
-const PLANET_RF = [.2, .25, .29];                                        // planet radius share of R: normal / mid boss / zone boss
+const PLANET_RF = [.17, .22, .26];                                        // planet radius share of R: normal / mid boss / zone boss
 const ORBIT_TILT = .45;                                                  // ry = R × tilt (2.5D ellipse)
-function makeSystem(side, planet, cons) {
-  const n = clamp(cons.length, 1, ORBIT_RF.length);
-  const rings = ORBIT_RF[n - 1].map((rf, k) => ({ rf, phase: rnd(0, TAU), speed: TAU / ORBIT_PERIOD[side][n - 1][k], cons: [] }));
-  cons.forEach((c, i) => { const r = rings[i % n]; c.ring = i % n; c.slot = r.cons.length; r.cons.push(c); });
+function makeSystem(side, planet, cons, ringOf) {
+  const n = ringOf ? clamp(planet.orbits || 1, 1, 2) : clamp(cons.length, 1, ORBIT_RF.length);
+  const rings = ORBIT_RF[n - 1].map((rf, k) => ({ rf, phase: rnd(0, TAU), speed: TAU / ORBIT_PERIOD[side][n - 1][k], cons: [],
+    skin: (planet.orbitSkins && planet.orbitSkins[k]) || 'dash' }));
+  cons.forEach((c, i) => { const k = ringOf ? ringOf[i] : i % n, r = rings[k]; c.ring = k; c.slot = r.cons.length; r.cons.push(c); });
   return { side, planet, cons, rings, phase: rnd(0, TAU), speed: TAU / (side === 'me' ? 7 : 8.5), orbits: 0, cx: 0, cy: 0, R: 0, ry: 0, pr: 0 };
 }
 function layout() {
   const top = 104, bot = 224, band = Math.max(200, H - top - bot);
-  const R = Math.min(W * .38, band * .4), ry = R * ORBIT_TILT;
-  const margin = ry + R * .25 * .95; // outer ring plus a constellation's half-height
+  const R = Math.min(W * .41, band * .42), ry = R * ORBIT_TILT;
+  const margin = ry + R * .22 * .95; // outer ring plus a constellation's half-height
   for (const [sys, cy] of [[G.foe, top + margin], [G.me, H - bot - margin]]) {
     if (!sys) continue;
     sys.cx = W / 2; sys.cy = cy; sys.R = R; sys.ry = ry;
@@ -64,23 +66,25 @@ const E = (c, type) => c && c.side === 'me' ? c.fxOn[type] || null : null;
 const myCons = id => G.me ? G.me.cons.filter(c => c.def.id === id) : [];
 
 // Builds the player's center planet object from its definition + planet level (행성 탭)
-function makePlayerPlanet(pid, lv) {
+function makePlayerPlanet(pid, lv, cos = {}) {
   const d = PLANET[pid], t = d.trait, hp = Math.round(d.hp * planetHpMul(lv));
   return { isPlanet: true, kind: d.kind, look: d.look, name: d.name, hp, maxHp: hp, baseHp: hp, dArmor: 20, mArmor: 20,
+    orbits: d.orbits, skin: cos.skin || 'basic', orbitSkins: cos.orbitSkins || [],
     regen: t.regen || 0, rateMul: t.rateMul || 1, atkMul: t.atkMul || 1, crit: t.crit || 0, dmgRed: t.dmgRed || 0, energy: t.energy || 0,
     flash: 0, dot: null, side: 'me' };
 }
 // Constellation with account-side bonuses (grade + star parts from 별자리 탭)
-function makeMyCon(id) {
+// os = base stats of the orbit it sits on (궤도 능력치)
+function makeMyCon(id, os = { atk: 0, rate: 0, hp: 0 }) {
   const b = conBonus(id), sk = SKIN[equippedSkin(id)], mod = sk.mod || {};
-  const c = makeCon(CON[id], 'me', { hp: b.hp * (mod.hp || 1), atk: b.atk * (mod.atk || 1) });
-  c.m.rate = b.rate * (mod.rate || 1) - 1; c.grade = b.grade;
+  const c = makeCon(CON[id], 'me', { hp: b.hp * (mod.hp || 1) * (1 + os.hp), atk: b.atk * (mod.atk || 1) * (1 + os.atk) });
+  c.m.rate = b.rate * (mod.rate || 1) * (1 + os.rate) - 1; c.grade = b.grade;
   c.skin = sk; c.style = sk.style || CON[id].style; c.kind = sk.kind || CON[id].kind;
   return c;
 }
 function startRun(mode) {
-  const P = makePlayerPlanet(save.mainPlanet, save.planets[save.mainPlanet].lv);
-  G.me = makeSystem('me', P, save.team.map(makeMyCon));
+  G.me = buildMySystem();
+  const P = G.me.planet;
   Object.assign(G, { mode, wave: 1, kills: 0, energy: 2 + P.energy, shield: 0, nova: 0, roar: 0, pShield: 0, proj: [], beams: [], fx: [], texts: [],
     lv: 1, xp: 0, pendingLv: 0, taken: [], zone: ZONES[0], choosing: false, paused: false });
   G.T = { armor: 0, marmor: 0, evade: 0, dmgRed: 0, planetRed: P.dmgRed };
@@ -97,7 +101,7 @@ function startPvp() {
   const pool = Array.from({ length: n }, () => ALL_CONS[Math.floor(Math.random() * ALL_CONS.length)]);
   const base = pool.reduce((s, d) => s + d.atk * d.rate * 10 + d.hp / 5, 0);
   const m = Math.max(.6, power / Math.max(1, base)) * scale;
-  const P = makePlayerPlanet(pid, 1 + Math.floor(Math.random() * 3));
+  const P = makePlayerPlanet(pid, 1 + Math.floor(Math.random() * 3), { skin: PLANET_SKINS[Math.floor(Math.random() * PLANET_SKINS.length)].id });
   Object.assign(P, { side: 'foe', hp: Math.round(P.hp * m * 1.1), shred: 0 }); P.maxHp = P.hp;
   G.ghost = { name, lv: Math.max(1, save.lv + Math.floor(rnd(-2, 3))), planet: PLANET[pid].name };
   G.foe = makeSystem('foe', P, pool.map(d => { const c = makeCon(d, 'foe', { hp: m, atk: m }); if (d.special) c.def = d; return c; }));
@@ -474,7 +478,7 @@ $('skShield').addEventListener('click', () => useSkill('shield'));
 $('skNova').addEventListener('click', () => useSkill('nova'));
 
 /* ---------- Tap targeting / in-battle level up ---------- */
-function conSize(sys) { return sys.R * .25; }
+function conSize(sys) { return sys.R * .22; }
 cv.addEventListener('pointerdown', e => {
   if (G.state !== 'fight' || G.paused || G.choosing) return;
   const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
@@ -659,6 +663,8 @@ function drawPlanet(sys, t) {
   else if (kind === 'moon') { c1 = '#f6f6fa'; c2 = '#a6a9bb'; c3 = '#3e4156'; glow = '200,205,235'; }
   else { [c1, c2, c3] = look.c; glow = look.glow; }
   if (kind === 'hole') { drawHole(x, y, r, t, P); return; }
+  const tint = P.skin && PSKIN[P.skin] ? PSKIN[P.skin].tint : null;
+  if (tint) glow = tint;
   const isStar = kind === 'sun' || kind === 'star';
   const hr = r * (isStar ? 2.8 + .15 * Math.sin(t * 2) : 2.1);
   if (save.settings.glow) {
@@ -697,6 +703,7 @@ function drawPlanet(sys, t) {
     sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(.55, 'rgba(0,0,10,.05)'); sh.addColorStop(1, 'rgba(0,0,15,.6)');
     ctx.fillStyle = sh; ctx.fillRect(x - r, y - r, r * 2, r * 2);
   }
+  if (tint) { ctx.globalCompositeOperation = 'color'; ctx.fillStyle = `rgba(${tint},.6)`; ctx.fillRect(x - r, y - r, r * 2, r * 2); ctx.globalCompositeOperation = 'source-over'; }
   if (P.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${P.flash * 3})`; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
   ctx.restore();
   if (look.ring) drawRing(x, y, r, false, glow);
@@ -776,11 +783,39 @@ function drawCon(sys, c, t) {
   }
   ctx.globalAlpha = 1;
 }
-function drawSystem(sys, t) {
-  ctx.save(); ctx.strokeStyle = sys.side === 'me' ? 'rgba(245,196,81,.22)' : 'rgba(255,123,138,.2)';
-  ctx.lineWidth = 1; ctx.setLineDash([2, 6]);
-  for (const r of sys.rings) { ctx.beginPath(); ctx.ellipse(sys.cx, sys.cy, sys.R * r.rf, sys.ry * r.rf, 0, 0, TAU); ctx.stroke(); }
+// Orbit skins (궤도 스킨): dash / dust / aurora / comet
+function drawOrbit(sys, r, t) {
+  const rx = sys.R * r.rf, ry = sys.ry * r.rf, mine = sys.side === 'me', col = mine ? '245,196,81' : '255,123,138';
+  ctx.save();
+  if (r.skin === 'dust') {
+    for (let i = 0; i < 48; i++) {
+      const a = i / 48 * TAU + t * .05, tw = .25 + .5 * Math.sin(t * 2 + i * 1.7) ** 2;
+      ctx.fillStyle = `rgba(230,225,255,${tw})`; ctx.beginPath(); ctx.arc(sys.cx + rx * Math.cos(a), sys.cy + ry * Math.sin(a), 1.3, 0, TAU); ctx.fill();
+    }
+  } else if (r.skin === 'aurora') {
+    ctx.strokeStyle = 'rgba(110,255,210,.16)'; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.ellipse(sys.cx, sys.cy, rx, ry, 0, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = 'rgba(160,255,230,.55)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.ellipse(sys.cx, sys.cy, rx, ry, 0, 0, TAU); ctx.stroke();
+  } else if (r.skin === 'comet') {
+    ctx.strokeStyle = `rgba(${col},.14)`; ctx.lineWidth = 1; ctx.setLineDash([2, 8]);
+    ctx.beginPath(); ctx.ellipse(sys.cx, sys.cy, rx, ry, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+    for (let k = 0; k < 3; k++) {
+      const a0 = t * .9 + k * TAU / 3;
+      for (let j = 0; j < 10; j++) {
+        const a = a0 - j * .045;
+        ctx.fillStyle = `rgba(255,220,160,${(1 - j / 10) * .9})`;
+        ctx.beginPath(); ctx.arc(sys.cx + rx * Math.cos(a), sys.cy + ry * Math.sin(a), 2.2 * (1 - j / 12), 0, TAU); ctx.fill();
+      }
+    }
+  } else {
+    ctx.strokeStyle = `rgba(${col},.22)`; ctx.lineWidth = 1; ctx.setLineDash([2, 6]);
+    ctx.beginPath(); ctx.ellipse(sys.cx, sys.cy, rx, ry, 0, 0, TAU); ctx.stroke();
+  }
   ctx.restore();
+}
+function drawSystem(sys, t) {
+  for (const r of sys.rings) drawOrbit(sys, r, t);
   const back = sys.cons.filter(c => c.depth < 0).sort((a, b) => a.y - b.y);
   const front = sys.cons.filter(c => c.depth >= 0).sort((a, b) => a.y - b.y);
   back.forEach(c => drawCon(sys, c, t));

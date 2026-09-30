@@ -315,7 +315,42 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .detail .mods{color:var(--ok);font-weight:500}
 .detail > button{justify-self:stretch}
 
-/* team */
+/* team: planet → orbits → constellations */
+.orb{position:relative;overflow:hidden}
+.orb i{position:absolute;inset:0;border-radius:50%;mix-blend-mode:color}
+.team-planet,.orbit-card{display:grid;gap:10px;padding:14px;border-radius:16px;border:1px solid var(--line);background:rgba(15,22,52,.8)}
+.tp-head{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.tp-head .orb{width:52px;height:52px}
+.tp-txt{display:grid;gap:6px;min-width:0}
+.tp-txt b{font-size:16px}
+.tp-txt small{font-family:var(--f-disp);color:var(--gold);font-size:12px;margin-left:4px}
+.schips{display:flex;flex-wrap:wrap;gap:4px}
+.schip{font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(82,227,164,.1);color:var(--ok);border:1px solid rgba(82,227,164,.3)}
+.chips-row{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:center}
+.chips-row .lbl{font-size:11px;color:var(--dim);white-space:nowrap}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(8,12,30,.7);font-size:12px;color:var(--dim)}
+.chip b{font-family:var(--f-disp);font-size:11px;margin-left:2px}
+.chip[aria-pressed="true"]{border-color:var(--gold);color:var(--gold);background:rgba(245,196,81,.1)}
+.orbit-card.target{border-color:var(--gold);box-shadow:inset 0 0 20px rgba(245,196,81,.12)}
+.oc-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px}
+.oc-head b{font-size:14px}
+.oslots{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.oslot{position:relative;display:grid;justify-items:center;gap:2px;padding:10px 6px;border-radius:12px;border:1px solid rgba(245,196,81,.45);background:rgba(245,196,81,.06);min-height:92px;align-content:center}
+.oslot b{font-size:12.5px}
+.oslot .x{position:absolute;top:6px;right:8px;font-size:10px;color:var(--dim)}
+.oslot.empty{border:1px dashed var(--line);background:none;color:var(--dim)}
+.oslot.empty span:first-child{font-size:22px;line-height:1}
+.oslot.empty[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+.con-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+.con-pick{position:relative;display:grid;justify-items:center;gap:2px;padding:10px 4px;border-radius:12px;border:1px solid var(--line);background:rgba(15,22,52,.75)}
+.con-pick b{font-size:13px}
+.con-pick em{position:absolute;top:5px;right:6px;font-style:normal;font-size:9.5px;padding:1px 6px;border-radius:999px;background:var(--gold);color:#1d1403;font-weight:700}
+.con-pick[aria-pressed="true"]{border-color:var(--gold);background:rgba(245,196,81,.08)}
+.con-pick.special .csvg .ln line{stroke:#d58bff}
+
+/* team (legacy) */
 .team-head{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(15,22,52,.8)}
 .team-head .orb{width:44px;height:44px}
 .team-head div{display:grid;gap:2px;min-width:0}
