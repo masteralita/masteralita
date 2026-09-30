@@ -25,9 +25,14 @@
    - 이 파일은 **비밀 키**예요. 채팅이나 GitHub에 올리지 마세요.
 7. 서비스 계정에 배포 권한 주기: https://console.cloud.google.com/iam-admin/iam 에서 프로젝트를 고르고
    `firebase-adminsdk-…` 계정의 ✏ 편집 → 역할 추가 **Firebase 관리자(Firebase Admin)**, **Service Usage 소비자** → 저장
-8. Claude Code 작업 환경에 등록 (세션 제목의 클라우드 환경 메뉴 → **Edit** → API credentials 또는 환경 변수)
-   - `FIREBASE_PROJECT_ID` = 프로젝트 ID (예: `galaxywar-1a2b3`)
-   - `FIREBASE_SERVICE_ACCOUNT` = 6번 JSON 파일의 **내용 전체**
+8. Claude Code 작업 환경에 등록 (세션 제목의 클라우드 환경 메뉴 → **Edit** → 환경 변수, `이름=값` 한 줄씩)
+   ```
+   FIREBASE_PROJECT_ID=galaxywar-1a2b3
+   FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@galaxywar-1a2b3.iam.gserviceaccount.com
+   FIREBASE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----\n
+   ```
+   - 세 값 모두 6번 JSON 파일의 `project_id`, `client_email`, `private_key` 값을 **따옴표 없이** 그대로 복사해요.
+   - `private_key`의 `\n`은 글자 그대로 두세요 (한 줄로 들어가요).
 9. 환경 변수는 **새 세션**부터 적용돼요. 새 세션에서 "Firebase 설정 끝났어. docs/FIREBASE.md 보고 이어서 진행해줘" 라고 말하면 돼요.
 
 ## 2. 데이터 구조 (Firestore)
