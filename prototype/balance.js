@@ -1,0 +1,152 @@
+'use strict';
+/* ==========================================================================
+   Balance registry — every value the admin screen (#admin) can edit.
+   A value is addressed by a path like "con/sgr/hp" into the live data objects
+   from data.js. Saved overrides live in the artifact database at
+   config/balance ({ values: { path: value } }) and are applied on top of the
+   defaults captured here, so the game and the admin screen share one source.
+   ========================================================================== */
+
+const BAL_ROOTS = {
+  con: CON, skin: SKIN, planet: PLANET, orbit: ORBIT_BASE, pskin: PSKIN, oskin: OSKIN,
+  grade: GRADES, gacha: GACHA, tier: SKIN_TIER, chest: CHEST_ODDS, adchest: AD_CHEST,
+  income: INCOME, slot: SLOT, enhance: ENHANCE_RATE, wave: WAVE,
+};
+
+// Param defaults per effect type, taken from the first skin that uses it (for switching an awakening's type)
+const FX_DEFAULTS = {};
+for (const s of Object.values(SKIN)) for (const ch of s.chain) if (!FX_DEFAULTS[ch.type]) FX_DEFAULTS[ch.type] = { ...ch.p };
+const FX_LABEL = {
+  multishot:'추가 사격', planetChip:'행성 관통', focus:'집중 누적', stun:'기절', execute:'처형', nth:'N번째 강타', splash:'범위 피해',
+  cleanse:'정화', amp:'공격력 증폭', extraProj:'투사체 추가', shred:'마방 감소', bounce:'튕김', teamGuard:'아군 피해 감소',
+  counter:'반격', revive:'부활', rage:'분노', quake:'지진', planetGuard:'행성 보호', echo:'연속 공격', critDmg:'치명 피해',
+  reflect:'피해 반사', slow:'둔화', molt:'탈피(무적)', roar:'포효', pierceBeam:'레이저 관통', energyKill:'처치 시 기력',
+  overheal:'초과 회복 보호막', nthHeal:'N번째 전체 회복', lowHpHeal:'위기 회복', balance:'저울질', pctDmg:'최대 HP 비례',
+  evadeCounter:'회피 반격', poisonStack:'독 중첩', poisonSpread:'독 전파', poisonBonus:'독 대상 추가 피해', leech:'흡혈',
+  applyPoison:'독/화상 부여', twinBeam:'쌍레이저', shieldPulse:'주기 보호막', energyPulse:'주기 기력', meteorCall:'유성 소환',
+};
+
+/* ---------- Sections (tables the admin shows and the xlsx exports) ---------- */
+// col: { key, label, kind: num|int|pct|text|orbits|chain, neutral? }  (pct = stored as fraction, shown ×100)
+const BAL_SECTIONS = [
+  { id:'con', title:'별자리', desc:'별자리 기본 능력치 (등급 배율·파츠·스킨 보정 전)',
+    rows: ALL_CONS.map(c => ({ id:c.id, label:`${c.name}자리`, sub:c.en })),
+    cols: [{ key:'hp', label:'HP', kind:'int' }, { key:'atk', label:'공격력', kind:'num' }, { key:'rate', label:'공격속도(/s)', kind:'num' },
+           { key:'def', label:'물리 방어', kind:'int' }, { key:'mdef', label:'마법 방어', kind:'int' }],
+    path: (r, c) => `con/${r}/${c}` },
+  { id:'skin', title:'스킨·스킬', desc:'스킨별 능력치 보정(배율)과 각성 I~III 효과',
+    rows: Object.values(SKIN).map(s => ({ id:s.id, label:s.name, sub:`${CON[s.con].name} · ${SKIN_TIER[s.tier].name}` })),
+    cols: [{ key:'mod/atk', label:'공격력 ×', kind:'num', neutral:1 }, { key:'mod/rate', label:'공속 ×', kind:'num', neutral:1 }, { key:'mod/hp', label:'HP ×', kind:'num', neutral:1 },
+           { key:'chain/0', label:'각성 I', kind:'chain' }, { key:'chain/1', label:'각성 II', kind:'chain' }, { key:'chain/2', label:'각성 III', kind:'chain' }],
+    path: (r, c) => `skin/${r}/${c}` },
+  { id:'planet', title:'행성', desc:'중심 행성 능력치와 특성 (궤도 수 1~2)',
+    rows: PLANETS.map(p => ({ id:p.id, label:p.name, sub:p.en })),
+    cols: [{ key:'hp', label:'HP', kind:'int' }, { key:'orbits', label:'궤도 수', kind:'orbits' }, { key:'unlock', label:'해금 💎', kind:'int' },
+           { key:'trait/atkMul', label:'공격력 ×', kind:'num', neutral:1 }, { key:'trait/rateMul', label:'공속 ×', kind:'num', neutral:1 },
+           { key:'trait/regen', label:'초당 회복', kind:'num', neutral:0 }, { key:'trait/dmgRed', label:'받는 피해 감소', kind:'pct', neutral:0 },
+           { key:'trait/energy', label:'시작 기력', kind:'int', neutral:0 }, { key:'trait/crit', label:'치명타율', kind:'pct', neutral:0 },
+           { key:'desc', label:'설명', kind:'text' }],
+    path: (r, c) => `planet/${r}/${c}` },
+  { id:'orbit', title:'궤도', desc:'궤도 기본 능력치 (그 궤도의 별자리에게 적용)',
+    rows: [{ id:'single/0', label:'단일 궤도', sub:'궤도 1개 행성' }, { id:'dual/0', label:'안쪽 궤도', sub:'궤도 2개 행성' }, { id:'dual/1', label:'바깥 궤도', sub:'궤도 2개 행성' }],
+    cols: [{ key:'name', label:'이름', kind:'text' }, { key:'atk', label:'공격력 +', kind:'pct' }, { key:'rate', label:'공속 +', kind:'pct' }, { key:'hp', label:'HP +', kind:'pct' }],
+    path: (r, c) => `orbit/${r}/${c}` },
+  { id:'pskin', title:'행성 스킨', desc:'행성 스킨 가격과 보너스',
+    rows: PLANET_SKINS.map(s => ({ id:s.id, label:s.name })),
+    cols: [{ key:'price', label:'가격 💎', kind:'int' }, { key:'bonus/hp', label:'행성 HP +', kind:'pct', neutral:0 },
+           { key:'bonus/atk', label:'전체 공격력 +', kind:'pct', neutral:0 }, { key:'bonus/dmgRed', label:'받는 피해 -', kind:'pct', neutral:0 }],
+    path: (r, c) => `pskin/${r}/${c}` },
+  { id:'oskin', title:'궤도 스킨', desc:'궤도 스킨 가격과 보너스 (그 궤도의 별자리)',
+    rows: ORBIT_SKINS.map(s => ({ id:s.id, label:s.name })),
+    cols: [{ key:'price', label:'가격 💎', kind:'int' }, { key:'bonus/atk', label:'공격력 +', kind:'pct', neutral:0 },
+           { key:'bonus/rate', label:'공속 +', kind:'pct', neutral:0 }, { key:'bonus/hp', label:'HP +', kind:'pct', neutral:0 }],
+    path: (r, c) => `oskin/${r}/${c}` },
+  { id:'grade', title:'등급·뽑기', desc:'등급 배율과 뽑기 가중치 (가중치 합 기준 확률)',
+    rows: GRADES.map((g, i) => ({ id:String(i), label:g.name, sub:g.en })),
+    cols: [{ key:'mult', label:'능력치 배율', kind:'num' }, { key:'gold', label:'골드 뽑기 가중치', kind:'num' }, { key:'paid', label:'유료 뽑기 가중치', kind:'num' }],
+    path: (r, c) => c === 'mult' ? `grade/${r}/mult` : `gacha/${c}/w/${r}` },
+  { id:'econ', title:'경제·확률', desc:'가격, 확률, 보상량', kv: [
+      ['gacha/gold/cost', '골드 뽑기 1회 (Star Dust)', 'int'], ['gacha/gold/cost10', '골드 뽑기 10회 (Star Dust)', 'int'],
+      ['gacha/paid/cost', '유료 뽑기 1회 (Star Piece)', 'int'], ['gacha/paid/cost10', '유료 뽑기 10회 (Star Piece)', 'int'],
+      ['tier/supernova/price', '스페셜 스킨 가격 (Star Piece)', 'int'],
+      ['chest/skin', '보물 상자 · 성운 스킨 확률', 'pct'], ['chest/dust', '보물 상자 · Star Dust 확률', 'pct'],
+      ['chest/piece', '보물 상자 · Star Piece 확률', 'pct'], ['chest/con', '보물 상자 · 별자리 카드 확률', 'pct'],
+      ['adchest/reward/0', '광고 상자 보상 최소 (Star Piece)', 'int'], ['adchest/reward/1', '광고 상자 보상 최대 (Star Piece)', 'int'],
+      ['adchest/cd/0', '광고 상자 등장 간격 최소 (초)', 'int'], ['adchest/cd/1', '광고 상자 등장 간격 최대 (초)', 'int'],
+      ['adchest/hp', '광고 상자 격추 횟수', 'int'], ['adchest/life', '광고 상자 유지 시간 (초)', 'int'],
+      ['income/dustBase', '방치 수입 · Star Dust 기본 (시간당)', 'int'], ['income/dustPerLv', '방치 수입 · 레벨당 추가', 'int'],
+      ['income/pieceRate', '방치 수입 · Star Piece (시간당)', 'num'], ['income/capHours', '방치 수입 · 최대 누적 (시간)', 'int'],
+      ['slot/act/cost', '액티브 슬롯 열기 (Star Dust)', 'int'], ['slot/pas/cost', '패시브 슬롯 열기 (Star Dust)', 'int'], ['slot/lim/cost', '한정 슬롯 열기 (Star Piece)', 'int'],
+      ...ENHANCE_RATE.map((_, i) => [`enhance/${i}`, `강화 성공률 +${i} → +${i + 1}`, 'pct']),
+    ] },
+  { id:'wave', title:'웨이브', desc:'아케이드 난이도 곡선', kv: [
+      ['wave/planetHp', '적 행성 기본 HP', 'int'], ['wave/planetGrowth', '적 행성 HP 증가 (웨이브마다 ×)', 'num'],
+      ['wave/statGrowth', '적 별자리 능력치 증가 (웨이브마다 ×)', 'num'], ['wave/deepFrom', '외우주 가속 시작 웨이브', 'int'],
+      ['wave/deepGrowth', '외우주 추가 증가 (×)', 'num'], ['wave/midBossHp', '중간 보스 HP 배율', 'num'], ['wave/zoneBossHp', '구역 보스 HP 배율', 'num'],
+      ['wave/conHp', '적 별자리 HP 배율', 'num'], ['wave/conAtk', '적 별자리 공격력 배율', 'num'], ['wave/timer', '웨이브 제한 시간 (초)', 'int'],
+    ] },
+];
+// Flatten into fields: path → { kind, neutral, label }
+const BAL_FIELDS = {};
+for (const s of BAL_SECTIONS) {
+  if (s.kv) for (const [path, label, kind] of s.kv) BAL_FIELDS[path] = { kind, label, sec: s.id };
+  else for (const r of s.rows) for (const c of s.cols) BAL_FIELDS[s.path(r.id, c.key)] = { kind: c.kind, neutral: c.neutral, label: `${r.label} · ${c.label}`, sec: s.id };
+}
+
+/* ---------- Path access ---------- */
+function balGet(path) {
+  const seg = path.split('/');
+  let o = BAL_ROOTS[seg[0]];
+  if (seg[0] === 'skin' && seg[2] === 'chain') { const ch = o[seg[1]].chain[+seg[3]]; return { type: ch.type, p: { ...ch.p } }; }
+  for (let i = 1; i < seg.length; i++) { if (o == null) return undefined; o = o[seg[i]]; }
+  return o;
+}
+function balSet(path, v) {
+  const seg = path.split('/');
+  let o = BAL_ROOTS[seg[0]];
+  if (seg[0] === 'skin' && seg[2] === 'chain') {
+    const ch = o[seg[1]].chain[+seg[3]];
+    ch.type = FX[v.type] ? v.type : ch.type; ch.p = { ...(v.p || FX_DEFAULTS[ch.type] || {}) }; // exactly the given params
+    ch.desc = FX[ch.type](ch.p); return;
+  }
+  const f = BAL_FIELDS[path], k = seg[seg.length - 1], isNeutral = f && f.neutral !== undefined && v === f.neutral;
+  for (let i = 1; i < seg.length - 1; i++) {
+    if (o[seg[i]] == null) { if (isNeutral) return; o[seg[i]] = {}; } // don't create containers just to hold a neutral value
+    o = o[seg[i]];
+  }
+  if (isNeutral && !(k in o)) return;
+  if (isNeutral && f.neutral === 0 && (seg.includes('bonus') || seg.includes('trait'))) delete o[k]; // no "+0%" lines
+  else o[k] = v;
+}
+const balValue = path => { const v = balGet(path), f = BAL_FIELDS[path]; return v === undefined && f ? f.neutral : v; };
+
+// Defaults as shipped in data.js (deep-copied)
+const BAL_DEFAULTS = {};
+for (const p of Object.keys(BAL_FIELDS)) BAL_DEFAULTS[p] = JSON.parse(JSON.stringify(balValue(p) ?? null));
+
+const sameVal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// Reset every field to its default, then apply the saved overrides
+function applyBalance(values = {}) {
+  for (const [p, d] of Object.entries(BAL_DEFAULTS)) balSet(p, JSON.parse(JSON.stringify(d)));
+  for (const [p, v] of Object.entries(values)) if (BAL_FIELDS[p]) { try { balSet(p, v); } catch {} }
+}
+
+/* ---------- Live sync with the artifact database ---------- */
+const BAL = { values: {}, savedAt: null, db: null, ready: false, listeners: [] };
+const BAL_DOC = 'config/balance';
+function onBalance(fn) { BAL.listeners.push(fn); }
+(async function loadBalance() {
+  const db = window.claude && window.claude.use ? await window.claude.use('db').catch(() => null) : null;
+  BAL.db = db;
+  if (!db) { BAL.ready = true; BAL.listeners.forEach(f => f()); return; }
+  db.doc(BAL_DOC).onSnapshot(snap => {
+    const d = snap.exists ? snap.data() : null;
+    BAL.values = (d && d.values) || {}; BAL.savedAt = d && d.savedAt || null; BAL.ready = true;
+    applyBalance(BAL.values);
+    BAL.listeners.forEach(f => f());
+  }, () => { BAL.ready = true; BAL.listeners.forEach(f => f()); });
+})();
+async function saveBalance(values) {
+  if (!BAL.db) throw { code: 'unavailable' };
+  await BAL.db.doc(BAL_DOC).set({ v: 1, values, savedAt: new Date().toISOString() });
+}

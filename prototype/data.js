@@ -344,12 +344,17 @@ const PART_BASE = [2, 3, 4.5, 6.5, 9, 12];               // % per grade at +0
 const partValue = p => PART_BASE[p.g] * (1 + p.en * .15);
 const PART_MAX_EN = 10;
 // 강화성공확률 시트: 1~5 100%, 6~7 90%, 7~8 80% …
-const enhanceRate = en => en < 5 ? 1 : [.9, .8, .7, .6, .5][en - 5];
+const ENHANCE_RATE = [1, 1, 1, 1, 1, .9, .8, .7, .6, .5];             // success rate for +0→+1 … +9→+10
+const enhanceRate = en => ENHANCE_RATE[en] ?? .5;
 const enhanceCost = p => 300 * (p.en + 1) * (p.g + 1);
 const SUMMON_COST = 1000, RESUMMON_COST = 800, promoteCost = p => 60 * (p.g + 1);
 
 /* ---------- Economy (필요 화면 시트: 공통) ---------- */
-const INCOME = { dust: lv => 90 + lv * 10, piece: () => 1, capHours: 12 };
+const INCOME = { dustBase:90, dustPerLv:10, pieceRate:1, capHours:12,
+  dust(lv) { return this.dustBase + lv * this.dustPerLv; }, piece() { return this.pieceRate; } };
+/* ---------- Arcade wave scaling ---------- */
+const WAVE = { planetHp:900, planetGrowth:1.2, statGrowth:1.13, deepFrom:20, deepGrowth:1.03,
+  midBossHp:1.8, zoneBossHp:2.6, conHp:.9, conAtk:.8, timer:40 };
 const CHEST_STEP = 10, CHEST_MAX = 1000;
 // per chest: 성운 스킨 → Star Dust → Star Piece → 별자리 카드 (cumulative bands)
 const CHEST_ODDS = { skin:.12, dust:.5, piece:.23, con:.15 };

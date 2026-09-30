@@ -116,19 +116,19 @@ function startPvp() {
 function startWave() {
   const n = G.wave, z = zoneOf(n);
   const bossTier = n % 10 === 0 ? 2 : n % 5 === 0 ? 1 : 0;
-  const deep = Math.max(0, n - 20);
-  const m = Math.pow(1.13, n - 1) * Math.pow(1.03, deep);
+  const deep = Math.max(0, n - WAVE.deepFrom);
+  const m = Math.pow(WAVE.statGrowth, n - 1) * Math.pow(WAVE.deepGrowth, deep);
   const look = bossTier === 2 ? z.boss : bossTier === 1 ? z.mid : z.foes[Math.floor(Math.random() * z.foes.length)];
   const base = z === ZONES[0] ? 2 : z === ZONES[1] ? 3 : 4;
   const count = bossTier ? base + 1 : Math.min(base + Math.floor(((n - 1) % 10) / 4), base + 2);
   const pool = Array.from({ length: count }, () => ZODIAC[Math.floor(Math.random() * ZODIAC.length)]);
-  const pHp = Math.round(900 * Math.pow(1.2, n - 1) * Math.pow(1.03, deep) * (bossTier === 2 ? 2.6 : bossTier === 1 ? 1.8 : 1));
+  const pHp = Math.round(WAVE.planetHp * Math.pow(WAVE.planetGrowth, n - 1) * Math.pow(WAVE.deepGrowth, deep) * (bossTier === 2 ? WAVE.zoneBossHp : bossTier === 1 ? WAVE.midBossHp : 1));
   G.foe = makeSystem('foe', { isPlanet: true, look, kind: look.kind, bossTier, ability: bossTier ? (look.ability || 'stun') : null,
     name: look.name, hp: pHp, maxHp: pHp, dArmor: 15 + n * 2, mArmor: 15 + n * 2, flash: 0, dot: null, shred: 0, side: 'foe' },
-    pool.map(d => makeCon(d, 'foe', { hp: .9 * m, atk: .8 * m })));
+    pool.map(d => makeCon(d, 'foe', { hp: WAVE.conHp * m, atk: WAVE.conAtk * m })));
   for (const c of G.me.cons) { c.dead = false; c.hp = c.maxHp; c.alpha = 1; c.stun = 0; c.dot = null; c.revived = false; c.molted = false; c.invuln = 0; }
   const P = G.me.planet; if (n > 1) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * .15);
-  G.timer = 40; G.enraged = false; G.bossCd = 5; G.bossCd2 = 8; G.focus = null; G.proj = []; G.beams = [];
+  G.timer = WAVE.timer; G.enraged = false; G.bossCd = 5; G.bossCd2 = 8; G.focus = null; G.proj = []; G.beams = [];
   G.state = 'fight';
   const newZone = z !== G.zone || n === 1; G.zone = z;
   $('foeName').textContent = (bossTier === 2 ? '구역 보스 · ' : bossTier === 1 ? 'BOSS · ' : '') + look.name;

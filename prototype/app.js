@@ -896,12 +896,14 @@ function openSettings() {
         <button type="button" data-act="soon">플레이 방법</button><button type="button" data-act="restore">구매 복원</button>
         <button type="button" data-act="soon">리뷰 남기기</button><button type="button" data-act="mail">문의하기</button>
         <button type="button" data-act="soon">이용약관</button><button type="button" data-act="reset" class="danger">서비스 탈퇴</button>
+        <button type="button" data-act="admin">밸런스 관리자</button>
       </div>
     </div>
     <div class="mbtns"><button class="cta sm" data-act="close" type="button">닫기</button></div>`,
   (act, el) => {
     if (act === 'close') closeModal();
     else if (act === 'soon') toast('정식 버전에서 열려요');
+    else if (act === 'admin') { closeModal(); location.hash = '#admin'; }
     else if (act === 'restore') toast('복원할 구매 내역이 없어요');
     else if (act === 'mail') toast('문의: support@galaxywar.example');
     else if (act === 'rename') {
