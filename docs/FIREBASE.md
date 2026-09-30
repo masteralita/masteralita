@@ -59,19 +59,41 @@
 
 ## 4. 진행 순서 (Claude)
 
-1. 관리자 웹사이트 (`admin/`): 로그인, 콘텐츠 목록/등록/수정, 이미지 업로드, 수치 편집(지금의 #admin 기능 이전), 엑셀 내보내기/가져오기, 초안 → 배포
-2. 현재 `prototype/data.js` 값을 Firestore로 옮기는 초기 등록 스크립트 (`tools/seed.mjs`)
-3. 보안 규칙 (`firestore.rules`, `storage.rules`) 과 Hosting 설정 (`firebase.json`) 배포
-4. 게임이 `meta/current` → `releases/{version}` 을 읽어 데이터를 적용하도록 변경 (못 받으면 내장 기본값 사용)
-5. 웹 프로토타입도 Hosting의 `/play` 에 올려서 claude.ai 밖에서도 접속 가능하게
+1. ✅ 관리자 웹사이트 (`admin/`): Google 로그인, 수치 편집(게임 안 #admin 기능 이전), 엑셀 내보내기/가져오기, 초안 저장 → 배포, 배포 기록·되돌리기
+   - ⏳ 콘텐츠 목록/등록/수정(새 별자리·스킨 추가), 이미지 업로드 — Storage 설정(1-4번) 후 진행
+2. ✅ 초기 등록 (`tools/seed.mjs`): v1 = data.js 기본값으로 배포함
+3. ✅ 보안 규칙 (`firestore.rules`) · Hosting 설정 (`firebase.json`) 배포 — `storage.rules`는 Storage 설정 후
+4. ✅ 게임이 `meta/current` → `releases/{version}` 을 읽어 적용 (기기에 캐시, 못 받으면 캐시 → 내장 기본값)
+5. ✅ 웹 프로토타입을 Hosting `/play/` 에 배포
 
-## 5. 이어받기 메모 (이전 세션 → 새 세션)
+## 5. 현재 상태
 
-- 작업 브랜치: `claude/vibrant-einstein-sc3mji` — 지금까지의 모든 작업이 여기에 있어요. 새 작업도 이 브랜치를 기준으로 이어가요.
-- 웹 프로토타입: `prototype/` (index.html + data.js, balance.js, battle.js, ads.js, app.js, admin.js)
-  - claude.ai 아티팩트로 배포 중: https://claude.ai/artifact/JN1fdTjTXAbeJoF3GsMeHj (게임), `#admin` (게임 안 밸런스 관리자)
-  - 수치 레지스트리: `prototype/balance.js` 의 `BAL_SECTIONS` (513개 값, `path → value`). Firebase의 `config/balance` 도 같은 형식으로 쓰면 돼요.
-- 사용자가 환경 변수 `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` 를 등록함 (API 자격 증명이 아닌 일반 환경 변수).
-  - 먼저 값이 있는지만 확인하고(내용은 출력하지 않기), 서비스 계정으로 토큰 발급 → Firestore/Storage/Hosting 접근을 점검해요.
-  - 권한 오류가 나면 1-7번(IAM 역할)을 사용자에게 다시 안내해요.
-- 다음 순서: 4번 "진행 순서"의 1번(관리자 웹사이트)부터.
+| | 주소 / 값 |
+|---|---|
+| 게임 | https://galaxywar-e3d9a.web.app/play/ |
+| 관리자 | https://galaxywar-e3d9a.web.app/admin/ |
+| Firestore DB | 이름 `glaxywardb` (기본 DB가 아닌 이름 있는 DB, 서울) — 코드의 `FIREBASE_DB` |
+| 웹 앱 설정 | `prototype/firebase-config.js` (공개 값이에요. 권한은 보안 규칙이 결정) |
+| Storage | ❌ 아직 없음 — 1-4번(Blaze 업그레이드 + Storage 시작)이 필요해요 |
+
+### 관리자 사이트 쓰는 법
+- 표에서 값 수정 → **초안 저장** (여러 관리자가 같은 초안을 봐요) → **배포** (메모 입력) → 게임은 다음 실행 때 새 버전을 받아요.
+- **배포 기록** 탭: 예전 버전을 초안으로 불러와 다시 배포하면 되돌리기예요.
+- claude.ai 게임의 `#admin`에 저장했던 값이 있으면: 그 화면에서 **엑셀 내보내기** → 관리자 사이트에서 **엑셀 가져오기** → 초안 저장 → 배포.
+
+### 도구 (`tools/`, 환경 변수 3개 필요)
+| 명령 | 하는 일 |
+|---|---|
+| `node tools/deploy.mjs` | 보안 규칙 + Hosting 배포 (`rules` / `hosting` / `build`만 따로도 가능) |
+| `node tools/add-admin.mjs <이메일>` | 관리자 등록 (그 계정이 관리자 사이트에서 한 번 로그인한 뒤) · `--remove`로 해제 |
+| `node tools/seed.mjs` | 배포 버전이 하나도 없을 때 v1 만들기 |
+
+- 서비스 계정 권한: Firestore·Hosting·Rules·Auth 조회는 돼요. **Service Usage 소비자** 역할이 아직 없어서 `x-goog-user-project` 헤더를 쓰는 API는 403이에요 (지금 도구는 필요 없음).
+- claude.ai 아티팩트(게임)는 외부 서버에 접속할 수 없어서 계속 내장 기본값을 써요. 서버 값이 들어간 게임은 `/play/` 주소로 열어요.
+
+## 6. 이어받기 메모
+
+- 작업 브랜치: `claude/upbeat-carson-fmqclr` (이전 `claude/vibrant-einstein-sc3mji` 작업 포함).
+- 웹 프로토타입: `prototype/` (index.html + data.js, firebase-config.js, balance.js, battle.js, ads.js, app.js)
+  - 수치 레지스트리: `prototype/balance.js` 의 `BAL_SECTIONS` (`path → value`). 관리자 사이트(`admin/admin.js`)가 같은 파일을 불러와 써요.
+- 다음 작업: Storage가 생기면 → `storage.rules` + 이미지 업로드, 그리고 콘텐츠(별자리·스킨·행성) 등록/수정을 데이터로 옮기기 (지금은 data.js에 코드로 있음).

@@ -1,10 +1,10 @@
 'use strict';
 /* ==========================================================================
-   Balance registry — every value the admin screen (#admin) can edit.
+   Balance registry — every value the admin site (admin/) can edit.
    A value is addressed by a path like "con/sgr/hp" into the live data objects
-   from data.js. Saved overrides live in the artifact database at
-   config/balance ({ values: { path: value } }) and are applied on top of the
-   defaults captured here, so the game and the admin screen share one source.
+   from data.js. Released overrides live in Firebase at releases/{version}
+   ({ values: { path: value } }) and are applied on top of the defaults
+   captured here, so the game and the admin site share one source.
    ========================================================================== */
 
 const BAL_ROOTS = {
@@ -131,22 +131,40 @@ function applyBalance(values = {}) {
   for (const [p, v] of Object.entries(values)) if (BAL_FIELDS[p]) { try { balSet(p, v); } catch {} }
 }
 
-/* ---------- Live sync with the artifact database ---------- */
-const BAL = { values: {}, savedAt: null, db: null, ready: false, listeners: [] };
-const BAL_DOC = 'config/balance';
+/* ---------- Released balance from Firebase (docs/FIREBASE.md) ---------- */
+// The admin site publishes releases/{version} and bumps meta/current; both are public to read.
+// The game checks meta/current on launch and downloads the release only when the version changed.
+// The last release is cached on the device, so an offline launch still uses it; nothing at all → data.js defaults.
+const BAL = { values: {}, version: 0, publishedAt: null, source: 'default', ready: false, listeners: [] };
+const BAL_CACHE = 'gw-balance';
 function onBalance(fn) { BAL.listeners.push(fn); }
-(async function loadBalance() {
-  const db = window.claude && window.claude.use ? await window.claude.use('db').catch(() => null) : null;
-  BAL.db = db;
-  if (!db) { BAL.ready = true; BAL.listeners.forEach(f => f()); return; }
-  db.doc(BAL_DOC).onSnapshot(snap => {
-    const d = snap.exists ? snap.data() : null;
-    BAL.values = (d && d.values) || {}; BAL.savedAt = d && d.savedAt || null; BAL.ready = true;
-    applyBalance(BAL.values);
-    BAL.listeners.forEach(f => f());
-  }, () => { BAL.ready = true; BAL.listeners.forEach(f => f()); });
-})();
-async function saveBalance(values) {
-  if (!BAL.db) throw { code: 'unavailable' };
-  await BAL.db.doc(BAL_DOC).set({ v: 1, values, savedAt: new Date().toISOString() });
+function useBalance(rel, source) {
+  BAL.values = rel.values || {}; BAL.version = rel.version || 0; BAL.publishedAt = rel.publishedAt || null; BAL.source = source;
+  applyBalance(BAL.values);
 }
+const fsPlain = f => 'mapValue' in f ? Object.fromEntries(Object.entries(f.mapValue.fields || {}).map(([k, x]) => [k, fsPlain(x)]))
+  : 'arrayValue' in f ? (f.arrayValue.values || []).map(fsPlain)
+  : 'integerValue' in f ? Number(f.integerValue) : 'nullValue' in f ? null : Object.values(f)[0];
+async function fsGet(path) {
+  const r = await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/${FIREBASE_DB}/documents/${path}?key=${FIREBASE_CONFIG.apiKey}`);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`firestore ${r.status}`);
+  return fsPlain({ mapValue: await r.json() });
+}
+(async function loadBalance() {
+  if (window.GW_ADMIN) return; // the admin site only uses the registry
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem(BAL_CACHE)); } catch {}
+  if (cached && cached.values) useBalance(cached, 'cache');
+  try {
+    const meta = await fsGet('meta/current');
+    const version = meta && meta.version || 0;
+    if (!version) { if (cached) useBalance({}, 'default'); }
+    else if (!cached || cached.version !== version) {
+      const rel = await fsGet(`releases/${version}`);
+      if (rel) { useBalance(rel, 'server'); try { localStorage.setItem(BAL_CACHE, JSON.stringify(rel)); } catch {} }
+    } else BAL.source = 'server';
+  } catch { /* offline or blocked (e.g. inside claude.ai): keep the cache or the defaults */ }
+  BAL.ready = true;
+  BAL.listeners.forEach(f => f());
+})();

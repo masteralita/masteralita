@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>갤럭시워 관리자</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+:root{
+  --void:#060a1a;--panel:#0f1634;--line:#26305f;--gold:#f5c451;--ink:#eaedff;--dim:#8d96c4;--lim:#c35bff;--ok:#52e3a4;
+  --f-disp:"Chakra Petch","Noto Sans KR",system-ui,sans-serif;
+  --f-body:"Noto Sans KR",system-ui,-apple-system,sans-serif;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--void);color:var(--ink);font-family:var(--f-body)}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+a{color:var(--gold)}
+code{font-size:12px;word-break:break-all}
+.eyebrow{font-family:var(--f-disp);font-size:12px;letter-spacing:.3em;color:var(--gold)}
+.cta{padding:14px 18px;border:0;border-radius:14px;background:linear-gradient(180deg,#ffd978,#e9a92f);color:#1d1403;font-family:var(--f-disp);font-weight:700;font-size:16px;letter-spacing:.08em}
+.cta:disabled{opacity:.4;cursor:default}
+.cta.sm{padding:9px 16px;font-size:13px;letter-spacing:.04em;border-radius:10px;font-family:var(--f-body)}
+.ghost{padding:14px;border-radius:14px;border:1px solid var(--line);background:var(--panel);font-weight:700}
+.ghost.sm{padding:9px 12px;font-size:12.5px;border-radius:10px}
+.ghost:disabled{opacity:.45;cursor:default}
+.link{border:0;background:none;padding:0;color:var(--gold);text-decoration:underline;font-size:12px}
+.admin{height:100%;display:grid;grid-template-rows:auto auto 1fr;background:var(--void);color:var(--ink)}
+.ad-top{display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:end;padding-inline:16px;padding-top:calc(14px + env(safe-area-inset-top,0px));padding-bottom:10px;border-bottom:1px solid var(--line);background:#0a1030}
+.ad-title h1{margin:2px 0 0;font-size:20px}
+.ad-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.ad-actions .file{position:relative;display:inline-flex;align-items:center;cursor:pointer;border:1px solid var(--line);background:var(--panel);font-weight:700}
+.ad-actions .file input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.ad-actions .file.off{opacity:.45;pointer-events:none}
+.ad-status{grid-column:1/-1}
+.ad-chip{display:inline-block;font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+.ad-chip.ok{color:var(--ok);border-color:rgba(82,227,164,.4)}
+.ad-chip.gold{color:var(--gold);border-color:rgba(245,196,81,.5)}
+.ad-chip.warn{color:#ffb27a;border-color:rgba(255,178,122,.5)}
+.ad-tabs{display:flex;gap:4px;overflow-x:auto;padding-inline:16px;padding-block:8px;border-bottom:1px solid var(--line);scrollbar-width:none}
+.ad-tabs::-webkit-scrollbar{display:none}
+.ad-tabs button{flex:none;padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:none;color:var(--dim);font-size:13px}
+.ad-tabs button[aria-current="page"]{background:var(--gold);border-color:var(--gold);color:#1d1403;font-weight:700}
+.ad-tabs em{font-style:normal;margin-left:6px;font-size:10px;padding:0 6px;border-radius:999px;background:rgba(245,196,81,.25);color:var(--gold)}
+.ad-tabs button[aria-current="page"] em{background:#1d1403;color:var(--gold)}
+.ad-body{overflow:auto;padding-inline:16px;padding-block:14px 40px;min-height:0}
+.ad-desc{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin-bottom:12px}
+.ad-desc h2{margin:0;font-size:17px}
+.ad-desc p{margin:0;flex:1 1 280px;font-size:12px;color:var(--dim);line-height:1.5}
+.ad-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+.ad-t{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+.ad-t th,.ad-t td{padding:6px 8px;border-bottom:1px solid rgba(38,48,95,.6);text-align:left;vertical-align:middle;white-space:nowrap}
+.ad-t thead th{position:sticky;top:0;background:#111a3f;font-size:11.5px;color:var(--dim);font-weight:500;z-index:1}
+.ad-t tbody th{font-weight:700;background:rgba(15,22,52,.6);position:sticky;left:0;z-index:1}
+.ad-t tbody th small{display:block;font-size:10.5px;color:var(--dim);font-weight:400}
+.ad-t td{position:relative}
+.ad-t td.mod::after{content:"";position:absolute;top:5px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--lim)}
+.ad-t td.dirty{box-shadow:inset 0 0 0 2px var(--gold)}
+.ad-t input,.ad-t select{font:inherit;color:var(--ink);background:rgba(8,12,30,.9);border:1px solid var(--line);border-radius:7px;padding:5px 7px}
+.ad-t input[type=number]{width:82px}
+.ad-t input.txt{width:180px}
+.ad-t input:focus,.ad-t select:focus{outline:2px solid var(--gold);outline-offset:0}
+.ad-t input:disabled,.ad-t select:disabled{opacity:.6}
+.num-in{display:inline-flex;align-items:center;gap:4px}
+.num-in i{font-style:normal;color:var(--dim);font-size:11px}
+.ad-t.kv th{white-space:normal;min-width:180px}
+.ad-t td.def{color:var(--dim);font-size:12px}
+.chain-ed{display:grid;gap:5px;min-width:250px}
+.chain-ed select{width:100%}
+.pps{display:flex;flex-wrap:wrap;gap:4px 8px}
+.pp{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--dim)}
+.pp input[type=number]{width:62px;padding:3px 5px}
+.fx-desc{white-space:normal;font-size:11px;color:var(--dim);line-height:1.4;max-width:280px}
+@media (max-width:620px){.ad-top{grid-template-columns:1fr;align-items:start}.ad-actions{justify-content:flex-start}.ad-title .eyebrow{letter-spacing:.2em}}
+
+.ad-status{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ad-status .who{margin-left:auto;font-size:12px;color:var(--dim)}
+.ad-t.rel td.note{white-space:normal;min-width:200px}
+.empty{color:var(--dim);font-size:14px;padding:16px}
+.gate{max-width:420px;margin:0 auto;padding:18vh 16px 40px;display:grid;gap:14px;justify-items:start}
+.gate h1{margin:0;font-size:24px}
+.gate p{margin:0;line-height:1.6}
+.gate .dim{color:var(--dim);font-size:13px}
+.gate dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:13px}
+.gate dt{color:var(--dim)}
+.gate dd{margin:0;min-width:0}
+dialog{border:1px solid var(--line);border-radius:16px;background:var(--panel);color:var(--ink);padding:20px;width:min(420px,calc(100% - 32px))}
+dialog::backdrop{background:rgba(0,0,0,.6)}
+dialog h3{margin:0 0 8px}
+dialog p{margin:0 0 12px;color:var(--dim);line-height:1.6;font-size:14px}
+dialog input{width:100%;box-sizing:border-box;font:inherit;color:var(--ink);background:rgba(8,12,30,.9);border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:12px}
+.dlg-btns{display:flex;justify-content:flex-end;gap:8px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,10px);max-width:calc(100% - 32px);padding:10px 16px;border-radius:12px;background:rgba(20,28,66,.97);border:1px solid var(--line);font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:30;text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<main class="admin" id="admin" aria-label="갤럭시워 관리자"></main>
+<dialog id="dlg"></dialog>
+<div class="toast" id="toast" role="status"></div>
+<script>window.GW_ADMIN = true;</script>
+<script src="../play/data.js"></script>
+<script src="../play/firebase-config.js"></script>
+<script src="../play/balance.js"></script>
+<script type="module" src="admin.js"></script>
+</body>
+</html>

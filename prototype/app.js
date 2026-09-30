@@ -903,7 +903,7 @@ function openSettings() {
   (act, el) => {
     if (act === 'close') closeModal();
     else if (act === 'soon') toast('정식 버전에서 열려요');
-    else if (act === 'admin') { closeModal(); location.hash = '#admin'; }
+    else if (act === 'admin') { closeModal(); window.open(`https://${FIREBASE_CONFIG.projectId}.web.app/admin/`, '_blank', 'noopener'); }
     else if (act === 'restore') toast('복원할 구매 내역이 없어요');
     else if (act === 'mail') toast('문의: support@galaxywar.example');
     else if (act === 'rename') {
@@ -976,6 +976,9 @@ function frame(now) {
   }
   requestAnimationFrame(frame);
 }
+
+// A newer balance release arrived after the first render: redraw the home tab with the new numbers
+onBalance(() => { if (G.state === 'home' && !$('shell').hidden) setTab(tab); });
 
 window.__gw = G; window.__save = () => save; // test handles
 resize();

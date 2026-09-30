@@ -1,0 +1,17 @@
+rules_version = '2';
+// 갤럭시워 — see docs/FIREBASE.md §3
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    // What the game reads, without signing in
+    match /meta/{doc} { allow read: if true; allow write: if isAdmin(); }
+    match /releases/{version} { allow read: if true; allow write: if isAdmin(); }
+    // Drafts and content: admins only
+    match /config/{doc} { allow read, write: if isAdmin(); }
+    match /content/{path=**} { allow read, write: if isAdmin(); }
+    // Admin list: each person can check their own entry; only the service account (tools/add-admin.mjs) adds people
+    match /admins/{uid} { allow read: if request.auth != null && request.auth.uid == uid; allow write: if false; }
+  }
+}
