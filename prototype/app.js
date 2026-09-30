@@ -700,6 +700,49 @@ function skinBonusText(kind, b) {
   const out = Object.entries(b).map(([k, v]) => `<li>${who[k]} <b>${k === 'dmgRed' ? '-' : '+'}${Math.round(v * 100)}%</b></li>`);
   return out.length ? `<ul class="sk-stats">${out.join('')}</ul>` : '<p class="mtxt">추가 능력치가 없는 기본 스킨이에요.</p>';
 }
+// 궤도 스킨 목록: owned first, then not owned; the preview follows the selection
+function openOrbitSkinList(k) {
+  const pid = save.mainPlanet, ps = save.planets[pid], cur = ps.orbitSkins[k] || 'dash';
+  const owned = ORBIT_SKINS.filter(s => save.oSkins.includes(s.id)), locked = ORBIT_SKINS.filter(s => !save.oSkins.includes(s.id));
+  let sel = cur;
+  const item = s => `<button class="skin-item" type="button" role="radio" data-os="${s.id}" aria-checked="${s.id === sel}">
+      <b>${s.name}</b><span class="mini">${Object.keys(s.bonus).length ? bonusLines(s.bonus, '').join(' · ').trim() : '능력치 없음'}</span>
+      ${s.id === cur ? '<em class="eq">장착</em>' : save.oSkins.includes(s.id) ? '<em class="own">보유</em>' : `<em class="piece">${fmt(s.price)}</em>`}
+    </button>`;
+  const info = () => {
+    const d = OSKIN[sel], own = save.oSkins.includes(sel);
+    const btn = sel === cur ? '<button class="cta sm" type="button" disabled>장착 중</button>'
+      : own ? '<button class="cta sm" data-act="equip" type="button">장착</button>'
+      : `<button class="cta sm" data-act="buy" type="button">구매 <b class="piece">${fmt(d.price)}</b></button>`;
+    return `<p class="mtxt">${d.flavor}</p>${skinBonusText('o', d.bonus)}
+      <div class="mbtns"><button class="ghost" data-act="close" type="button">취소</button>${btn}</div>`;
+  };
+  openModal(`
+    <div class="sk-preview"><canvas id="pvCv" aria-label="궤도 스킨 미리보기"></canvas><span class="sk-badge">미리보기</span></div>
+    <h3>${PLANET[pid].orbits === 1 ? '단일 궤도' : `궤도 ${k + 1}`} 스킨</h3>
+    <div class="skin-list" role="radiogroup" aria-label="궤도 스킨">
+      ${owned.length ? `<span class="set-h">보유</span>${owned.map(item).join('')}` : ''}
+      ${locked.length ? `<span class="set-h">미보유</span>${locked.map(item).join('')}` : ''}
+    </div>
+    <div id="osInfo">${info()}</div>`,
+  act => {
+    if (act === 'close') { closeModal(); return; }
+    if (act === 'buy') { if (!spend('piece', OSKIN[sel].price)) return; save.oSkins.push(sel); }
+    if (act === 'buy' || act === 'equip') {
+      ps.orbitSkins[k] = sel; persist(); closeModal();
+      toast(`${OSKIN[sel].name} 스킨을 ${act === 'buy' ? '구매하고 ' : ''}장착했어요`);
+      renderTeam(); enterHomeSystemOnly();
+    }
+  });
+  $('modalBody').querySelector('.skin-list').addEventListener('click', e => {
+    const b = e.target.closest('[data-os]'); if (!b) return;
+    sel = b.dataset.os;
+    $('modalBody').querySelectorAll('[data-os]').forEach(x => x.setAttribute('aria-checked', x === b));
+    $('osInfo').innerHTML = info();
+    PREVIEW.sys = buildMySystem({ oskin: { [k]: sel } });
+  });
+  PREVIEW = { canvas: $('pvCv'), sys: buildMySystem({ oskin: { [k]: cur } }) };
+}
 function openSkinPopup(kind, id, k) {
   const pid = save.mainPlanet, ps = save.planets[pid];
   let name, tag, body, owned, equipped, price = 0, lock = '', ov;
@@ -773,7 +816,7 @@ function renderTeam() {
           <button class="oslot" type="button" data-slot="${k}:${j}" aria-label="${CON[a[j]].name}자리 변경">${conSvg(a[j], 44)}<b>${SKIN[equippedSkin(a[j])].name}</b><span class="x">변경</span></button>`
           : `<button class="oslot empty" type="button" data-slot="${k}:${j}"><span>+</span><span class="mini">빈 자리</span></button>`).join('')}
       </div>
-      <div class="chips-row"><span class="lbl">궤도 스킨</span><div class="chips">${chips(ORBIT_SKINS, ps.orbitSkins[k] || 'dash', 'o', k)}</div></div>
+      <div class="skin-line"><span class="lbl">궤도 스킨</span><b>${OSKIN[ps.orbitSkins[k] || 'dash'].name}</b><button class="ghost sm" data-oskin="${k}" type="button">변경</button></div>
     </section>`; }).join('')}
     <p class="fine">별자리 <b>${save.team.length} / ${cap}</b> · 최소 ${TEAM_MIN}개 · 궤도마다 최대 ${ORBIT_CAP}개 · 칸을 눌러 별자리를 등록하거나 바꿔요${n === 1 ? ' · 궤도가 1개인 행성은 궤도 능력치가 더 높아요' : ''}</p>`;
 }
@@ -785,6 +828,7 @@ $('pane-team').addEventListener('click', e => {
     openSkinPopup(sk.dataset.sk, sk.dataset.id, sk.dataset.k != null ? +sk.dataset.k : null);
     return;
   }
+  const osb = e.target.closest('[data-oskin]'); if (osb) { openOrbitSkinList(+osb.dataset.oskin); return; }
   const sl = e.target.closest('[data-slot]'); if (!sl) return;
   const [k, j] = sl.dataset.slot.split(':').map(Number), cur = save.form[k][j];
   if (cur) confirmBox('별자리 변경', `${CON[cur].name}자리를 변경하시겠습니까?`, '변경', () => pickConPopup(k, j));
