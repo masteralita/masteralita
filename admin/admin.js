@@ -9,7 +9,10 @@
    ========================================================================== */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js';
-import { getFirestore, doc, getDoc, getDocs, setDoc, onSnapshot, collection, query, where, orderBy, limit, runTransaction } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js';
+import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, onSnapshot, collection, query, where, orderBy, limit, runTransaction } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js';
+import { makeOps } from './ops.js';
+import { makeStats } from './stats.js';
+import { makeLegal } from './legal.js';
 
 const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
@@ -17,15 +20,19 @@ const db = getFirestore(app, FIREBASE_DB);
 
 const ADM = {
   phase: 'loading', // loading | signin | denied | ready
-  user: null, sec: BAL_SECTIONS[0].id,
+  user: null, area: 'balance', sec: BAL_SECTIONS[0].id, // area: balance | ops | players | stats | legal
   draft: {}, saved: {}, savedAt: null, savedBy: null, // saved = config/balance
   content: {}, savedContent: {}, open: null,          // added items (balance.js applyContent), open = card being edited
   meta: null, releases: [], unsubs: [], busy: false,
-  players: null, playerQ: '', player: null,            // 플레이어 tab: list, search text, opened uid
+  players: null, playerQ: '', player: null, lb: {},     // 플레이어 tab: list, search text, opened uid, leaderboard entries by uid
 };
 const clone = o => JSON.parse(JSON.stringify(o));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const root = document.getElementById('admin');
+const fmtTime = t => t ? new Date(t).toLocaleString('ko-KR') : '';
+// 운영 · 통계 · 약관 areas live in their own modules
+const ctx = { db, ADM, esc, fmtTime, toast: (...a) => toast(...a), confirmBox: (...a) => confirmBox(...a), render: () => render() };
+const OPS = makeOps(ctx), STATS = makeStats(ctx), LEGAL = makeLegal(ctx);
 const liveRel = () => ADM.releases.find(r => ADM.meta && r.version === ADM.meta.version) || { values: {}, content: {} };
 const live = () => liveRel().values || {};
 
@@ -36,7 +43,6 @@ const ctDiff = (a = {}, b = {}) => CT_KINDS.reduce((n, k) => n + diff(a[k] || {}
 const unsavedCount = () => diff(ADM.draft, ADM.saved).length + ctDiff(ADM.content, ADM.savedContent);
 const pendingCount = () => diff(ADM.saved, live()).length + ctDiff(ADM.savedContent, liveRel().content);
 const isDirty = () => unsavedCount() > 0;
-const fmtTime = t => t ? new Date(t).toLocaleString('ko-KR') : '';
 
 /* ---------- Value formatting ---------- */
 function showNum(kind, v) { return kind === 'pct' ? +(v * 100).toFixed(4) : v; }
@@ -107,36 +113,44 @@ function statusChips() {
     : `<span class="ad-chip">게임 적용 중: ${ADM.meta && ADM.meta.version ? `v${ADM.meta.version}` : '내장 기본값'}</span>`);
   return out.join('');
 }
+const AREAS = [['balance', '밸런스'], ['ops', '운영'], ['players', '플레이어'], ['stats', '통계'], ['legal', '약관·정책']];
 function render() {
   if (ADM.phase !== 'ready') { root.innerHTML = gateHtml(); return; }
-  const s = BAL_SECTIONS.find(x => x.id === ADM.sec);
-  const counts = Object.fromEntries(BAL_SECTIONS.map(x => [x.id, Object.keys(ADM.draft).filter(p => BAL_FIELDS[p] && BAL_FIELDS[p].sec === x.id).length]));
-  const body = root.querySelector('.ad-body'), scroll = body ? body.scrollTop : 0;
+  const body = root.querySelector('.ad-body'), scroll = body ? body.scrollTop : 0, a = ADM.area;
+  let tabs = '', main;
+  if (a === 'balance') {
+    const s = BAL_SECTIONS.find(x => x.id === ADM.sec);
+    const counts = Object.fromEntries(BAL_SECTIONS.map(x => [x.id, Object.keys(ADM.draft).filter(p => BAL_FIELDS[p] && BAL_FIELDS[p].sec === x.id).length]));
+    tabs = `<nav class="ad-tabs" aria-label="밸런스 분류">${BAL_SECTIONS.map(x => `<button type="button" data-sec="${x.id}" aria-current="${x.id === ADM.sec ? 'page' : 'false'}">${x.title}${counts[x.id] ? `<em>${counts[x.id]}</em>` : ''}</button>`).join('')}
+      <button type="button" data-sec="content" aria-current="${ADM.sec === 'content' ? 'page' : 'false'}">추가 항목${ctCount() ? `<em>${ctCount()}</em>` : ''}</button>
+      <button type="button" data-sec="releases" aria-current="${ADM.sec === 'releases' ? 'page' : 'false'}">배포 기록</button></nav>`;
+    main = s ? `
+      <div class="ad-desc"><h2>${s.title}</h2><p>${s.desc} · 금색 테두리 = 저장 전 변경, 점 = 기본값과 다름 · 칸에 마우스를 올리면 기본값이 보여요</p>
+        <button class="ghost sm" data-ad="secdefaults" type="button"${counts[s.id] ? '' : ' disabled'}>이 탭 기본값</button></div>
+      <div class="ad-scroll">${sectionHtml(s)}</div>` : ADM.sec === 'content' ? contentHtml() : `
+      <div class="ad-desc"><h2>배포 기록</h2><p>[배포]를 누를 때마다 버전이 하나씩 쌓여요. 예전 버전을 초안으로 불러와 다시 배포하면 되돌릴 수 있어요.</p></div>
+      <div class="ad-scroll">${releasesHtml()}</div>`;
+  } else if (a === 'ops') { tabs = OPS.tabsHtml(); main = OPS.html(); }
+  else if (a === 'players') main = playersHtml();
+  else if (a === 'stats') main = STATS.html();
+  else main = LEGAL.html();
   const pending = pendingCount() || isDirty() || !(ADM.meta && ADM.meta.version); // the first release can be the defaults
   root.innerHTML = `
     <header class="ad-top">
       <div class="ad-title"><span class="eyebrow">GALAXY WAR · ADMIN</span><h1>갤럭시워 관리자</h1></div>
-      <div class="ad-actions">
+      ${a === 'balance' ? `<div class="ad-actions">
         <button class="ghost sm" data-ad="export" type="button">엑셀 내보내기</button>
         <label class="ghost sm file">엑셀 가져오기<input type="file" id="adImport" accept=".xlsx"></label>
         <button class="ghost sm" data-ad="defaults" type="button">전체 기본값</button>
         <button class="ghost sm" data-ad="discard" type="button"${isDirty() ? '' : ' disabled'}>변경 취소</button>
         <button class="ghost sm" data-ad="save" type="button"${isDirty() && !ADM.busy ? '' : ' disabled'}>초안 저장</button>
         <button class="cta sm" data-ad="publish" type="button"${pending && !ADM.busy ? '' : ' disabled'}>배포</button>
-      </div>
-      <div class="ad-status">${statusChips()}<span class="who">${esc(ADM.user.email || ADM.user.uid)} · <a href="../play/" target="_blank" rel="noopener">게임 열기</a> · <button class="link" data-ad="signout" type="button">로그아웃</button></span></div>
+      </div>` : '<div></div>'}
+      <div class="ad-status">${a === 'balance' ? statusChips() : ''}<span class="who">${esc(ADM.user.email || ADM.user.uid)} · <a href="../play/" target="_blank" rel="noopener">게임 열기</a> · <button class="link" data-ad="signout" type="button">로그아웃</button></span></div>
     </header>
-    <nav class="ad-tabs" aria-label="설정 분류">${BAL_SECTIONS.map(x => `<button type="button" data-sec="${x.id}" aria-current="${x.id === ADM.sec ? 'page' : 'false'}">${x.title}${counts[x.id] ? `<em>${counts[x.id]}</em>` : ''}</button>`).join('')}
-      <button type="button" data-sec="content" aria-current="${ADM.sec === 'content' ? 'page' : 'false'}">추가 항목${ctCount() ? `<em>${ctCount()}</em>` : ''}</button>
-      <button type="button" data-sec="releases" aria-current="${ADM.sec === 'releases' ? 'page' : 'false'}">배포 기록</button>
-      <button type="button" data-sec="players" aria-current="${ADM.sec === 'players' ? 'page' : 'false'}">플레이어</button></nav>
-    <div class="ad-body">${s ? `
-      <div class="ad-desc"><h2>${s.title}</h2><p>${s.desc} · 금색 테두리 = 저장 전 변경, 점 = 기본값과 다름 · 칸에 마우스를 올리면 기본값이 보여요</p>
-        <button class="ghost sm" data-ad="secdefaults" type="button"${counts[s.id] ? '' : ' disabled'}>이 탭 기본값</button></div>
-      <div class="ad-scroll">${sectionHtml(s)}</div>` : ADM.sec === 'content' ? contentHtml() : ADM.sec === 'players' ? playersHtml() : `
-      <div class="ad-desc"><h2>배포 기록</h2><p>[배포]를 누를 때마다 버전이 하나씩 쌓여요. 예전 버전을 초안으로 불러와 다시 배포하면 되돌릴 수 있어요.</p></div>
-      <div class="ad-scroll">${releasesHtml()}</div>`}
-    </div>`;
+    <nav class="ad-areas" aria-label="관리 영역">${AREAS.map(([id, label]) => `<button type="button" data-area="${id}" aria-current="${id === a ? 'page' : 'false'}">${label}${id === 'balance' && isDirty() ? '<em>•</em>' : ''}</button>`).join('')}</nav>
+    ${tabs}
+    <div class="ad-body">${main}</div>`;
   root.querySelector('.ad-body').scrollTop = scroll;
 }
 function gateHtml() {
@@ -283,7 +297,12 @@ function playerDetail(p) {
     ['대전', `${s.wins || 0}승 ${s.losses || 0}패`], ['별자리', cons || '-'], ['팀', (s.team || []).map(id => (CON[id] || {}).name || id).join(', ') || '-'],
     ['행성', Object.entries(s.planets || {}).map(([id, x]) => `${(PLANET[id] || {}).name || id} Lv ${x.lv}`).join(', ')], ['광고 제거', s.adPass ? '구매함' : '-'],
     ['생일', s.birthday ? `${s.birthday[0]}월 ${s.birthday[1]}일` : '-']];
-  return `<dl class="pl-dl">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+  const lb = ADM.lb[p.uid];
+  if (lb === undefined) { ADM.lb[p.uid] = 'loading'; getDoc(doc(db, 'leaderboard', p.uid)).then(d => { ADM.lb[p.uid] = d.exists() ? d.data() : null; render(); }).catch(() => { ADM.lb[p.uid] = null; render(); }); }
+  const rank = lb === 'loading' || lb === undefined ? '확인 중…' : !lb ? '랭킹 기록 없음' : lb.hidden ? '랭킹에서 숨김' : '랭킹에 표시 중';
+  return `<div class="pl-acts"><button class="cta sm" type="button" data-plmail="${p.uid}" data-name="${esc(p.name)}">우편 보내기</button>
+      ${lb && lb !== 'loading' ? `<button class="ghost sm" type="button" data-plhide="${p.uid}">${lb.hidden ? '랭킹에 다시 표시' : '랭킹에서 숨기기'}</button>` : ''}<span class="ct-desc">${rank}</span></div>
+    <dl class="pl-dl">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
     <details><summary>원본 저장 데이터 (JSON)</summary><pre>${esc(JSON.stringify(s, null, 2))}</pre></details>`;
 }
 const fmtN = n => Math.floor(n || 0).toLocaleString('ko-KR');
@@ -301,7 +320,16 @@ function playersHtml() {
     </tbody></table></div>`}`;
 }
 root.addEventListener('submit', e => { if (!e.target.matches('[data-plsearch]')) return; e.preventDefault(); ADM.playerQ = e.target.q.value; ADM.player = null; loadPlayers(); });
-root.addEventListener('click', e => {
+root.addEventListener('click', async e => {
+  if (ADM.area !== 'players') return;
+  const pm = e.target.closest('[data-plmail]'); if (pm) { OPS.mailTo(pm.dataset.plmail, pm.dataset.name); return; }
+  const ph = e.target.closest('[data-plhide]');
+  if (ph) {
+    const uid = ph.dataset.plhide, hide = !ADM.lb[uid].hidden;
+    try { await updateDoc(doc(db, 'leaderboard', uid), { hidden: hide }); ADM.lb[uid] = { ...ADM.lb[uid], hidden: hide }; toast(hide ? '랭킹에서 숨겼어요' : '랭킹에 다시 표시해요'); }
+    catch (err) { toast(`바꾸지 못했어요 (${err.code || err.message})`); }
+    render(); return;
+  }
   if (e.target.closest('[data-plclear]')) { ADM.playerQ = ''; loadPlayers(); }
   else if (e.target.closest('[data-plreload]')) loadPlayers();
   else { const r = e.target.closest('[data-pl]'); if (r) { ADM.player = ADM.player === r.dataset.pl ? null : r.dataset.pl; render(); } }
@@ -371,6 +399,7 @@ async function publish() {
 
 /* ---------- Events ---------- */
 root.addEventListener('click', async e => {
+  const ar = e.target.closest('[data-area]'); if (ar) { ADM.area = ar.dataset.area; render(); root.querySelector('.ad-body').scrollTop = 0; return; }
   if (await contentClick(e)) return;
   const t = e.target.closest('[data-sec]'); if (t) { ADM.sec = t.dataset.sec; render(); root.querySelector('.ad-body').scrollTop = 0; return; }
   const l = e.target.closest('[data-load]');

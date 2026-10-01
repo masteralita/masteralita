@@ -367,6 +367,14 @@ const ZODIAC_DATES = [ // 생일 → 별자리 (별자리 시트 조건 열)
   ['cnc', 7, 22], ['leo', 8, 22], ['vir', 9, 22], ['lib', 10, 22], ['sco', 11, 21], ['sgr', 12, 21], ['cap', 12, 31],
 ];
 function zodiacOf(m, d) { for (const [id, mm, dd] of ZODIAC_DATES) if (m < mm || (m === mm && d <= dd)) return id; return 'cap'; }
+/* ---------- Rewards (우편함 · 쿠폰): { type, n, id?, g? } ---------- */
+const REWARD_TYPES = { dust:'Star Dust', piece:'Star Piece', chest:'보물 상자 칸', con:'별자리 카드', skin:'스킨' };
+function rewardText(r) {
+  const n = Math.max(1, r.n | 0);
+  if (r.type === 'con') return `${CON[r.id] ? CON[r.id].name + '자리' : '별자리'} ${(GRADES[r.g | 0] || GRADES[0]).name} 카드 ×${n}`;
+  if (r.type === 'skin') return `${SKIN[r.id] ? SKIN[r.id].name : '스킨'} 스킨`;
+  return `${REWARD_TYPES[r.type] || r.type} ×${n.toLocaleString('ko-KR')}`;
+}
 const GHOST_NAMES = ['Gesut4565', 'NovaKatze', 'Orbiter77', '별헤는밤', 'Andromeda_J', '은하수산책', 'Halley86', 'ZENITH'];
 
 

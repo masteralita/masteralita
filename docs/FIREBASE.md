@@ -47,6 +47,12 @@
 | `releases/{version}` | 게임이 받는 **확정본** 한 벌 (관리자가 "배포"를 누르면 만들어짐) — `values`(수치·글자) + `content`(추가 항목) |
 | `meta/current` | 현재 배포 버전 번호 — 게임은 이 번호가 바뀌었을 때만 새로 받음 |
 | `admins/{uid}` | 관리자 목록 (쓰기 권한) |
+| `leaderboard/{uid}` | 랭킹 — `name`, `best`(최고 웨이브), `lv`, `linked`, `hidden`(관리자가 숨김) |
+| `stats/{yyyy-mm-dd}` | 일별 카운터 (한국 시간): active, newPlayers, sessions, runs, waves, battles, gacha, ads, skinBuys, mailClaims, coupons |
+| `site/legal` · `site/status` | 이용약관·개인정보 처리방침·문의 메일 / 점검 모드 (`maintenance`, `message`, `until`) |
+| `notices/{id}` | 공지 — `title`, `body`, `active`, `pinned`, `popup`, `startAt`, `endAt` |
+| `mail/{id}` | 우편 — `target`('all'/'some'), `uids`, `includeNew`, `rewards`, `expiresAt` |
+| `coupons/{CODE}` (+ `redeemed/{uid}`) | 쿠폰 — `rewards`, `maxUses`(0=무제한), `uses`, `expiresAt`, `active` |
 | `players/{uid}` | 플레이어 진행 데이터 — `data`(저장 전체를 JSON 문자열로), 목록용 `name`·`lv`·`best`·`wins`, `provider`(anonymous/google.com), `updatedAt`, `createdAt` |
 
 - 지금은 `content/*` 대신 `config/balance`(초안)와 `releases/{v}`에 `content: { skins, pskins, oskins }` 로 추가 항목을 함께 담아요 (형식은 `prototype/balance.js` 의 `applyContent` 주석).
@@ -59,6 +65,10 @@
 - 쓰기: `content`, `config`, `releases`, `meta`, 이미지 → `admins/{uid}` 에 등록된 사람만
 - 첫 관리자는 서비스 계정으로 등록 (사용자 Google 계정 1개)
 - `players/{uid}`: 본인만 읽기·쓰기 (필드·크기 검사), 관리자는 읽기만
+- `leaderboard`: 누구나 읽기, 본인만 쓰기(`hidden`은 못 바꿈), 관리자는 `hidden`만 바꿈
+- `stats`: 게임은 정해진 카운터를 한 번에 +200 이하로만 올릴 수 있고, 읽기는 관리자만
+- `site`·`notices`: 누구나 읽기, 관리자만 쓰기 · `mail`: 받는 사람(전체 또는 uids)만 읽기
+- `coupons`: 코드로 한 건 조회만(목록 불가). `uses +1`과 `redeemed/{uid}` 생성을 한 트랜잭션으로 해야 하고, 계정당 1회·횟수·기간을 규칙이 검사
 
 ## 4. 진행 순서 (Claude)
 
@@ -70,7 +80,8 @@
 3. ✅ 보안 규칙 (`firestore.rules`) · Hosting 설정 (`firebase.json`) 배포 — `storage.rules`는 Storage 설정 후
 4. ✅ 게임이 `meta/current` → `releases/{version}` 을 읽어 적용 (기기에 캐시, 못 받으면 캐시 → 내장 기본값)
 5. ✅ 웹 프로토타입을 Hosting `/play/` 에 배포
-6. ✅ 플레이어 계정·클라우드 저장 (`prototype/cloud.js`) + 관리자 사이트 `플레이어` 탭 (조회 전용)
+6. ✅ 플레이어 계정·클라우드 저장 (`prototype/cloud.js`) + 관리자 사이트 `플레이어` 탭
+7. ✅ 운영 기능 (`prototype/live.js`, `admin/ops.js` · `stats.js` · `legal.js`): 랭킹, 공지, 우편, 쿠폰, 점검, 통계, 약관·개인정보 처리방침·확률 정보
 
 ## 5. 현재 상태
 
@@ -97,6 +108,21 @@
 - Firebase를 못 불러오면(오프라인, claude.ai 안) 기기에만 저장해요.
 - ⚠️ 저장 내용은 게임(클라이언트)이 정해서 올려요. 재화 조작을 막으려면 결제·보상 지급을 서버(Functions)에서 검증해야 해요 — 인앱 결제 붙일 때 같이 해요.
 
+### 관리자 사이트 구성
+| 영역 | 내용 |
+|---|---|
+| 밸런스 | 수치·글자 표, 추가 항목, 배포 기록 (초안 저장 → 배포) |
+| 운영 | 공지사항(팝업·고정·기간) · 우편 발송(전체/선택, 보상 종류·개수, 만료, 회수) · 쿠폰(코드, 횟수, 기간, 중지) · 점검(켜면 게임 즉시 가림, 관리자는 통과) |
+| 플레이어 | 최근 50명 / 닉네임 검색, 진행 요약, 우편 보내기, 랭킹 숨기기 |
+| 통계 | 전체·오늘·7일·30일 활동, 신규, 일별 차트·표, 최고 웨이브·레벨 분포 |
+| 약관·정책 | 이용약관, 개인정보 처리방침(기본 양식 제공 — 【】 채우고 법률 검토), 문의 메일. 웹 주소 `/legal/?doc=terms`, `/legal/?doc=privacy` (앱 마켓 등록용) |
+
+보상 종류(우편·쿠폰): Star Dust, Star Piece, 보물 상자 칸, 별자리 카드(별자리·등급·장수), 스킨 (`data.js`의 `REWARD_TYPES`). 이미 가진 스킨은 Star Piece 100으로 바꿔 줘요.
+
+### 통계 · Google 애널리틱스
+- 지금은 자체 통계: 게임이 이벤트(가입, 아케이드·배틀 종료, 뽑기, 광고 시청, 스킨 구매, 우편 수령, 쿠폰)를 기기에 모았다가 `stats/{날짜}`에 더해요.
+- **GA 연결 (사용자 작업)**: Firebase 콘솔 → 프로젝트 설정 → 통합 → Google Analytics 연결. 연결되면 웹 앱 설정에 `measurementId`가 생겨요 → `prototype/firebase-config.js`에 추가하면 같은 이벤트가 GA에도 기록돼요 (Claude에게 "GA 연결했어" 라고 하면 돼요).
+
 ### 도구 (`tools/`, 환경 변수 3개 필요)
 | 명령 | 하는 일 |
 |---|---|
@@ -110,7 +136,8 @@
 ## 6. 이어받기 메모
 
 - 작업 브랜치: `claude/upbeat-carson-fmqclr` (이전 `claude/vibrant-einstein-sc3mji` 작업 포함).
-- 웹 프로토타입: `prototype/` (index.html + data.js, firebase-config.js, balance.js, battle.js, ads.js, app.js, cloud.js)
+- 웹 프로토타입: `prototype/` (index.html + data.js, firebase-config.js, balance.js, battle.js, ads.js, app.js, cloud.js, live.js)
+- 관리자: `admin/` (admin.js = 밸런스·플레이어, ops.js, stats.js, legal.js) · 약관 웹 페이지: `legal/`
   - 수치 레지스트리: `prototype/balance.js` 의 `BAL_SECTIONS` (`path → value`). 관리자 사이트(`admin/admin.js`)가 같은 파일을 불러와 써요.
 - 추가 항목이 배포에서 빠지면 그 스킨을 장착한 플레이어는 기본 스킨으로 돌아가요 (`equippedSkin`, `PSKIN.basic`, `OSKIN.dash` 대체).
 - Firestore는 배열 안의 배열을 저장할 수 없어요 — 추가 스킨의 능력치 카드는 `{ key, name }` 로 저장하고 게임이 `[key, name]` 으로 바꿔요.

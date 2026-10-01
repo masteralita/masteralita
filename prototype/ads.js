@@ -52,11 +52,13 @@ const Ads = (() => {
   return {
     platform, network: cfg.network, label: cfg.label, native: !!nativeAdMob,
     async showRewarded(placement = 'default') {
+      let r;
       if (nativeAdMob) {
-        try { return await showNative(placement); }
-        catch (e) { return { rewarded: false, network: cfg.network, platform, error: String(e && e.message || e) }; }
-      }
-      return showSimulated(placement);
+        try { r = await showNative(placement); }
+        catch (e) { r = { rewarded: false, network: cfg.network, platform, error: String(e && e.message || e) }; }
+      } else r = await showSimulated(placement);
+      if (r.rewarded && window.CLOUD) CLOUD.event('ad_reward', { placement });
+      return r;
     },
   };
 })();

@@ -37,6 +37,7 @@ function build() {
   if (!/^<!doctype/i.test(html)) fs.writeFileSync(game, '<!doctype html>\n<html lang="ko">\n<meta charset="utf-8">\n'
     + '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n' + html);
   copy('admin', 'admin');
+  copy('legal', 'legal');
   const files = [];
   const walk = d => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); e.isDirectory() ? walk(p) : files.push(p); } };
   walk(out);

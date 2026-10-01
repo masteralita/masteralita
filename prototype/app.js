@@ -181,7 +181,7 @@ function showTitle() {
       save.cons[id] = Object.assign(save.cons[id] || newCon(0), { g: 4 });
       save.form = [[id, ...save.form[0].filter(x => x !== id)], save.form[1].filter(x => x !== id)]; normalizeForm();
     }
-    save.lastCollect = Date.now(); persist();
+    save.lastCollect = Date.now(); save.joinedAt = Date.now(); persist(); gwEvent('sign_up', {});
     enterHome();
     if (save.birthday) { const id = save.team[0]; setTimeout(() => showGachaResult([{ id, g: 4, res: 'new' }], '탄생 별자리 지급'), 350); }
   });
@@ -451,6 +451,37 @@ function openAdChest() {
   });
 }
 
+const gwEvent = (name, params) => window.CLOUD && CLOUD.event(name, params); // cloud.js: stats + analytics
+// 우편함 · 쿠폰 rewards → applied to the save, shown like a gacha result
+function grantRewards(rewards, title) {
+  const cards = [], extra = [];
+  for (const r of rewards || []) {
+    const n = Math.max(1, r.n | 0);
+    if (r.type === 'dust') { save.dust += n; extra.push(`Star Dust +${fmt(n)}`); }
+    else if (r.type === 'piece') { save.piece += n; extra.push(`Star Piece +${fmt(n)}`); }
+    else if (r.type === 'chest') { save.chest = Math.min(CHEST_MAX, save.chest + n); extra.push(`보물 상자 +${n}칸`); }
+    else if (r.type === 'con' && CON[r.id]) for (let i = 0; i < Math.min(n, 30); i++) cards.push(grantCon(r.id, clamp(r.g | 0, 0, GRADES.length - 1)));
+    else if (r.type === 'skin' && SKIN[r.id]) {
+      const sk = SKIN[r.id];
+      if (ownsSkin(sk.con, sk.id)) { save.piece += 100; extra.push(`${sk.name} (보유 중) → Star Piece +100`); }
+      else { addSkin(sk.id); cards.push({ skin: sk.id, id: sk.con }); }
+    }
+  }
+  showGachaResult(cards, title, extra);
+}
+
+// 확률 정보 (확률형 아이템 표시): straight from the live data, so it always matches the released balance
+function showProbability() {
+  const pct = (v, sum) => `${(+(v / sum * 100).toFixed(2))}%`;
+  const gacha = Object.values(GACHA).map(g => { const sum = g.w.reduce((a, b) => a + b, 0); return `<h4>${g.name}</h4><ul class="prob">${GRADES.map((gr, i) => g.w[i] ? `<li><span>${gr.name}</span><b>${pct(g.w[i], sum)}</b></li>` : '').join('')}</ul>
+    <p class="mtxt">별자리는 ${g.cur === 'piece' ? '뱀주인자리를 포함한 13종' : '12종'} 중 같은 확률로 정해져요.</p>`; }).join('');
+  const csum = Object.values(CHEST_ODDS).reduce((a, b) => a + b, 0), cl = { skin: '성운 스킨', dust: 'Star Dust', piece: 'Star Piece', con: '별자리 카드' };
+  openModal(`<h3>확률 정보</h3><div class="doc-body prob-body">${gacha}
+    <h4>보물 상자</h4><ul class="prob">${Object.entries(CHEST_ODDS).map(([k, v]) => `<li><span>${cl[k] || k}</span><b>${pct(v, csum)}</b></li>`).join('')}</ul>
+    <h4>강화 성공률</h4><ul class="prob">${ENHANCE_RATE.map((v, i) => `<li><span>+${i} → +${i + 1}</span><b>${Math.round(v * 100)}%</b></li>`).join('')}</ul></div>
+    <div class="mbtns"><button class="cta sm" data-act="close" type="button">닫기</button></div>`, () => closeModal());
+}
+
 /* ---------- Gacha / constellation rewards ---------- */
 function rollGrade(w) {
   const sum = w.reduce((a, b) => a + b, 0); let r = Math.random() * sum;
@@ -544,7 +575,7 @@ $('pane-store').addEventListener('click', e => {
     const k = g.dataset.gacha, n = +g.dataset.n, def = GACHA[k];
     if (!spend(def.cur, n === 10 ? def.cost10 : def.cost)) return;
     const list = Array.from({ length: n }, () => rollCon(def.w, k === 'paid'));
-    showGachaResult(list, `${def.name} ${n}회`);
+    showGachaResult(list, `${def.name} ${n}회`); gwEvent('gacha', { kind: k, n });
     return;
   }
   const b = e.target.closest('[data-buy]'); if (!b) return;
@@ -820,6 +851,7 @@ function openSkinPopup(kind, id, k) {
     if (act === 'buy') {
       if (!spend('piece', price)) return;
       if (kind === 'c') addSkin(id); else save[kind === 'p' ? 'pSkins' : 'oSkins'].push(id);
+      gwEvent('skin_buy', { kind, id });
     }
     if (kind === 'c') save.cons[SKIN[id].con].skin = id;
     else if (kind === 'p') ps.skin = id; else ps.orbitSkins[k] = id;
@@ -930,7 +962,9 @@ function openSettings() {
       <div class="links">
         <button type="button" data-act="soon">플레이 방법</button><button type="button" data-act="restore">구매 복원</button>
         <button type="button" data-act="soon">리뷰 남기기</button><button type="button" data-act="mail">문의하기</button>
-        <button type="button" data-act="soon">이용약관</button><button type="button" data-act="reset" class="danger">서비스 탈퇴</button>
+        <button type="button" data-act="terms">이용약관</button><button type="button" data-act="privacy">개인정보 처리방침</button>
+        <button type="button" data-act="notices">공지사항</button><button type="button" data-act="coupon">쿠폰 입력</button>
+        <button type="button" data-act="probability">확률 정보</button><button type="button" data-act="reset" class="danger">서비스 탈퇴</button>
         <button type="button" data-act="admin">밸런스 관리자</button>
       </div>
     </div>
@@ -940,7 +974,11 @@ function openSettings() {
     else if (act === 'soon') toast('정식 버전에서 열려요');
     else if (act === 'admin') { closeModal(); window.open(`https://${FIREBASE_CONFIG.projectId}.web.app/admin/`, '_blank', 'noopener'); }
     else if (act === 'restore') toast('복원할 구매 내역이 없어요');
-    else if (act === 'mail') toast('문의: support@galaxywar.example');
+    else if (act === 'mail') { if (window.LIVE) LIVE.contact(); else toast('서버에 연결되면 문의처를 볼 수 있어요'); }
+    else if (act === 'probability') showProbability();
+    else if (['terms', 'privacy', 'notices', 'coupon'].includes(act)) {
+      if (window.LIVE) LIVE.open(act); else toast('서버에 연결되면 볼 수 있어요');
+    }
     else if (act === 'rename') {
       openModal(`<h3>닉네임 변경</h3><form id="renameForm" class="rename"><input id="renameInput" maxlength="12" value="${save.name}" aria-label="닉네임"><button class="cta sm" type="submit">저장</button></form>`);
       $('renameForm').onsubmit = ev => { ev.preventDefault(); const v = $('renameInput').value.trim(); if (v) { save.name = v; persist(); renderTopBar(); } closeModal(); };
@@ -973,6 +1011,7 @@ function finishBattle(win) {
   save.dust += dust; save.chest = Math.min(CHEST_MAX, save.chest + chest);
   const up = gainAccXp(xp);
   persist();
+  gwEvent(arcade ? 'arcade_end' : 'battle_end', arcade ? { wave: G.wave } : { win: !!win });
   $('resEyebrow').textContent = arcade ? 'PLANET DESTROYED' : win ? 'VICTORY' : 'DEFEAT';
   $('resEyebrow').style.color = !arcade && win ? 'var(--gold)' : 'var(--act)';
   $('resWave').textContent = arcade ? `WAVE ${G.wave}` : win ? '승리' : '패배';

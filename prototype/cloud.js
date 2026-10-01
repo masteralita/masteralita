@@ -16,7 +16,9 @@ const CLOUD = window.CLOUD = {
   state: 'off',      // off | connecting | synced | saving | offline
   account: null,     // { guest, email }
   savedAt: null,     // updatedAt of the last copy known to be on the server
+  fb: null,          // { auth, db, A, F } for live.js once signed in
   schedule() {}, flush() {}, linkGoogle: async () => false, signOut: async () => {}, deleteData: async () => {},
+  event: () => {},   // gameplay events → daily counters (stats/{day}) and Google Analytics when configured
 };
 const notify = () => window.dispatchEvent(new Event('gw-cloud'));
 const ask = (title, text, ok) => new Promise(res => {
@@ -26,13 +28,14 @@ const ask = (title, text, ok) => new Promise(res => {
 });
 
 const sdk = await Promise.all(['firebase-app.js', 'firebase-auth.js', 'firebase-firestore.js'].map(f => import(SDK + f))).catch(() => null);
-if (sdk) boot(...sdk); else notify(); // no SDK → state stays 'off', the game is local-only
+if (sdk) boot(...sdk); else { CLOUD.failed = true; notify(); } // no SDK → state stays 'off', the game is local-only
 
 function boot(AP, A, F) {
   const app = AP.initializeApp(FIREBASE_CONFIG);
   const auth = A.getAuth(app), db = F.getFirestore(app, FIREBASE_DB);
   const ref = () => F.doc(db, 'players', auth.currentUser.uid);
-  let timer = null, forceRemote = false, pushing = null;
+  let timer = null, forceRemote = false, pushing = null, lastLb = '';
+  CLOUD.fb = { auth, db, A, F };
   const setState = s => { CLOUD.state = s; notify(); };
 
   function describe(user) {
@@ -80,7 +83,59 @@ function boot(AP, A, F) {
     try { await pushing; CLOUD.savedAt = at; setState('synced'); }
     catch (err) { console.warn('cloud push', err); setState('offline'); }
     finally { pushing = null; }
+    pushLeaderboard(s);
+    flushStats();
   }
+  // 랭킹 entry: only when something it shows changed (merge keeps an admin's hidden flag)
+  function pushLeaderboard(s) {
+    if (!auth.currentUser || !s.best) return;
+    const e = { name: String(s.name).slice(0, 24), best: s.best | 0, lv: Math.max(1, s.lv | 0), linked: !auth.currentUser.isAnonymous };
+    const key = auth.currentUser.uid + JSON.stringify(e);
+    if (key === lastLb) return;
+    F.setDoc(F.doc(db, 'leaderboard', auth.currentUser.uid), { ...e, updatedAt: Date.now() }, { merge: true })
+      .then(() => { lastLb = key; }).catch(err => console.warn('leaderboard', err));
+  }
+
+  /* ---------- Stats: per-day counters (KST), batched in localStorage and added with increment() ---------- */
+  const STATS_KEY = 'gw-stats', dayKey = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const loadPending = () => { try { return JSON.parse(localStorage.getItem(STATS_KEY)) || {}; } catch { return {}; } };
+  const savePending = p => { try { localStorage.setItem(STATS_KEY, JSON.stringify(p)); } catch {} };
+  let statTimer = null;
+  function count(k, n = 1) {
+    const p = loadPending(), d = dayKey();
+    p[d] = p[d] || {}; p[d][k] = (p[d][k] || 0) + Math.max(0, Math.round(n));
+    savePending(p);
+    clearTimeout(statTimer); statTimer = setTimeout(flushStats, 15000);
+  }
+  async function flushStats() {
+    clearTimeout(statTimer);
+    if (!auth.currentUser) return;
+    const p = loadPending();
+    for (const [d, c] of Object.entries(p)) {
+      const send = Object.fromEntries(Object.entries(c).filter(([, v]) => v > 0).map(([k, v]) => [k, Math.min(v, 200)])); // the rules allow +200 per write
+      if (!Object.keys(send).length) { delete p[d]; continue; }
+      try {
+        await F.setDoc(F.doc(db, 'stats', d), Object.fromEntries(Object.entries(send).map(([k, v]) => [k, F.increment(v)])), { merge: true });
+        const now = loadPending();
+        for (const [k, v] of Object.entries(send)) { now[d][k] -= v; if (now[d][k] <= 0) delete now[d][k]; }
+        if (!Object.keys(now[d]).length) delete now[d];
+        savePending(now);
+      } catch (err) { console.warn('stats', err); return; }
+    }
+  }
+  // Google Analytics: on automatically once the web app config has a measurementId (docs/FIREBASE.md)
+  let ga = null;
+  if (FIREBASE_CONFIG.measurementId) import(SDK + 'firebase-analytics.js').then(m => { ga = { log: m.logEvent, a: m.getAnalytics(app) }; }).catch(() => {});
+  const EVENT_STATS = { sign_up: { newPlayers: 1 }, arcade_end: p => ({ runs: 1, waves: p.wave || 0 }), battle_end: { battles: 1 },
+    gacha: p => ({ gacha: p.n || 1 }), ad_reward: { ads: 1 }, skin_buy: { skinBuys: 1 }, mail_claim: p => ({ mailClaims: p.n || 1 }), coupon: { coupons: 1 } };
+  CLOUD.event = (name, params = {}) => {
+    const m = EVENT_STATS[name], add = typeof m === 'function' ? m(params) : m;
+    if (add) for (const [k, v] of Object.entries(add)) count(k, v);
+    if (ga) ga.log(ga.a, name, params);
+  };
+  count('sessions');
+  try { if (localStorage.getItem('gw-active-day') !== dayKey()) { count('active'); localStorage.setItem('gw-active-day', dayKey()); } } catch {}
+  addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushStats(); });
 
   CLOUD.schedule = () => { if (!auth.currentUser) return; clearTimeout(timer); timer = setTimeout(push, PUSH_DELAY); };
   CLOUD.flush = () => (timer || CLOUD.state === 'offline' ? push() : pushing || Promise.resolve());
@@ -88,7 +143,7 @@ function boot(AP, A, F) {
   addEventListener('online', () => { if (CLOUD.state === 'offline') pull(); });
 
   A.onAuthStateChanged(auth, user => {
-    CLOUD.account = describe(user); notify();
+    CLOUD.account = describe(user); CLOUD.uid = user ? user.uid : null; lastLb = ''; notify();
     if (!user) { setState('connecting'); A.signInAnonymously(auth).catch(() => setState('offline')); return; }
     pull();
   });
@@ -132,6 +187,7 @@ function boot(AP, A, F) {
     if (!auth.currentUser) return;
     clearTimeout(timer); timer = null;
     await F.deleteDoc(ref()).catch(() => {});
+    await F.deleteDoc(F.doc(db, 'leaderboard', auth.currentUser.uid)).catch(() => {});
     CLOUD.savedAt = null;
     try { await auth.currentUser.delete(); } catch { await A.signOut(auth); }
   };
