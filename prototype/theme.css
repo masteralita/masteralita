@@ -1,0 +1,128 @@
+/* ==========================================================================
+   Theme: dark-fantasy mobile RPG look (benchmark: 벤치마킹/벤치_클라우디아)
+   - navy damask background, bevelled silver frames, gold frames for shop goods
+   - glossy teal buttons (red for cancel/danger), slanted teal title ribbons
+   - framed square tiles in the bottom nav, outlined Korean labels
+   Drawn entirely in CSS/SVG; loaded after the base styles in index.html.
+   ========================================================================== */
+:root{
+  --metal:linear-gradient(160deg,#eef3fa 0%,#9aa6b8 22%,#4a5568 48%,#c3ccd9 72%,#5f6b7d 100%);
+  --metal-dim:linear-gradient(160deg,#9aa6b8 0%,#4a5568 40%,#2c3443 70%,#6b778a 100%);
+  --goldf:linear-gradient(160deg,#fff4b8 0%,#e0aa3e 25%,#7d4f10 50%,#f8d87c 75%,#a8721e 100%);
+  --teal-btn:linear-gradient(180deg,#7fe6ea 0%,#2aa3ad 42%,#0e6772 52%,#178591 100%);
+  --red-btn:linear-gradient(180deg,#ff8f86 0%,#d3343a 42%,#8e1219 52%,#b5222a 100%);
+  --steel-btn:linear-gradient(180deg,#68768c 0%,#3a4456 45%,#222a38 55%,#323c4d 100%);
+  --inner:linear-gradient(180deg,rgba(18,26,52,.96),rgba(7,11,26,.97));
+  --stroke:0 1px 0 #000,1px 0 0 #000,-1px 0 0 #000,0 -1px 0 #000,0 2px 3px rgba(0,0,0,.6);
+  --damask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72'%3E%3Cg fill='none' stroke='%23162348' stroke-width='1.2'%3E%3Cpath d='M36 0L72 36L36 72L0 36Z'/%3E%3Cpath d='M36 14c-6 6-6 12 0 18c6-6 6-12 0-18zM36 58c-6-6-6-12 0-18c6 6 6 12 0 18zM14 36c6-6 12-6 18 0c-6 6-12 6-18 0zM58 36c-6-6-12-6-18 0c6 6 12 6 18 0z'/%3E%3Ccircle cx='36' cy='36' r='2.2' fill='%231a2a55'/%3E%3Ccircle cx='0' cy='0' r='3'/%3E%3Ccircle cx='72' cy='0' r='3'/%3E%3Ccircle cx='0' cy='72' r='3'/%3E%3Ccircle cx='72' cy='72' r='3'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ---------- Ground ---------- */
+.shell{background:var(--damask) center/72px 72px,radial-gradient(120% 80% at 50% 0%,#101b3f,#060a1a 70%)}
+.shell.see-through{background:transparent}
+
+/* ---------- Frames: bevelled silver panel (padding-box inner + border-box metal) ---------- */
+.hcard,.pcell,.team-planet,.orbit-card,.slot-panel,.star-stage,.lv-row,.mail-row,.notice-row,.set-group,.planet-hero,
+.skin-item,.con-pick,.oslot,.tslot,.lv-me,.doc-body,.sk-preview,.ccell.locked,.skin-card{
+  border:2px solid transparent!important;
+  background:var(--inner) padding-box,var(--metal) border-box!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 3px 8px rgba(0,0,0,.45);
+}
+.ccell.locked,.skin-card:not([aria-pressed="true"]),.oslot.empty{background:var(--inner) padding-box,var(--metal-dim) border-box!important}
+/* owned constellations keep their grade colour in the frame */
+.ccell:not(.locked){border:2px solid transparent!important;
+  background:radial-gradient(90% 70% at 50% 35%,color-mix(in srgb,var(--g) 18%,transparent),transparent 70%) padding-box,var(--inner) padding-box,
+    linear-gradient(160deg,#fff 0%,var(--g) 25%,color-mix(in srgb,var(--g) 40%,#111) 55%,var(--g) 80%,#333 100%) border-box!important;
+  box-shadow:0 0 10px color-mix(in srgb,var(--g) 35%,transparent),0 3px 8px rgba(0,0,0,.45)}
+.skin-card[aria-pressed="true"],.pcell[aria-pressed="true"],.con-pick[aria-checked="true"],.skin-item[aria-checked="true"],.lv-row.me{
+  background:var(--inner) padding-box,linear-gradient(160deg,#d8ffff,#3fd0da 35%,#0b5b66 60%,#7ff0f4 100%) border-box!important;
+  box-shadow:0 0 12px rgba(63,208,218,.45),0 3px 8px rgba(0,0,0,.45)}
+
+/* Shop goods: gold frame with glow */
+.shop-card,.banner-card,.piece-pack,.gcard{
+  border:2px solid transparent!important;
+  background:radial-gradient(100% 60% at 50% 0%,rgba(255,214,110,.16),transparent 70%) padding-box,linear-gradient(180deg,#2a1d08,#120c03) padding-box,var(--goldf) border-box!important;
+  box-shadow:0 0 14px rgba(255,190,70,.35),inset 0 0 18px rgba(0,0,0,.6)}
+.banner-card{background:radial-gradient(120% 140% at 0% 0%,rgba(195,91,255,.35),rgba(20,10,40,.95) 60%) padding-box,var(--goldf) border-box!important}
+
+/* ---------- Buttons ---------- */
+.cta,.hbtn,.buy,.mode{position:relative;border:2px solid #c9f7f8!important;background:var(--teal-btn)!important;color:#fff!important;
+  text-shadow:var(--stroke);box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -2px 0 rgba(0,0,0,.25),0 3px 6px rgba(0,0,0,.5);font-weight:700}
+.cta:disabled,.hbtn:disabled,.buy:disabled{filter:grayscale(.85) brightness(.7)}
+.ghost{border:2px solid #b9c3d1!important;background:var(--steel-btn)!important;color:#fff;text-shadow:var(--stroke);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 3px 6px rgba(0,0,0,.45)}
+.mbtns .ghost,.links .danger{border-color:#ffc2bd!important;background:var(--red-btn)!important;color:#fff!important}
+.buy b,.cta b,.hbtn b{text-shadow:var(--stroke)}
+.mode{min-height:64px;border-radius:12px!important}
+.mode.pvp{border-color:#ffc2bd!important;background:var(--red-btn)!important}
+.mode b{font-size:20px;text-shadow:var(--stroke)}
+.mode span{color:#e9fbff!important;text-shadow:var(--stroke)}
+
+/* ---------- Titles: slanted teal ribbon ---------- */
+.sec-h h2,.skins .sec-h h2{position:relative;display:inline-block;padding:4px 30px 4px 12px;margin-left:-16px;color:#fff;font-size:18px;text-shadow:var(--stroke);z-index:0}
+.sec-h h2::before{content:"";position:absolute;inset:0;z-index:-1;transform:skewX(-20deg);transform-origin:left;
+  background:linear-gradient(90deg,rgba(20,140,150,.95),rgba(16,90,110,.75) 70%,transparent);border-top:1px solid rgba(160,240,245,.6);border-bottom:1px solid rgba(0,0,0,.5)}
+.modal-body h3{margin:-18px -18px 14px;padding:12px 16px;text-align:center;font-size:17px;color:#fff;text-shadow:var(--stroke);
+  background:linear-gradient(180deg,#3a4458,#1c2230);border-bottom:2px solid #8f9bb0;border-radius:14px 14px 0 0}
+
+/* ---------- Top bar: rank badge, currency gauges, square menu button ---------- */
+.topbar{background:linear-gradient(180deg,#1b2338,#0b1022)!important;border-bottom:2px solid #6f7b90!important;box-shadow:0 2px 0 #0a0d16,0 4px 10px rgba(0,0,0,.5)}
+.lvbadge{border-radius:50%!important;border:2px solid transparent!important;background:radial-gradient(circle at 40% 30%,#3b5a9a,#0f1d44 70%) padding-box,var(--metal) border-box!important;
+  box-shadow:0 0 0 2px #0b1022,0 2px 6px rgba(0,0,0,.6);color:#fff;text-shadow:var(--stroke)}
+.cur{border:2px solid transparent!important;border-radius:999px!important;background:linear-gradient(180deg,#05070f,#141b2e) padding-box,var(--metal-dim) border-box!important;
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.7)}
+.cur span{color:#fff;text-shadow:var(--stroke);font-variant-numeric:tabular-nums}
+.gear{border:2px solid transparent!important;border-radius:8px!important;background:var(--steel-btn) padding-box,var(--metal) border-box!important;
+  color:#fff!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 2px 5px rgba(0,0,0,.5)}
+.who b{text-shadow:var(--stroke)}
+
+/* ---------- Bottom nav: framed square tiles ---------- */
+.nav{gap:4px!important;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px))!important;background:linear-gradient(180deg,#141a2b,#05070e)!important;border-top:2px solid #6f7b90!important}
+.nav button{border:2px solid transparent!important;border-radius:8px!important;background:linear-gradient(180deg,#1d2a4d,#0a1024) padding-box,var(--metal-dim) border-box!important;
+  color:#fff!important;font-size:13px!important;font-weight:700;letter-spacing:0!important;text-shadow:var(--stroke);padding:6px 0 4px!important;min-height:58px}
+.nav button svg{width:26px!important;height:26px!important;stroke:#dfe9ff;filter:drop-shadow(0 1px 1px #000)}
+.nav button[aria-current="page"]{background:radial-gradient(80% 70% at 50% 40%,rgba(80,200,230,.45),transparent 70%) padding-box,linear-gradient(180deg,#22406e,#0c1838) padding-box,
+  linear-gradient(160deg,#e9ffff,#59d4dd 35%,#11606b 60%,#9af3f6 100%) border-box!important;box-shadow:0 0 10px rgba(89,212,221,.5)}
+.nav button[aria-current="page"] svg{stroke:#fff}
+
+/* ---------- Chips, labels, modal ---------- */
+.gchip{text-shadow:none}
+.ccell .tm,.skin-card em.eq{background:linear-gradient(180deg,#ffe58a,#d99a1c)!important;color:#2a1700!important;border:1px solid #fff3c4}
+.modal-body{border:2px solid transparent!important;border-radius:16px!important;background:var(--inner) padding-box,var(--metal) border-box!important;box-shadow:0 10px 30px rgba(0,0,0,.7)}
+.set-h,.skin-list .set-h{color:#9fe8ee!important;text-shadow:var(--stroke)}
+.links button{border:2px solid transparent!important;background:var(--steel-btn) padding-box,var(--metal-dim) border-box!important;color:#fff;text-shadow:var(--stroke)}
+.detail-head .back{border:2px solid #c9f7f8!important;background:var(--teal-btn)!important;color:#fff;text-shadow:var(--stroke)}
+.side-icons .gear{border-radius:8px!important}
+.power{color:#c9d3ea}
+.power b{text-shadow:var(--stroke)}
+.set-group{padding:10px 12px!important;border-radius:12px;margin-bottom:10px}
+
+/* ---------- Art: SpriteCook images in img/ (see docs/UI.md) ---------- */
+.nav button img{width:34px;height:34px;object-fit:contain;filter:drop-shadow(0 1px 1px #000)}
+.nav button.home img{width:38px;height:38px}
+.nav button:not([aria-current="page"]) img{filter:drop-shadow(0 1px 1px #000) saturate(.75) brightness(.85)}
+.side-icons .gear img{width:26px;height:26px;object-fit:contain;filter:drop-shadow(0 1px 1px #000)}
+.dust::before,.piece::before{width:16px;height:16px;margin-right:3px;vertical-align:-3px;border-radius:0;transform:none;clip-path:none;background:center/contain no-repeat}
+.dust::before{background-image:url(img/cur_dust.png)}
+.piece::before{background-image:url(img/cur_piece.png)}
+.cur .dust::before,.cur .piece::before{width:18px;height:18px}
+.banner-card{grid-template-columns:1fr!important;min-height:120px;
+  background:linear-gradient(90deg,rgba(6,8,22,.92) 0%,rgba(6,8,22,.7) 45%,transparent 75%) padding-box,url(img/banner_ophiuchus.webp) 70% center/cover no-repeat padding-box,var(--goldf) border-box!important}
+.banner-card .bc-art{display:none}
+.banner-card .bc-txt{max-width:58%}
+.banner-card .bc-txt p,.banner-card .bc-txt h3{text-shadow:var(--stroke)}
+.shop-card.gacha-gold,.shop-card.gacha-paid{background:linear-gradient(180deg,rgba(6,8,22,.25),rgba(6,8,22,.8) 70%) padding-box,var(--art) center top/cover no-repeat padding-box,var(--goldf) border-box!important}
+.shop-card.gacha-gold{--art:url(img/banner_gold.webp)}
+.shop-card.gacha-paid{--art:url(img/banner_premium.webp)}
+.shop-card.gacha-gold h3,.shop-card.gacha-paid h3,.shop-card.gacha-gold .mini,.shop-card.gacha-paid .mini{text-shadow:var(--stroke)}
+.ccell[data-g],.gcard[data-g]{border-color:transparent!important;background:var(--frame) center/100% 100% no-repeat!important;padding:18px 10px 20px!important;box-shadow:none!important;
+  filter:drop-shadow(0 0 6px color-mix(in srgb,var(--g) 40%,transparent)) drop-shadow(0 3px 4px rgba(0,0,0,.5))}
+[data-g="0"]{--frame:url(img/card_common.webp)}
+[data-g="1"]{--frame:url(img/card_magic.webp)}
+[data-g="2"]{--frame:url(img/card_rare.webp)}
+[data-g="3"]{--frame:url(img/card_unique.webp)}
+[data-g="4"]{--frame:url(img/card_epic.webp)}
+[data-g="5"]{--frame:url(img/card_legend.webp)}
+.loot-art{margin-bottom:22px}
+.loot-art .box{width:120px;height:120px;border-radius:0;background:url(img/icon_chest.png) center/contain no-repeat;box-shadow:none;filter:drop-shadow(0 0 18px rgba(255,200,80,.5))}
+.loot-art .box::before,.loot-art .box::after{content:none}

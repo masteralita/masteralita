@@ -1,0 +1,92 @@
+rules_version = '2';
+// 갤럭시워 — see docs/FIREBASE.md §3
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    // What the game reads, without signing in
+    match /meta/{doc} { allow read: if true; allow write: if isAdmin(); }
+    match /releases/{version} { allow read: if true; allow write: if isAdmin(); }
+    // Drafts and content: admins only
+    match /config/{doc} { allow read, write: if isAdmin(); }
+    match /content/{path=**} { allow read, write: if isAdmin(); }
+    // Player saves: one document per account (players/{uid}); the game writes its own, admins can look players up.
+    // data = the whole save as a JSON string (the save has arrays inside arrays, which Firestore fields can't hold);
+    // name/lv/best/wins are copies for the admin list.
+    match /players/{uid} {
+      function validSave() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['data', 'name', 'lv', 'best', 'wins', 'provider', 'updatedAt', 'serverAt', 'createdAt', 'app'])
+          && d.data is string && d.data.size() < 200000
+          && d.name is string && d.name.size() <= 24
+          && d.lv is int && d.best is int && d.wins is int
+          && d.updatedAt is int && d.serverAt == request.time;
+      }
+      allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow create, update: if request.auth != null && request.auth.uid == uid && validSave();
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+    // 랭킹: name/best/lv copied from the save. Everyone can read; the owner writes their own entry, admins can only hide it.
+    match /leaderboard/{uid} {
+      function validEntry() {
+        let d = request.resource.data;
+        return d.keys().hasOnly(['name', 'best', 'lv', 'linked', 'updatedAt', 'hidden'])
+          && d.name is string && d.name.size() > 0 && d.name.size() <= 24
+          && d.best is int && d.best >= 0 && d.best <= 100000 && d.lv is int && d.lv >= 1 && d.lv <= 100000
+          && d.linked is bool && d.updatedAt is int;
+      }
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == uid && validEntry() && !('hidden' in request.resource.data);
+      allow update: if (request.auth != null && request.auth.uid == uid && validEntry()
+                        && request.resource.data.get('hidden', false) == resource.data.get('hidden', false))
+                    || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hidden']));
+      allow delete: if request.auth != null && (request.auth.uid == uid || isAdmin());
+    }
+    // 통계: one document per day (KST). Players can only add to the known counters, a little at a time.
+    match /stats/{day} {
+      function bump(k) {
+        let n = request.resource.data.get(k, 0);
+        let o = resource == null ? 0 : resource.data.get(k, 0);
+        return n is int && n >= o && n <= o + 200;
+      }
+      allow read: if isAdmin();
+      allow create, update: if request.auth != null && day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.keys().hasOnly(['active', 'newPlayers', 'sessions', 'runs', 'waves', 'battles', 'gacha', 'ads', 'skinBuys', 'mailClaims', 'coupons'])
+        && bump('active') && bump('newPlayers') && bump('sessions') && bump('runs') && bump('waves') && bump('battles')
+        && bump('gacha') && bump('ads') && bump('skinBuys') && bump('mailClaims') && bump('coupons');
+    }
+    // 약관·문의 메일(site/legal), 점검(site/status), 공지: public, written in the admin site
+    match /site/{doc} { allow read: if true; allow write: if isAdmin(); }
+    match /notices/{id} { allow read: if true; allow write: if isAdmin(); }
+    // 우편: to everyone (target 'all') or to listed accounts (uids). Claims are kept in the player's save.
+    match /mail/{id} {
+      allow read: if isAdmin() || (request.auth != null && (resource.data.target == 'all' || request.auth.uid in resource.data.uids));
+      allow write: if isAdmin();
+    }
+    // 쿠폰: players can look a code up (not list them) and redeem it once per account:
+    // uses +1 and redeemed/{uid} must be written together, within the limit and the period.
+    match /coupons/{code} {
+      function redeem() {
+        let c = resource.data;
+        let n = request.resource.data;
+        return n.diff(c).affectedKeys().hasOnly(['uses']) && n.uses == c.uses + 1
+          && c.active == true && (c.maxUses == 0 || c.uses < c.maxUses)
+          && (c.expiresAt == 0 || request.time.toMillis() < c.expiresAt)
+          && !exists(/databases/$(database)/documents/coupons/$(code)/redeemed/$(request.auth.uid))
+          && existsAfter(/databases/$(database)/documents/coupons/$(code)/redeemed/$(request.auth.uid));
+      }
+      allow get: if request.auth != null;
+      allow list, create, delete: if isAdmin();
+      allow update: if isAdmin() || (request.auth != null && redeem());
+      match /redeemed/{uid} {
+        allow read: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+        allow create: if request.auth != null && request.auth.uid == uid && request.resource.data.keys().hasOnly(['at'])
+          && getAfter(/databases/$(database)/documents/coupons/$(code)).data.uses == get(/databases/$(database)/documents/coupons/$(code)).data.uses + 1;
+        allow update, delete: if false;
+      }
+    }
+    // Admin list: each person can check their own entry; only the service account (tools/add-admin.mjs) adds people
+    match /admins/{uid} { allow read: if request.auth != null && request.auth.uid == uid; allow write: if false; }
+  }
+}

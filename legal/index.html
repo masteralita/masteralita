@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>갤럭시워 약관</title>
+<style>
+:root{--bg:#ffffff;--ink:#1b1f2e;--dim:#5d6480;--line:#e3e6ef;--accent:#b8860b;color-scheme:light dark}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#060a1a;--ink:#eaedff;--dim:#8d96c4;--line:#26305f;--accent:#f5c451}}
+:root[data-theme="dark"]{--bg:#060a1a;--ink:#eaedff;--dim:#8d96c4;--line:#26305f;--accent:#f5c451}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans KR",system-ui,-apple-system,sans-serif;line-height:1.75}
+main{max-width:760px;margin:0 auto;padding:32px 16px 64px}
+nav{display:flex;gap:16px;font-size:14px;margin-bottom:24px}
+nav a{color:var(--dim);text-decoration:none}
+nav a[aria-current="page"]{color:var(--accent);font-weight:700}
+h1{font-size:22px;margin:0 0 4px}
+.meta{color:var(--dim);font-size:13px;margin:0 0 24px}
+.body{white-space:pre-wrap;font-size:15px;border-top:1px solid var(--line);padding-top:20px;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<main>
+  <nav><a href="?doc=terms" data-doc="terms">이용약관</a><a href="?doc=privacy" data-doc="privacy">개인정보 처리방침</a></nav>
+  <h1 id="title">갤럭시워</h1>
+  <p class="meta" id="meta"></p>
+  <div class="body" id="body">불러오는 중…</div>
+</main>
+<script src="../play/firebase-config.js"></script>
+<script>
+// site/legal is public (firestore.rules); read it over REST so this page needs no SDK
+const DOCS = { terms: '이용약관', privacy: '개인정보 처리방침' };
+const key = DOCS[new URLSearchParams(location.search).get('doc')] ? new URLSearchParams(location.search).get('doc') : 'terms';
+document.title = `갤럭시워 ${DOCS[key]}`;
+document.getElementById('title').textContent = `갤럭시워 ${DOCS[key]}`;
+document.querySelectorAll('[data-doc]').forEach(a => a.setAttribute('aria-current', a.dataset.doc === key ? 'page' : 'false'));
+fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/${FIREBASE_DB}/documents/site/legal?key=${FIREBASE_CONFIG.apiKey}`)
+  .then(r => (r.ok ? r.json() : null))
+  .then(d => {
+    const f = (d && d.fields) || {}, text = f[key] && f[key].stringValue, at = f.updatedAt && Number(f.updatedAt.integerValue);
+    document.getElementById('body').textContent = text || '준비 중이에요.';
+    if (at) document.getElementById('meta').textContent = `최종 수정 ${new Date(at).toLocaleDateString('ko-KR')}`;
+  })
+  .catch(() => { document.getElementById('body').textContent = '불러오지 못했어요. 잠시 후 다시 시도해 주세요.'; });
+</script>
+</body>
+</html>
