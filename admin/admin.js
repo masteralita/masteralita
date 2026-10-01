@@ -9,7 +9,7 @@
    ========================================================================== */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js';
-import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, orderBy, limit, runTransaction } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js';
+import { getFirestore, doc, getDoc, getDocs, setDoc, onSnapshot, collection, query, where, orderBy, limit, runTransaction } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js';
 
 const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
@@ -21,6 +21,7 @@ const ADM = {
   draft: {}, saved: {}, savedAt: null, savedBy: null, // saved = config/balance
   content: {}, savedContent: {}, open: null,          // added items (balance.js applyContent), open = card being edited
   meta: null, releases: [], unsubs: [], busy: false,
+  players: null, playerQ: '', player: null,            // 플레이어 tab: list, search text, opened uid
 };
 const clone = o => JSON.parse(JSON.stringify(o));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -127,11 +128,12 @@ function render() {
     </header>
     <nav class="ad-tabs" aria-label="설정 분류">${BAL_SECTIONS.map(x => `<button type="button" data-sec="${x.id}" aria-current="${x.id === ADM.sec ? 'page' : 'false'}">${x.title}${counts[x.id] ? `<em>${counts[x.id]}</em>` : ''}</button>`).join('')}
       <button type="button" data-sec="content" aria-current="${ADM.sec === 'content' ? 'page' : 'false'}">추가 항목${ctCount() ? `<em>${ctCount()}</em>` : ''}</button>
-      <button type="button" data-sec="releases" aria-current="${ADM.sec === 'releases' ? 'page' : 'false'}">배포 기록</button></nav>
+      <button type="button" data-sec="releases" aria-current="${ADM.sec === 'releases' ? 'page' : 'false'}">배포 기록</button>
+      <button type="button" data-sec="players" aria-current="${ADM.sec === 'players' ? 'page' : 'false'}">플레이어</button></nav>
     <div class="ad-body">${s ? `
       <div class="ad-desc"><h2>${s.title}</h2><p>${s.desc} · 금색 테두리 = 저장 전 변경, 점 = 기본값과 다름 · 칸에 마우스를 올리면 기본값이 보여요</p>
         <button class="ghost sm" data-ad="secdefaults" type="button"${counts[s.id] ? '' : ' disabled'}>이 탭 기본값</button></div>
-      <div class="ad-scroll">${sectionHtml(s)}</div>` : ADM.sec === 'content' ? contentHtml() : `
+      <div class="ad-scroll">${sectionHtml(s)}</div>` : ADM.sec === 'content' ? contentHtml() : ADM.sec === 'players' ? playersHtml() : `
       <div class="ad-desc"><h2>배포 기록</h2><p>[배포]를 누를 때마다 버전이 하나씩 쌓여요. 예전 버전을 초안으로 불러와 다시 배포하면 되돌릴 수 있어요.</p></div>
       <div class="ad-scroll">${releasesHtml()}</div>`}
     </div>`;
@@ -262,6 +264,48 @@ function contentChange(el) {
   ADM.content = { ...ADM.content, [k]: { ...ADM.content[k], [id]: d } };
   render();
 }
+
+/* ---------- 플레이어 (players/{uid}, read-only) ---------- */
+async function loadPlayers() {
+  const q = ADM.playerQ.trim(), col = collection(db, 'players');
+  ADM.players = 'loading'; render();
+  try {
+    const snap = await getDocs(q ? query(col, where('name', '==', q), limit(50)) : query(col, orderBy('updatedAt', 'desc'), limit(50)));
+    ADM.players = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+  } catch (err) { ADM.players = []; toast(`플레이어를 불러오지 못했어요 (${err.code || err.message})`); }
+  render();
+}
+function playerDetail(p) {
+  let s = null; try { s = JSON.parse(p.data); } catch {}
+  if (!s) return '<p class="empty">저장 데이터를 읽지 못했어요.</p>';
+  const cons = Object.entries(s.cons || {}).map(([id, c]) => `${(CON[id] || {}).name || id}(${(GRADES[c.g] || {}).name || c.g})`).join(', ');
+  const rows = [['Star Dust', fmtN(s.dust)], ['Star Piece', fmtN(s.piece)], ['레벨 · 경험치', `Lv ${s.lv} · ${fmtN(s.xp)}`], ['최고 웨이브', s.best || 0],
+    ['대전', `${s.wins || 0}승 ${s.losses || 0}패`], ['별자리', cons || '-'], ['팀', (s.team || []).map(id => (CON[id] || {}).name || id).join(', ') || '-'],
+    ['행성', Object.entries(s.planets || {}).map(([id, x]) => `${(PLANET[id] || {}).name || id} Lv ${x.lv}`).join(', ')], ['광고 제거', s.adPass ? '구매함' : '-'],
+    ['생일', s.birthday ? `${s.birthday[0]}월 ${s.birthday[1]}일` : '-']];
+  return `<dl class="pl-dl">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+    <details><summary>원본 저장 데이터 (JSON)</summary><pre>${esc(JSON.stringify(s, null, 2))}</pre></details>`;
+}
+const fmtN = n => Math.floor(n || 0).toLocaleString('ko-KR');
+function playersHtml() {
+  if (ADM.players === null) setTimeout(loadPlayers);
+  const list = Array.isArray(ADM.players) ? ADM.players : [];
+  return `<div class="ad-desc"><h2>플레이어</h2><p>게임 진행 데이터 (players/{uid}) · 최근 저장한 50명, 또는 닉네임으로 찾기 · 읽기 전용이에요.</p></div>
+    <form class="pl-search" data-plsearch><input type="search" name="q" placeholder="닉네임 정확히 입력" value="${esc(ADM.playerQ)}"><button class="ghost sm" type="submit">찾기</button>
+      ${ADM.playerQ ? '<button class="ghost sm" type="button" data-plclear>전체 보기</button>' : ''}<button class="ghost sm" type="button" data-plreload>새로고침</button></form>
+    ${ADM.players === 'loading' || ADM.players === null ? '<p class="empty">불러오는 중…</p>' : !list.length ? '<p class="empty">플레이어가 없어요.</p>' : `
+    <div class="ad-scroll"><table class="ad-t pl"><thead><tr><th>닉네임</th><th>Lv</th><th>최고 웨이브</th><th>승</th><th>계정</th><th>마지막 저장</th><th>가입</th><th>UID</th></tr></thead><tbody>
+      ${list.map(p => `<tr class="pl-row${ADM.player === p.uid ? ' on' : ''}" data-pl="${p.uid}"><th scope="row">${esc(p.name)}</th><td>${p.lv}</td><td>${p.best}</td><td>${p.wins}</td>
+        <td>${p.provider === 'google.com' ? 'Google' : '게스트'}</td><td>${fmtTime(p.updatedAt)}</td><td>${p.createdAt ? fmtTime(p.createdAt.toMillis()) : ''}</td><td><code>${p.uid}</code></td></tr>
+        ${ADM.player === p.uid ? `<tr class="pl-detail"><td colspan="8">${playerDetail(p)}</td></tr>` : ''}`).join('')}
+    </tbody></table></div>`}`;
+}
+root.addEventListener('submit', e => { if (!e.target.matches('[data-plsearch]')) return; e.preventDefault(); ADM.playerQ = e.target.q.value; ADM.player = null; loadPlayers(); });
+root.addEventListener('click', e => {
+  if (e.target.closest('[data-plclear]')) { ADM.playerQ = ''; loadPlayers(); }
+  else if (e.target.closest('[data-plreload]')) loadPlayers();
+  else { const r = e.target.closest('[data-pl]'); if (r) { ADM.player = ADM.player === r.dataset.pl ? null : r.dataset.pl; render(); } }
+});
 
 /* ---------- Toast / dialogs ---------- */
 function toast(msg) {

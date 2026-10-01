@@ -186,6 +186,8 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .bd{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .bdp{font-size:12.5px;color:var(--dim);line-height:1.5;min-height:3em}
 .bdp b{color:var(--ink)}
+.tlink{border:0;background:none;color:var(--dim);font-size:13px;padding:6px}
+.tlink b{color:var(--gold);font-weight:700;text-decoration:underline}
 .tap{border:0;background:none;color:var(--ink);font-family:var(--f-disp);letter-spacing:.3em;font-size:14px;padding:18px 28px;animation:blink 1.6s ease-in-out infinite}
 .tap small{display:block;letter-spacing:0;font-family:var(--f-body);color:var(--dim);margin-top:6px}
 @keyframes blink{50%{opacity:.35}}
@@ -516,6 +518,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
       </label>
       <div class="bdp" id="bdPreview"></div>
       <button class="cta" type="submit">게스트로 시작</button>
+      <button class="tlink" id="titleLink" type="button" hidden>이미 하던 계정이 있나요? <b>Google로 이어하기</b></button>
     </form>
     <button class="tap" id="titleTap" type="button" hidden>TOUCH TO START<small>화면을 눌러 시작하기</small></button>
   </section>
@@ -588,3 +591,4 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 <script src="battle.js"></script>
 <script src="ads.js"></script>
 <script src="app.js"></script>
+<script type="module" src="cloud.js"></script>

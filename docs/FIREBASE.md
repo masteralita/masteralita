@@ -47,6 +47,7 @@
 | `releases/{version}` | 게임이 받는 **확정본** 한 벌 (관리자가 "배포"를 누르면 만들어짐) — `values`(수치·글자) + `content`(추가 항목) |
 | `meta/current` | 현재 배포 버전 번호 — 게임은 이 번호가 바뀌었을 때만 새로 받음 |
 | `admins/{uid}` | 관리자 목록 (쓰기 권한) |
+| `players/{uid}` | 플레이어 진행 데이터 — `data`(저장 전체를 JSON 문자열로), 목록용 `name`·`lv`·`best`·`wins`, `provider`(anonymous/google.com), `updatedAt`, `createdAt` |
 
 - 지금은 `content/*` 대신 `config/balance`(초안)와 `releases/{v}`에 `content: { skins, pskins, oskins }` 로 추가 항목을 함께 담아요 (형식은 `prototype/balance.js` 의 `applyContent` 주석).
 - 관리자 화면에서 고친 내용은 **초안**으로 저장되고, **배포**를 눌러야 게임에 나가요 (실수 방지, 되돌리기 가능).
@@ -57,6 +58,7 @@
 - 읽기: `releases`, `meta`, 이미지 → 누구나 (게임이 로그인 없이 받음)
 - 쓰기: `content`, `config`, `releases`, `meta`, 이미지 → `admins/{uid}` 에 등록된 사람만
 - 첫 관리자는 서비스 계정으로 등록 (사용자 Google 계정 1개)
+- `players/{uid}`: 본인만 읽기·쓰기 (필드·크기 검사), 관리자는 읽기만
 
 ## 4. 진행 순서 (Claude)
 
@@ -68,6 +70,7 @@
 3. ✅ 보안 규칙 (`firestore.rules`) · Hosting 설정 (`firebase.json`) 배포 — `storage.rules`는 Storage 설정 후
 4. ✅ 게임이 `meta/current` → `releases/{version}` 을 읽어 적용 (기기에 캐시, 못 받으면 캐시 → 내장 기본값)
 5. ✅ 웹 프로토타입을 Hosting `/play/` 에 배포
+6. ✅ 플레이어 계정·클라우드 저장 (`prototype/cloud.js`) + 관리자 사이트 `플레이어` 탭 (조회 전용)
 
 ## 5. 현재 상태
 
@@ -84,6 +87,16 @@
 - **배포 기록** 탭: 예전 버전을 초안으로 불러와 다시 배포하면 되돌리기예요.
 - claude.ai 게임의 `#admin`에 저장했던 값이 있으면: 그 화면에서 **엑셀 내보내기** → 관리자 사이트에서 **엑셀 가져오기** → 초안 저장 → 배포.
 
+### 플레이어 계정·저장 (`prototype/cloud.js`)
+- 처음 실행하면 **익명(게스트) 계정**이 자동으로 만들어져요 (Authentication → 익명 로그인 사용 중).
+- 게임은 지금처럼 기기 저장(localStorage)으로 플레이하고, 저장할 때마다 `updatedAt`을 찍어 4초 뒤 서버에 올려요. 앱을 닫을 때도 바로 올려요.
+- 실행할 때 서버 사본이 더 새것이면 서버 것을 불러와요 (전투 중이면 끝난 뒤).
+- 설정 → **Google 연동**: 게스트 계정에 Google을 연결해요 (uid 그대로). 다른 기기에서는 타이틀의 **Google로 이어하기**로 불러와요.
+  - 이미 있는 Google 계정이면 그 계정으로 전환: 저장된 진행이 있으면 불러오고, 없으면 지금 진행을 옮겨요. 게스트 사본은 서버에 남겨 둬요.
+- 설정 → **로그아웃**(Google 연동 시): 진행은 서버에 두고 이 기기는 새 게스트로 시작해요. **서비스 탈퇴**: 서버 데이터와 계정까지 지워요.
+- Firebase를 못 불러오면(오프라인, claude.ai 안) 기기에만 저장해요.
+- ⚠️ 저장 내용은 게임(클라이언트)이 정해서 올려요. 재화 조작을 막으려면 결제·보상 지급을 서버(Functions)에서 검증해야 해요 — 인앱 결제 붙일 때 같이 해요.
+
 ### 도구 (`tools/`, 환경 변수 3개 필요)
 | 명령 | 하는 일 |
 |---|---|
@@ -97,7 +110,7 @@
 ## 6. 이어받기 메모
 
 - 작업 브랜치: `claude/upbeat-carson-fmqclr` (이전 `claude/vibrant-einstein-sc3mji` 작업 포함).
-- 웹 프로토타입: `prototype/` (index.html + data.js, firebase-config.js, balance.js, battle.js, ads.js, app.js)
+- 웹 프로토타입: `prototype/` (index.html + data.js, firebase-config.js, balance.js, battle.js, ads.js, app.js, cloud.js)
   - 수치 레지스트리: `prototype/balance.js` 의 `BAL_SECTIONS` (`path → value`). 관리자 사이트(`admin/admin.js`)가 같은 파일을 불러와 써요.
 - 추가 항목이 배포에서 빠지면 그 스킨을 장착한 플레이어는 기본 스킨으로 돌아가요 (`equippedSkin`, `PSKIN.basic`, `OSKIN.dash` 대체).
 - Firestore는 배열 안의 배열을 저장할 수 없어요 — 추가 스킨의 능력치 카드는 `{ key, name }` 로 저장하고 게임이 `[key, name]` 으로 바꿔요.

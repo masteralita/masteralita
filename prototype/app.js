@@ -4,7 +4,7 @@
    settings, rewards. The battle itself lives in battle.js.
    ========================================================================== */
 
-/* ---------- Save (prototype: kept in this browser only) ---------- */
+/* ---------- Save: kept in this browser, mirrored to players/{uid} by cloud.js ---------- */
 const SAVE_KEY = 'gw.save.v1';
 function freshSave() {
   return {
@@ -24,10 +24,9 @@ const ownsSkin = (id, sid) => sid === id || (save.skins || []).includes(sid) || 
 const addSkin = sid => { save.skins = [...new Set([...(save.skins || []), sid])]; };
 const skinStyle = sk => { const d = CON[sk.con]; return `${STYLE_LABEL[sk.style || d.style]} · ${KIND_LABEL[sk.kind || d.kind]}`; };
 let save = (() => {
-  try { const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if (v && v.v === 1) { const o = Object.assign(freshSave(), v); if (!v.form) o.form = [v.team || [], []]; return o; } } catch {}
+  try { const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if (v && v.v === 1) return loadSave(v); } catch {}
   return freshSave();
 })();
-if (save.adsRemoved && !save.adPass) save.adPass = true; // older saves bought the previous ad item
 // Team formation (팀업): save.form[k] = constellations on orbit k of the main planet.
 // Keeps 1 orbit's worth on single-orbit planets, ≤ ORBIT_CAP per orbit and ≤ TEAM_MAX in total; save.team mirrors it flat.
 function normalizeForm() {
@@ -55,7 +54,43 @@ function buildMySystem(ov = {}) {
   }));
   return makeSystem('me', P, cons, ringOf);
 }
-function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch {} }
+/* ---------- Account (cloud.js) ---------- */
+function accountRows() {
+  const C = window.CLOUD, a = C && C.account;
+  const sync = !C || C.state === 'off' ? '이 기기에만 저장돼요'
+    : C.state === 'connecting' ? '서버에 연결 중…' : C.state === 'saving' ? '저장 중…'
+    : C.state === 'offline' ? '오프라인 · 연결되면 저장해요'
+    : C.savedAt ? `서버에 저장됨 · ${new Date(C.savedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : '서버 연결됨';
+  const who = !a ? '게스트 계정' : a.guest ? '게스트 계정 · 이 기기에서만 이어할 수 있어요' : `Google · ${a.email || '연결됨'}`;
+  const btn = !C || C.state === 'off' ? '' : !a || a.guest ? '<button class="ghost sm" data-act="link" type="button">Google 연동</button>'
+    : '<button class="ghost sm" data-act="signout" type="button">로그아웃</button>';
+  return `<div class="set-row"><span>연동 계정<small>${who}</small></span>${btn}</div>
+    <div class="set-row"><span>클라우드 저장<small>${sync}</small></span></div>`;
+}
+addEventListener('gw-cloud', () => { const el = document.getElementById('acctRows'); if (el) el.innerHTML = accountRows(); });
+function persist() {
+  save.updatedAt = Date.now(); // cloud.js keeps whichever copy is newer
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch {}
+  if (window.CLOUD) CLOUD.schedule();
+}
+function loadSave(v) {
+  const o = Object.assign(freshSave(), v);
+  if (!v.form) o.form = [v.team || [], []];
+  if (o.adsRemoved && !o.adPass) o.adPass = true; // older saves bought the previous ad item
+  return o;
+}
+// cloud.js: the server copy is newer (or the player switched accounts) → replace this device's progress
+window.gwAdoptSave = remote => {
+  save = loadSave(remote);
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch {}
+  closeModal();
+  if (G.state === 'title') showTitle(); else enterHome();
+};
+// cloud.js: signed out / deleted → start over as a new guest
+window.gwResetLocal = () => {
+  try { localStorage.removeItem(SAVE_KEY); } catch {}
+  save = freshSave(); tab = 'home'; closeModal(); showTitle();
+};
 
 const fmt = n => Math.floor(n).toLocaleString('en-US');
 const CUR = { dust: 'Star Dust', piece: 'Star Piece' };
@@ -151,6 +186,9 @@ function showTitle() {
     if (save.birthday) { const id = save.team[0]; setTimeout(() => showGachaResult([{ id, g: 4, res: 'new' }], '탄생 별자리 지급'), 350); }
   });
   $('titleTap').addEventListener('click', () => enterHome());
+  $('titleLink').addEventListener('click', () => window.CLOUD && CLOUD.linkGoogle());
+  // offered only while a guest can still pick up an existing Google account's progress
+  addEventListener('gw-cloud', () => { const C = window.CLOUD; $('titleLink').hidden = !C || C.state === 'off' || !!(C.account && !C.account.guest); });
 })();
 
 /* ---------- Screen switching ---------- */
@@ -886,8 +924,7 @@ function openSettings() {
     <div class="set-group"><span class="set-h">계정</span>
       ${tg('push', '알림')}
       <div class="set-row"><span>닉네임</span><button class="ghost sm" data-act="rename" type="button">${save.name || '게스트'} · 변경</button></div>
-      <div class="set-row"><span>연동된 SNS<small>게스트 계정</small></span><button class="ghost sm" data-act="soon" type="button">SNS 연동</button></div>
-      <div class="set-row"><span>회원가입 전환</span><button class="ghost sm" data-act="soon" type="button">전환</button></div>
+      <div id="acctRows">${accountRows()}</div>
     </div>
     <div class="set-group"><span class="set-h">서비스 이용</span>
       <div class="links">
@@ -908,9 +945,13 @@ function openSettings() {
       openModal(`<h3>닉네임 변경</h3><form id="renameForm" class="rename"><input id="renameInput" maxlength="12" value="${save.name}" aria-label="닉네임"><button class="cta sm" type="submit">저장</button></form>`);
       $('renameForm').onsubmit = ev => { ev.preventDefault(); const v = $('renameInput').value.trim(); if (v) { save.name = v; persist(); renderTopBar(); } closeModal(); };
     }
-    else if (act === 'reset') confirmBox('서비스 탈퇴', '이 기기의 진행 데이터를 모두 지우고 처음부터 시작해요. 되돌릴 수 없어요.', '모두 지우기', () => {
-      try { localStorage.removeItem(SAVE_KEY); } catch {}
-      save = freshSave(); tab = 'home'; showTitle();
+    else if (act === 'link') { closeModal(); window.CLOUD && CLOUD.linkGoogle(); }
+    else if (act === 'signout') confirmBox('로그아웃', '진행은 Google 계정에 저장돼 있어요. 이 기기는 새 게스트로 처음부터 시작해요.', '로그아웃', async () => {
+      await CLOUD.signOut(); toast('로그아웃했어요');
+    });
+    else if (act === 'reset') confirmBox('서비스 탈퇴', '이 기기와 서버에 저장된 진행 데이터를 모두 지우고 처음부터 시작해요. 되돌릴 수 없어요.', '모두 지우기', async () => {
+      if (window.CLOUD) await CLOUD.deleteData();
+      window.gwResetLocal();
     });
   });
   $('modalBody').addEventListener('change', e => {
