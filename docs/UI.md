@@ -21,3 +21,16 @@
 5. 로비 우편함·랭킹 아이콘, 보물 상자 그림
 
 이미지 위치: `prototype/img/` (deploy.mjs가 png/webp 를 /play/ 로 함께 올림 — 하위 폴더 복사 추가 필요).
+
+## 만든 그림 (2026-10-01, SpriteCook · GPT 2.5 Flare)
+`prototype/img/` 에 있어요. 아이콘은 2배 크기(레티나용)로 저장했어요. 아직 코드에 연결 안 됨.
+
+| 파일 | 크기 | 쓰일 곳 |
+|---|---|---|
+| `cur_dust.png`, `cur_piece.png` | 128×128 | `.dust::before`, `.piece::before` |
+| `nav_store/planets/home/const/team.png` | 192×192 | `.nav button svg` 교체 |
+| `icon_mail.png`, `icon_rank.png`, `icon_chest.png` | 192×192 | 로비 우편함·랭킹, 보물 상자 |
+| `banner_ophiuchus/gold/premium.webp` | 1024×~333 (3:1) | 상점 패키지 배너, 골드/유료 뽑기 카드 |
+| `card_common/magic/rare/unique/epic/legend.webp` | 240×~360 | `.ccell`, `.gcard` 등급별 배경 |
+
+배너는 왼쪽 1/3이 어두워서 글자를 올리기 좋아요.
