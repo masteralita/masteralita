@@ -305,6 +305,17 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .pcell .tag{position:absolute;top:4px;right:4px;font-size:9px;padding:1px 5px;border-radius:999px;background:var(--gold);color:#1d1403;font-weight:700}
 
 /* stars */
+.con-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ccell{position:relative;display:grid;justify-items:center;gap:3px;padding:10px 4px 9px;border-radius:12px;border:1px solid color-mix(in srgb,var(--g) 55%,#26305f);background:rgba(8,12,30,.85);min-width:0}
+.ccell b{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.ccell small{font-size:10.5px;color:var(--dim);font-variant-numeric:tabular-nums}
+.ccell.locked{border-style:dashed;border-color:var(--line)}
+.ccell.locked b{color:var(--dim)}
+.ccell .tm{position:absolute;top:6px;left:6px;font-style:normal;font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:999px;background:var(--gold);color:#1d1403}
+.detail-head{display:flex;align-items:center;gap:8px;min-width:0}
+.detail-head .back{flex:none;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(15,22,52,.9);font-size:12.5px;font-weight:700}
+.detail-head b{font-size:16px}
+.detail-head span:not(.gchip){font-family:var(--f-disp);font-size:11px;color:var(--dim);letter-spacing:.08em}
 .strip{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-inline:-16px;padding-inline:16px;scrollbar-width:none}
 .strip::-webkit-scrollbar{display:none}
 .scard{flex:0 0 auto;display:grid;justify-items:center;gap:2px;width:62px;padding:6px 4px 0;border-radius:10px;border:1px solid var(--g);background:#05070f;overflow:hidden}

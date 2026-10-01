@@ -213,7 +213,7 @@ function setTab(t) {
   ({ store: renderStore, planets: renderPlanets, home: renderHome, stars: renderStars, team: renderTeam })[t]();
   if (t === 'home') requestAnimationFrame(layoutHome);
 }
-document.querySelector('.nav').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) setTab(b.dataset.tab); });
+document.querySelector('.nav').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; if (b.dataset.tab === 'stars') starView = 'list'; setTab(b.dataset.tab); });
 
 function renderTopBar() {
   $('tbLv').textContent = save.lv;
@@ -637,19 +637,30 @@ $('pane-planets').addEventListener('click', e => {
 });
 
 /* ---------- 별자리 (Stars) — 컨셉 이미지 23·24 ---------- */
-let starSel = null, slotSel = null, skinSel = null;
+let starSel = null, slotSel = null, skinSel = null, starView = 'list'; // 별자리 tab: list (3-column grid) → detail
+// 별자리 목록: every constellation in a 3-column grid, owned first (by grade), then the ones still to find
+function renderStarList() {
+  const team = new Set(save.team);
+  const list = [...ALL_CONS].sort((a, b) => (save.cons[b.id] ? save.cons[b.id].g + 1 : 0) - (save.cons[a.id] ? save.cons[a.id].g + 1 : 0));
+  const owned = ALL_CONS.filter(c => save.cons[c.id]).length;
+  $('pane-stars').innerHTML = `
+    <div class="sec-h"><h2>별자리</h2><span>보유 ${owned} / ${ALL_CONS.length} · 눌러서 상세 보기</span></div>
+    <div class="con-grid">${list.map(c => { const o = save.cons[c.id]; return `
+      <button class="ccell${o ? '' : ' locked'}" type="button" data-sid="${c.id}" style="--g:${o ? GRADES[o.g].col : '#3a4270'}">
+        ${team.has(c.id) ? '<em class="tm">편성</em>' : ''}
+        ${conSvg(c.id, 64, { dim: !o })}
+        <b>${c.name}자리</b>
+        ${o ? `${gradeChip(o.g)}<small>전투력 ${fmt(conPower(c.id))}</small>` : '<span class="gchip" style="--g:#59608a">미보유</span><small>&nbsp;</small>'}
+      </button>`; }).join('')}</div>`;
+}
 function renderStars() {
+  if (starView === 'list') { renderStarList(); return; }
   const owned = ALL_CONS.filter(c => save.cons[c.id]);
   if (!starSel || !CON[starSel]) starSel = (owned[0] || ALL_CONS[0]).id;
   const d = CON[starSel], o = save.cons[starSel];
   if (slotSel == null || slotSel >= d.sh.pts.length) slotSel = d.sh.key;
   const b = conBonus(starSel), eq = SKIN[equippedSkin(starSel)];
   if (!skinSel || SKIN[skinSel].con !== starSel) skinSel = eq.id;
-  const strip = ALL_CONS.map(c => {
-    const oc = save.cons[c.id];
-    return `<button class="scard" type="button" data-sid="${c.id}" aria-pressed="${c.id === starSel}" style="--g:${oc ? GRADES[oc.g].col : '#3a4270'}">
-      ${conSvg(c.id, 46, { dim: !oc })}<span>${c.en.slice(0, 7).toUpperCase()}</span></button>`;
-  }).join('');
   const sw = 300, P = d.sh.pts.map(([x, y]) => [x * 120, y * 100]);
   const slotsSvg = P.map(([x, y], i) => {
     const t = slotType(d, i), s = o && o.slots[i], open = s && s.open, part = s && s.part;
@@ -661,7 +672,8 @@ function renderStars() {
     </g>`;
   }).join('');
   $('pane-stars').innerHTML = `
-    <div class="strip">${strip}</div>
+    <div class="detail-head"><button class="back" type="button" data-sact="list" aria-label="별자리 목록으로">‹ 목록</button>
+      <b>${d.name}자리</b><span>${d.en}</span>${o ? gradeChip(o.g) : '<span class="gchip" style="--g:#59608a">미보유</span>'}</div>
     ${skinSection(starSel, o)}
     <section class="star-stage">
       <svg class="graph" style="--ln:rgb(${eq.pal.line})" viewBox="${-sw / 2} -125 ${sw} 250" role="img" aria-label="${d.name}자리 별 슬롯">
@@ -733,12 +745,13 @@ function slotPanel(d, o) {
     </div>`;
 }
 $('pane-stars').addEventListener('click', e => {
-  const c = e.target.closest('[data-sid]'); if (c) { starSel = c.dataset.sid; slotSel = null; skinSel = null; renderStars(); return; }
+  const c = e.target.closest('[data-sid]'); if (c) { starSel = c.dataset.sid; slotSel = null; skinSel = null; starView = 'detail'; renderStars(); $('pane-stars').closest('.panes').scrollTop = 0; return; }
   const sl = e.target.closest('[data-slot]'); if (sl) { slotSel = +sl.dataset.slot; renderStars(); return; }
   const sk = e.target.closest('[data-skin]'); if (sk) { openSkinPopup('c', sk.dataset.skin); return; }
   const a = e.target.closest('[data-sact]'); if (!a) return;
   const act = a.dataset.sact;
   if (act === 'store') { setTab('store'); return; }
+  if (act === 'list') { starView = 'list'; renderStars(); return; }
   const d = CON[starSel], o = save.cons[starSel], i = slotSel, S = SLOT[slotType(d, i)];
   o.slots[i] = o.slots[i] || { open: false, part: null };
   const s = o.slots[i];
