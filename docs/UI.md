@@ -23,7 +23,7 @@
 이미지 위치: `prototype/img/` (deploy.mjs가 png/webp 를 /play/ 로 함께 올림 — 하위 폴더 복사 추가 필요).
 
 ## 만든 그림 (2026-10-01, SpriteCook · GPT 2.5 Flare)
-`prototype/img/` 에 있어요. 아이콘은 2배 크기(레티나용)로 저장했어요. 아직 코드에 연결 안 됨.
+`prototype/img/` 에 있어요. 아이콘은 2배 크기(레티나용)로 저장했어요. theme.css 끝의 "Art" 구역과 index.html·app.js에서 연결했어요. 게임 속 낙하 보물상자(캔버스)는 아직 기존 그림이에요.
 
 | 파일 | 크기 | 쓰일 곳 |
 |---|---|---|

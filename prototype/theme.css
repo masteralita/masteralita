@@ -96,3 +96,33 @@
 .power{color:#c9d3ea}
 .power b{text-shadow:var(--stroke)}
 .set-group{padding:10px 12px!important;border-radius:12px;margin-bottom:10px}
+
+/* ---------- Art: SpriteCook images in img/ (see docs/UI.md) ---------- */
+.nav button img{width:34px;height:34px;object-fit:contain;filter:drop-shadow(0 1px 1px #000)}
+.nav button.home img{width:38px;height:38px}
+.nav button:not([aria-current="page"]) img{filter:drop-shadow(0 1px 1px #000) saturate(.75) brightness(.85)}
+.side-icons .gear img{width:26px;height:26px;object-fit:contain;filter:drop-shadow(0 1px 1px #000)}
+.dust::before,.piece::before{width:16px;height:16px;margin-right:3px;vertical-align:-3px;border-radius:0;transform:none;clip-path:none;background:center/contain no-repeat}
+.dust::before{background-image:url(img/cur_dust.png)}
+.piece::before{background-image:url(img/cur_piece.png)}
+.cur .dust::before,.cur .piece::before{width:18px;height:18px}
+.banner-card{grid-template-columns:1fr!important;min-height:120px;
+  background:linear-gradient(90deg,rgba(6,8,22,.92) 0%,rgba(6,8,22,.7) 45%,transparent 75%) padding-box,url(img/banner_ophiuchus.webp) 70% center/cover no-repeat padding-box,var(--goldf) border-box!important}
+.banner-card .bc-art{display:none}
+.banner-card .bc-txt{max-width:58%}
+.banner-card .bc-txt p,.banner-card .bc-txt h3{text-shadow:var(--stroke)}
+.shop-card.gacha-gold,.shop-card.gacha-paid{background:linear-gradient(180deg,rgba(6,8,22,.25),rgba(6,8,22,.8) 70%) padding-box,var(--art) center top/cover no-repeat padding-box,var(--goldf) border-box!important}
+.shop-card.gacha-gold{--art:url(img/banner_gold.webp)}
+.shop-card.gacha-paid{--art:url(img/banner_premium.webp)}
+.shop-card.gacha-gold h3,.shop-card.gacha-paid h3,.shop-card.gacha-gold .mini,.shop-card.gacha-paid .mini{text-shadow:var(--stroke)}
+.ccell[data-g],.gcard[data-g]{border-color:transparent!important;background:var(--frame) center/100% 100% no-repeat!important;padding:18px 10px 20px!important;box-shadow:none!important;
+  filter:drop-shadow(0 0 6px color-mix(in srgb,var(--g) 40%,transparent)) drop-shadow(0 3px 4px rgba(0,0,0,.5))}
+[data-g="0"]{--frame:url(img/card_common.webp)}
+[data-g="1"]{--frame:url(img/card_magic.webp)}
+[data-g="2"]{--frame:url(img/card_rare.webp)}
+[data-g="3"]{--frame:url(img/card_unique.webp)}
+[data-g="4"]{--frame:url(img/card_epic.webp)}
+[data-g="5"]{--frame:url(img/card_legend.webp)}
+.loot-art{margin-bottom:22px}
+.loot-art .box{width:120px;height:120px;border-radius:0;background:url(img/icon_chest.png) center/contain no-repeat;box-shadow:none;filter:drop-shadow(0 0 18px rgba(255,200,80,.5))}
+.loot-art .box::before,.loot-art .box::after{content:none}

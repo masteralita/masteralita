@@ -32,6 +32,7 @@ function build() {
     for (const f of fs.readdirSync(path.join(ROOT, from))) if (/\.(html|js|css|png|jpg|svg|webp|json)$/.test(f)) fs.copyFileSync(path.join(ROOT, from, f), path.join(out, to, f));
   };
   copy('prototype', 'play');
+  copy('prototype/img', 'play/img');
   // prototype/index.html has no document skeleton (claude.ai adds one when it publishes the artifact); add it here
   const game = path.join(out, 'play', 'index.html'), html = fs.readFileSync(game, 'utf8');
   if (!/^<!doctype/i.test(html)) fs.writeFileSync(game, '<!doctype html>\n<html lang="ko">\n<meta charset="utf-8">\n'

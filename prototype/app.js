@@ -519,7 +519,7 @@ function showGachaResult(list, title, extra = []) {
     ? `<div class="gcard skin" style="--g:rgb(${SKIN[r.skin].pal.line});animation-delay:${i * 70}ms">
         ${conSvg(r.id, 64, { skin: r.skin })}<b>${SKIN[r.skin].name}</b><span class="gchip" style="--g:rgb(${SKIN[r.skin].pal.line})">${SKIN_TIER[SKIN[r.skin].tier].name} 스킨</span><em class="new">SKIN</em>
       </div>`
-    : `<div class="gcard" style="--g:${GRADES[r.g].col};animation-delay:${i * 70}ms">
+    : `<div class="gcard" data-g="${r.g}" style="--g:${GRADES[r.g].col};animation-delay:${i * 70}ms">
         ${conSvg(r.id, 64)}<b>${CON[r.id].name}</b>${gradeChip(r.g)}${label(r)}
       </div>`;
   openModal(`<h3>${title}</h3>
@@ -550,7 +550,7 @@ function renderStore() {
     </section>
     <div class="grid2">
       ${['gold', 'paid'].map(k => { const g = GACHA[k]; return `
-        <section class="shop-card">
+        <section class="shop-card gacha-${k}">
           <h3>${g.name}</h3>
           <p class="mini">${k === 'paid' ? '레어 이상 확정 · 뱀주인자리 포함' : '12궁 별자리 카드'}</p>
           <button class="buy" data-gacha="${k}" data-n="1" type="button"><span>1회</span><b class="${g.cur}">${fmt(g.cost)}</b></button>
@@ -646,7 +646,7 @@ function renderStarList() {
   $('pane-stars').innerHTML = `
     <div class="sec-h"><h2>별자리</h2><span>보유 ${owned} / ${ALL_CONS.length} · 눌러서 상세 보기</span></div>
     <div class="con-grid">${list.map(c => { const o = save.cons[c.id]; return `
-      <button class="ccell${o ? '' : ' locked'}" type="button" data-sid="${c.id}" style="--g:${o ? GRADES[o.g].col : '#3a4270'}">
+      <button class="ccell${o ? '' : ' locked'}" type="button" data-sid="${c.id}"${o ? ` data-g="${o.g}"` : ''} style="--g:${o ? GRADES[o.g].col : '#3a4270'}">
         ${team.has(c.id) ? '<em class="tm">편성</em>' : ''}
         ${conSvg(c.id, 64, { dim: !o })}
         <b>${c.name}자리</b>
