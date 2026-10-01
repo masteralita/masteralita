@@ -34,3 +34,6 @@
 | `card_common/magic/rare/unique/epic/legend.webp` | 240×~360 | `.ccell`, `.gcard` 등급별 배경 |
 
 배너는 왼쪽 1/3이 어두워서 글자를 올리기 좋아요.
+| `con_<id>.webp` (13종: sgr cap aqr psc ari tau gem cnc leo vir lib sco oph) | 240×240 | `conSvg()` 기본 스킨 별자리 그림 (다른 스킨은 기존 선 그림) |
+
+별자리 그림은 2026-10-01 SpriteCook 시트 1장(4×4)으로 만들어 잘랐어요. 잠긴 별자리는 `.cimg.dim` 으로 흑백 처리돼요.
