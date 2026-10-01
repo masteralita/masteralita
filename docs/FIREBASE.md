@@ -121,7 +121,9 @@
 
 ### 통계 · Google 애널리틱스
 - 지금은 자체 통계: 게임이 이벤트(가입, 아케이드·배틀 종료, 뽑기, 광고 시청, 스킨 구매, 우편 수령, 쿠폰)를 기기에 모았다가 `stats/{날짜}`에 더해요.
-- **GA 연결 (사용자 작업)**: Firebase 콘솔 → 프로젝트 설정 → 통합 → Google Analytics 연결. 연결되면 웹 앱 설정에 `measurementId`가 생겨요 → `prototype/firebase-config.js`에 추가하면 같은 이벤트가 GA에도 기록돼요 (Claude에게 "GA 연결했어" 라고 하면 돼요).
+- **Google 애널리틱스 연결됨**: 속성 `galaxywar-e3d9a` (ID 556835274), 측정 ID `G-XY3C0SLW59` (`prototype/firebase-config.js`).
+  - Firebase 웹 앱과 GA 스트림이 연결돼 있지 않아서(Firebase가 측정 ID를 비워서 돌려줌) Firebase Analytics SDK 대신 **gtag.js로 측정 ID에 직접** 보내요 (`cloud.js`). `user_id` = 계정 uid.
+  - 같은 이벤트 이름이 GA에도 기록돼요: sign_up, arcade_end(wave), battle_end(win), gacha(kind, n), ad_reward, skin_buy, mail_claim, coupon + 자동 page_view.
 
 ### 도구 (`tools/`, 환경 변수 3개 필요)
 | 명령 | 하는 일 |

@@ -7,6 +7,7 @@ const FIREBASE_CONFIG = {
   projectId: "galaxywar-e3d9a",
   storageBucket: "galaxywar-e3d9a.firebasestorage.app",
   messagingSenderId: "983136099060",
-  appId: "1:983136099060:web:163630e2a9d58751901ca1"
+  appId: "1:983136099060:web:163630e2a9d58751901ca1",
+  measurementId: "G-XY3C0SLW59" // Google Analytics (cloud.js logs gameplay events when this is set)
 };
 const FIREBASE_DB = 'glaxywardb'; // named Firestore database (서울)

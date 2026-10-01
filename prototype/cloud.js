@@ -123,15 +123,24 @@ function boot(AP, A, F) {
       } catch (err) { console.warn('stats', err); return; }
     }
   }
-  // Google Analytics: on automatically once the web app config has a measurementId (docs/FIREBASE.md)
+  // Google Analytics (gtag.js straight to the measurement ID — the Firebase web app isn't linked to the GA stream,
+  // so the Firebase Analytics SDK would fetch an empty ID). Events carry the account uid as user_id.
   let ga = null;
-  if (FIREBASE_CONFIG.measurementId) import(SDK + 'firebase-analytics.js').then(m => { ga = { log: m.logEvent, a: m.getAnalytics(app) }; }).catch(() => {});
+  const MID = FIREBASE_CONFIG.measurementId;
+  if (MID) {
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = window.gtag || function () { dataLayer.push(arguments); };
+    gtag('js', new Date());
+    gtag('config', MID, { send_page_view: true });
+    const tag = document.createElement('script'); tag.async = true; tag.src = `https://www.googletagmanager.com/gtag/js?id=${MID}`; document.head.appendChild(tag);
+    ga = { log: (name, params) => gtag('event', name, params) };
+  }
   const EVENT_STATS = { sign_up: { newPlayers: 1 }, arcade_end: p => ({ runs: 1, waves: p.wave || 0 }), battle_end: { battles: 1 },
     gacha: p => ({ gacha: p.n || 1 }), ad_reward: { ads: 1 }, skin_buy: { skinBuys: 1 }, mail_claim: p => ({ mailClaims: p.n || 1 }), coupon: { coupons: 1 } };
   CLOUD.event = (name, params = {}) => {
     const m = EVENT_STATS[name], add = typeof m === 'function' ? m(params) : m;
     if (add) for (const [k, v] of Object.entries(add)) count(k, v);
-    if (ga) ga.log(ga.a, name, params);
+    if (ga) ga.log(name, params);
   };
   count('sessions');
   try { if (localStorage.getItem('gw-active-day') !== dayKey()) { count('active'); localStorage.setItem('gw-active-day', dayKey()); } } catch {}
@@ -144,6 +153,7 @@ function boot(AP, A, F) {
 
   A.onAuthStateChanged(auth, user => {
     CLOUD.account = describe(user); CLOUD.uid = user ? user.uid : null; lastLb = ''; notify();
+    if (ga && user) gtag('config', MID, { user_id: user.uid, send_page_view: false });
     if (!user) { setState('connecting'); A.signInAnonymously(auth).catch(() => setState('offline')); return; }
     pull();
   });
