@@ -145,13 +145,9 @@ function confirmBox(title, text, okLabel, onOk) {
     act => { closeModal(); if (act === 'ok') onOk(); });
 }
 const gradeChip = g => `<span class="gchip" style="--g:${GRADES[g].col}">${GRADES[g].name}</span>`;
-const orbStyle = pid => {
-  const d = PLANET[pid];
-  if (d.kind === 'earth') return 'background:radial-gradient(circle at 35% 30%,#9fd0ff,#2f6be8 45%,#0b1f5a 80%);box-shadow:0 0 18px rgba(80,150,255,.45)';
-  if (d.kind === 'sun') return 'background:radial-gradient(circle at 40% 35%,#fff6c4,#ffb02e 45%,#e2531a 85%);box-shadow:0 0 22px rgba(255,160,40,.7)';
-  if (d.kind === 'moon') return 'background:radial-gradient(circle at 35% 30%,#f2f2f6,#a3a6b8 50%,#4b4e63 90%);box-shadow:0 0 14px rgba(200,200,230,.3)';
-  const [a, b, c] = d.look.c;
-  return `background:radial-gradient(circle at 35% 30%,${a},${b} 50%,${c} 88%);box-shadow:0 0 16px rgba(${d.look.glow},.4)`;
+const orbStyle = (pid, tint = null) => {
+  const d = PLANET[pid], glow = { earth: '80,150,255', sun: '255,160,40', moon: '200,205,235' }[d.kind] || d.look.glow;
+  return `background:url(${pxPlanetUrl(pid, tint)}) center/contain no-repeat;filter:drop-shadow(0 0 8px rgba(${glow},.45))${d.look && d.look.ring ? ';transform:scale(1.7)' : ''}`;
 };
 
 /* ---------- Title / login (화면설계서 4p) ---------- */
@@ -880,7 +876,7 @@ function openSkinPopup(kind, id, k) {
 
 /* ---------- 팀 (Team formation): planet → orbits → constellations ---------- */
 const statChips = o => [o.atk && `공격력 +${Math.round(o.atk * 100)}%`, o.rate && `공격속도 +${Math.round(o.rate * 100)}%`, o.hp && `HP +${Math.round(o.hp * 100)}%`].filter(Boolean).map(x => `<span class="schip">${x}</span>`).join('');
-const skinOrb = (pid, sk) => `<span class="orb" style="${orbStyle(pid)}">${PSKIN[sk] && PSKIN[sk].tint ? `<i style="background:rgba(${PSKIN[sk].tint},.6)"></i>` : ''}</span>`;
+const skinOrb = (pid, sk) => `<span class="orb" style="${orbStyle(pid, PSKIN[sk] && PSKIN[sk].tint)}"></span>`;
 function renderTeam() {
   normalizeForm();
   const pid = save.mainPlanet, pd = PLANET[pid], ps = save.planets[pid], n = pd.orbits, cap = teamCap(pid);

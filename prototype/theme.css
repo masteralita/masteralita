@@ -45,16 +45,18 @@
   box-shadow:0 0 14px rgba(255,190,70,.35),inset 0 0 18px rgba(0,0,0,.6)}
 .banner-card{background:radial-gradient(120% 140% at 0% 0%,rgba(195,91,255,.35),rgba(20,10,40,.95) 60%) padding-box,var(--goldf) border-box!important}
 
-/* ---------- Buttons ---------- */
-.cta,.hbtn,.buy,.mode{position:relative;border:2px solid #c9f7f8!important;background:var(--teal-btn)!important;color:#fff!important;
-  text-shadow:var(--stroke);box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -2px 0 rgba(0,0,0,.25),0 3px 6px rgba(0,0,0,.5);font-weight:700}
+/* ---------- Buttons: 9-slice art (img/btn_*.png, tools/gen_buttons.py) — glowing rim, misty marbled fill ---------- */
+.cta,.hbtn,.buy,.mode,.ghost,.links .danger,.skill,.pause{position:relative;border-width:2px!important;border-style:solid!important;border-color:transparent!important;background:none!important;color:#fff!important;
+  border-image:url(img/btn_teal.png) 24 fill / 12px stretch;border-radius:6px!important;
+  text-shadow:var(--stroke);box-shadow:0 3px 6px rgba(0,0,0,.5);font-weight:700}
+.cta:active,.hbtn:active,.buy:active,.mode:active,.ghost:active{filter:brightness(1.18);transform:translateY(1px)}
 .cta:disabled,.hbtn:disabled,.buy:disabled{filter:grayscale(.85) brightness(.7)}
-.ghost{border:2px solid #b9c3d1!important;background:var(--steel-btn)!important;color:#fff;text-shadow:var(--stroke);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 3px 6px rgba(0,0,0,.45)}
-.mbtns .ghost,.links .danger{border-color:#ffc2bd!important;background:var(--red-btn)!important;color:#fff!important}
+.ghost,.skill,.pause{border-image-source:url(img/btn_steel.png);box-shadow:0 3px 6px rgba(0,0,0,.45)}
+.mbtns .ghost,.links .danger,.mode.pvp{border-image-source:url(img/btn_red.png)}
+.skill.ready{border-image-source:url(img/btn_teal.png)}
+.skill .cs{color:#ffe08a!important;text-shadow:var(--stroke)}
 .buy b,.cta b,.hbtn b{text-shadow:var(--stroke)}
-.mode{min-height:64px;border-radius:12px!important}
-.mode.pvp{border-color:#ffc2bd!important;background:var(--red-btn)!important}
+.mode{min-height:64px}
 .mode b{font-size:20px;text-shadow:var(--stroke)}
 .mode span{color:#e9fbff!important;text-shadow:var(--stroke)}
 
