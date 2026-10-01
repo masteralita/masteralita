@@ -20,7 +20,8 @@ function freshSave() {
 function newCon(g) { return { g, slots: {}, skins: [], skin: null }; }
 // Every constellation owns its classic skin; others are bought with Star Piece in the 별자리 tab
 const equippedSkin = id => { const s = save.cons[id] && save.cons[id].skin; return s && SKIN[s] ? s : id; }; // a skin a later release removed → classic
-const ownsSkin = (id, sid) => sid === id || (save.skins || []).includes(sid) || !!(save.cons[id] && (save.cons[id].skins || []).includes(sid));
+// The classic skin comes with the constellation; other skins can be owned before it (chest, mail, purchase)
+const ownsSkin = (id, sid) => (sid === id ? !!save.cons[id] : (save.skins || []).includes(sid) || !!(save.cons[id] && (save.cons[id].skins || []).includes(sid)));
 const addSkin = sid => { save.skins = [...new Set([...(save.skins || []), sid])]; };
 const skinStyle = sk => { const d = CON[sk.con]; return `${STYLE_LABEL[sk.style || d.style]} · ${KIND_LABEL[sk.kind || d.kind]}`; };
 let save = (() => {
@@ -689,7 +690,7 @@ function skinSection(id, o) {
       <button class="skin-card tier-${sk.tier}" type="button" data-skin="${sk.id}" aria-pressed="${sk.id === eq}" style="--ln:rgb(${sk.pal.line})">
         ${conSvg(id, 54, { skin: sk.id, dim: !ownsSkin(id, sk.id) })}
         <b>${sk.name}</b><span class="mini">${SKIN_TIER[sk.tier].name} · ${skinStyle(sk)}</span>
-        ${sk.id === eq && o ? '<em class="eq">장착</em>' : ownsSkin(id, sk.id) ? '<em class="own">보유</em>' : SKIN_TIER[sk.tier].src === 'chest' ? '<em>상자</em>' : `<em class="piece">${fmt(SKIN_TIER[sk.tier].price)}</em>`}
+        ${sk.id === eq && o ? '<em class="eq">장착</em>' : ownsSkin(id, sk.id) ? '<em class="own">보유</em>' : sk.tier === 'classic' ? '<em>미보유</em>' : SKIN_TIER[sk.tier].src === 'chest' ? '<em>상자</em>' : `<em class="piece">${fmt(SKIN_TIER[sk.tier].price)}</em>`}
       </button>`).join('')}</div>
   </section>`;
 }
@@ -824,7 +825,8 @@ function openSkinPopup(kind, id, k) {
     name = sk.name; tag = `${CON[con].name}자리 · ${SKIN_TIER[sk.tier].name} 스킨`;
     body = `<div class="detail">${perkList(sk)}</div>`;
     owned = ownsSkin(con, id); equipped = have && equippedSkin(con) === id; price = SKIN_TIER[sk.tier].price;
-    if (!owned && src === 'chest') lock = `로비 보물 상자에서 ${Math.round(CHEST_ODDS.skin * 100)}% 확률로 얻을 수 있어요.`;
+    if (!have && sk.tier === 'classic') lock = '별자리를 얻으면 기본 스킨으로 함께 받아요.';
+    else if (!owned && src === 'chest') lock = `로비 보물 상자에서 ${Math.round(CHEST_ODDS.skin * 100)}% 확률로 얻을 수 있어요.`;
     else if (!have) lock = owned ? '보유 중이에요. 별자리를 얻으면 장착할 수 있어요.' : '별자리를 먼저 얻어야 구매할 수 있어요.';
     ov = { onlyCon: con, conSkin: id };
   } else {
