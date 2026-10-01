@@ -20,7 +20,7 @@ LIVE.open = async name => {
   ({ ranking: openRanking, mailbox: openMailbox, notices: openNotices, coupon: openCoupon,
      terms: () => openDoc('terms', '이용약관'), privacy: () => openDoc('privacy', '개인정보 처리방침') })[name]?.();
 };
-document.querySelector('.home-quick').addEventListener('click', e => { const b = e.target.closest('[data-live]'); if (b) LIVE.open(b.dataset.live); });
+document.querySelector('.side-icons').addEventListener('click', e => { const b = e.target.closest('[data-live]'); if (b) LIVE.open(b.dataset.live); });
 
 /* ---------- 랭킹: best wave, standard competition ranking (ties share a rank) ---------- */
 async function openRanking() {
