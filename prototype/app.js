@@ -19,11 +19,9 @@ function freshSave() {
 }
 function newCon(g) { return { g, slots: {}, skins: [], skin: null }; }
 // Every constellation owns its classic skin; others are bought with Star Piece in the 별자리 tab
-const equippedSkin = id => (save.cons[id] && save.cons[id].skin) || id;
+const equippedSkin = id => { const s = save.cons[id] && save.cons[id].skin; return s && SKIN[s] ? s : id; }; // a skin a later release removed → classic
 const ownsSkin = (id, sid) => sid === id || (save.skins || []).includes(sid) || !!(save.cons[id] && (save.cons[id].skins || []).includes(sid));
 const addSkin = sid => { save.skins = [...new Set([...(save.skins || []), sid])]; };
-const STYLE_LABEL = { arrow:'화살', shot:'탄환', orb:'구체', beam:'레이저', heal:'회복', poison:'독침', twin:'쌍탄' };
-const KIND_LABEL = { phys:'물리', magic:'마법', both:'물리·마법' };
 const skinStyle = sk => { const d = CON[sk.con]; return `${STYLE_LABEL[sk.style || d.style]} · ${KIND_LABEL[sk.kind || d.kind]}`; };
 let save = (() => {
   try { const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if (v && v.v === 1) { const o = Object.assign(freshSave(), v); if (!v.form) o.form = [v.team || [], []]; return o; } } catch {}
@@ -51,7 +49,7 @@ function buildMySystem(ov = {}) {
   const P = makePlayerPlanet(pid, ps.lv, { skin: ov.pskin || ps.skin, orbitSkins: oSk });
   const cons = [], ringOf = [], form = ov.onlyCon ? [[ov.onlyCon], []] : save.form;
   form.forEach((a, k) => a.forEach(id => {
-    const os = orbitStats(pid, k), ob = OSKIN[oSk[k]].bonus;
+    const os = orbitStats(pid, k), ob = (OSKIN[oSk[k]] || OSKIN.dash).bonus;
     cons.push(makeMyCon(id, { atk: os.atk + (ob.atk || 0), rate: os.rate + (ob.rate || 0), hp: os.hp + (ob.hp || 0) }, ov.onlyCon ? ov.conSkin : null));
     ringOf.push(k);
   }));
@@ -705,7 +703,7 @@ function skinBonusText(kind, b) {
 function openSkinList(kind, k) {
   const pid = save.mainPlanet, ps = save.planets[pid], isP = kind === 'p';
   const LIST = isP ? PLANET_SKINS : ORBIT_SKINS, MAP = isP ? PSKIN : OSKIN, ownKey = isP ? 'pSkins' : 'oSkins';
-  const cur = isP ? ps.skin || 'basic' : ps.orbitSkins[k] || 'dash';
+  const cur = isP ? (PSKIN[ps.skin] ? ps.skin : 'basic') : (OSKIN[ps.orbitSkins[k]] ? ps.orbitSkins[k] : 'dash');
   const ov = id => isP ? { pskin: id } : { oskin: { [k]: id } };
   const owned = LIST.filter(s => save[ownKey].includes(s.id)), locked = LIST.filter(s => !save[ownKey].includes(s.id));
   let sel = cur;
@@ -807,7 +805,7 @@ function renderTeam() {
           <span class="schips"><span class="schip">HP ${fmt(pd.hp * planetHpMul(ps.lv))}</span>${pd.desc !== 'HP가 높은 기본 행성' ? `<span class="schip">${pd.desc}</span>` : ''}<span class="schip">궤도 ${n}개</span></span></div>
         <button class="ghost sm" data-tact="planet" type="button">행성 변경</button>
       </div>
-      <div class="skin-line"><span class="lbl">행성 스킨</span><b>${PSKIN[ps.skin || 'basic'].name}</b><button class="ghost sm" data-pskin type="button">변경</button></div>
+      <div class="skin-line"><span class="lbl">행성 스킨</span><b>${(PSKIN[ps.skin] || PSKIN.basic).name}</b><button class="ghost sm" data-pskin type="button">변경</button></div>
     </section>
     ${Array.from({ length: n }, (_, k) => { const os = orbitStats(pid, k), a = save.form[k]; return `
     <section class="orbit-card">
@@ -817,7 +815,7 @@ function renderTeam() {
           <button class="oslot" type="button" data-slot="${k}:${j}" aria-label="${CON[a[j]].name}자리 변경">${conSvg(a[j], 44)}<b>${SKIN[equippedSkin(a[j])].name}</b><span class="x">변경</span></button>`
           : `<button class="oslot empty" type="button" data-slot="${k}:${j}"><span>+</span><span class="mini">빈 자리</span></button>`).join('')}
       </div>
-      <div class="skin-line"><span class="lbl">궤도 스킨</span><b>${OSKIN[ps.orbitSkins[k] || 'dash'].name}</b><button class="ghost sm" data-oskin="${k}" type="button">변경</button></div>
+      <div class="skin-line"><span class="lbl">궤도 스킨</span><b>${(OSKIN[ps.orbitSkins[k]] || OSKIN.dash).name}</b><button class="ghost sm" data-oskin="${k}" type="button">변경</button></div>
     </section>`; }).join('')}
     <p class="fine">별자리 <b>${save.team.length} / ${cap}</b> · 최소 ${TEAM_MIN}개 · 궤도마다 최대 ${ORBIT_CAP}개 · 칸을 눌러 별자리를 등록하거나 바꿔요${n === 1 ? ' · 궤도가 1개인 행성은 궤도 능력치가 더 높아요' : ''}</p>`;
 }

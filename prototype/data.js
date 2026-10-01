@@ -237,10 +237,13 @@ const SKINS = {
   ],
 };
 const SKIN = Object.fromEntries(Object.values(SKINS).flat().map(s => [s.id, s]));
-for (const [cid, list] of Object.entries(SKINS)) for (const s of list) {
+function prepSkin(s, cid) {
   s.con = cid; s.pal = cid === 'oph' && s.tier === 'classic' ? PAL.special : PAL[s.tier];
   for (const ch of s.chain) ch.desc = FX[ch.type](ch.p);
 }
+for (const [cid, list] of Object.entries(SKINS)) for (const s of list) prepSkin(s, cid);
+const STYLE_LABEL = { arrow:'화살', shot:'탄환', orb:'구체', beam:'레이저', heal:'회복', poison:'독침', twin:'쌍탄' };
+const KIND_LABEL = { phys:'물리', magic:'마법', both:'물리·마법' };
 const STAT_MAX = 3;
 
 /* ---------- Voyage zones ---------- */

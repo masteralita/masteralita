@@ -44,10 +44,11 @@
 | `content/planets/items/{id}` | 이름, HP, 궤도 수, 해금 가격, 특성, 설명, 이미지 |
 | `content/planetSkins/items/{id}`, `content/orbitSkins/items/{id}` | 가격, 보너스, 색상/이미지 |
 | `config/balance` | 경제·확률·웨이브 등 수치 (지금 `#admin` 화면의 값과 같은 `path → value` 형식) |
-| `releases/{version}` | 게임이 받는 **확정본** 한 벌 (관리자가 "배포"를 누르면 만들어짐) |
+| `releases/{version}` | 게임이 받는 **확정본** 한 벌 (관리자가 "배포"를 누르면 만들어짐) — `values`(수치·글자) + `content`(추가 항목) |
 | `meta/current` | 현재 배포 버전 번호 — 게임은 이 번호가 바뀌었을 때만 새로 받음 |
 | `admins/{uid}` | 관리자 목록 (쓰기 권한) |
 
+- 지금은 `content/*` 대신 `config/balance`(초안)와 `releases/{v}`에 `content: { skins, pskins, oskins }` 로 추가 항목을 함께 담아요 (형식은 `prototype/balance.js` 의 `applyContent` 주석).
 - 관리자 화면에서 고친 내용은 **초안**으로 저장되고, **배포**를 눌러야 게임에 나가요 (실수 방지, 되돌리기 가능).
 - 이미지는 Storage `images/{종류}/{id}.png` 에 저장하고, 문서에는 경로만 기록해요.
 
@@ -60,7 +61,9 @@
 ## 4. 진행 순서 (Claude)
 
 1. ✅ 관리자 웹사이트 (`admin/`): Google 로그인, 수치 편집(게임 안 #admin 기능 이전), 엑셀 내보내기/가져오기, 초안 저장 → 배포, 배포 기록·되돌리기
-   - ⏳ 콘텐츠 목록/등록/수정(새 별자리·스킨 추가), 이미지 업로드 — Storage 설정(1-4번) 후 진행
+   - ✅ 글자 수정: 별자리·스킨·각성·능력치 카드·행성·행성/궤도 스킨의 이름과 설명 (각 탭의 글자 칸, `스킨 이름·설명` 탭)
+   - ✅ 추가 항목: 새 스킨·행성 스킨·궤도 스킨 등록/수정/삭제 (`추가 항목` 탭)
+   - ⏳ 새 별자리·새 행성 추가(별 모양·행성 그림 편집 필요), 이미지 업로드 — Storage 설정(1-4번) 후 진행
 2. ✅ 초기 등록 (`tools/seed.mjs`): v1 = data.js 기본값으로 배포함
 3. ✅ 보안 규칙 (`firestore.rules`) · Hosting 설정 (`firebase.json`) 배포 — `storage.rules`는 Storage 설정 후
 4. ✅ 게임이 `meta/current` → `releases/{version}` 을 읽어 적용 (기기에 캐시, 못 받으면 캐시 → 내장 기본값)
@@ -96,4 +99,6 @@
 - 작업 브랜치: `claude/upbeat-carson-fmqclr` (이전 `claude/vibrant-einstein-sc3mji` 작업 포함).
 - 웹 프로토타입: `prototype/` (index.html + data.js, firebase-config.js, balance.js, battle.js, ads.js, app.js)
   - 수치 레지스트리: `prototype/balance.js` 의 `BAL_SECTIONS` (`path → value`). 관리자 사이트(`admin/admin.js`)가 같은 파일을 불러와 써요.
-- 다음 작업: Storage가 생기면 → `storage.rules` + 이미지 업로드, 그리고 콘텐츠(별자리·스킨·행성) 등록/수정을 데이터로 옮기기 (지금은 data.js에 코드로 있음).
+- 추가 항목이 배포에서 빠지면 그 스킨을 장착한 플레이어는 기본 스킨으로 돌아가요 (`equippedSkin`, `PSKIN.basic`, `OSKIN.dash` 대체).
+- Firestore는 배열 안의 배열을 저장할 수 없어요 — 추가 스킨의 능력치 카드는 `{ key, name }` 로 저장하고 게임이 `[key, name]` 으로 바꿔요.
+- 다음 작업: Storage가 생기면 → `storage.rules` + 이미지 업로드, 새 별자리(별 모양 편집기)·새 행성 추가.

@@ -19,16 +19,22 @@ const ADM = {
   phase: 'loading', // loading | signin | denied | ready
   user: null, sec: BAL_SECTIONS[0].id,
   draft: {}, saved: {}, savedAt: null, savedBy: null, // saved = config/balance
+  content: {}, savedContent: {}, open: null,          // added items (balance.js applyContent), open = card being edited
   meta: null, releases: [], unsubs: [], busy: false,
 };
 const clone = o => JSON.parse(JSON.stringify(o));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const root = document.getElementById('admin');
-const live = () => (ADM.releases.find(r => ADM.meta && r.version === ADM.meta.version) || { values: {} }).values;
+const liveRel = () => ADM.releases.find(r => ADM.meta && r.version === ADM.meta.version) || { values: {}, content: {} };
+const live = () => liveRel().values || {};
 
 const curVal = p => (p in ADM.draft ? ADM.draft[p] : BAL_DEFAULTS[p]);
 const diff = (a, b) => [...new Set([...Object.keys(a), ...Object.keys(b)])].filter(p => !sameVal(a[p], b[p]));
-const isDirty = () => diff(ADM.draft, ADM.saved).length > 0;
+const CT_KINDS = ['skins', 'pskins', 'oskins'];
+const ctDiff = (a = {}, b = {}) => CT_KINDS.reduce((n, k) => n + diff(a[k] || {}, b[k] || {}).length, 0);
+const unsavedCount = () => diff(ADM.draft, ADM.saved).length + ctDiff(ADM.content, ADM.savedContent);
+const pendingCount = () => diff(ADM.saved, live()).length + ctDiff(ADM.savedContent, liveRel().content);
+const isDirty = () => unsavedCount() > 0;
 const fmtTime = t => t ? new Date(t).toLocaleString('ko-KR') : '';
 
 /* ---------- Value formatting ---------- */
@@ -85,14 +91,14 @@ function sectionHtml(s) {
 function releasesHtml() {
   const cur = ADM.meta && ADM.meta.version;
   if (!ADM.releases.length) return '<p class="empty">아직 배포한 버전이 없어요. 게임은 내장 기본값을 쓰고 있어요.</p>';
-  return `<table class="ad-t rel"><thead><tr><th>버전</th><th>배포 시각</th><th>배포한 사람</th><th>메모</th><th>기본값과 다른 값</th><th></th></tr></thead><tbody>
+  return `<table class="ad-t rel"><thead><tr><th>버전</th><th>배포 시각</th><th>배포한 사람</th><th>메모</th><th>기본값과 다른 값</th><th>추가 항목</th><th></th></tr></thead><tbody>
     ${ADM.releases.map(r => `<tr><th scope="row">v${r.version}${r.version === cur ? ' <span class="ad-chip ok">게임 적용 중</span>' : ''}</th>
-      <td>${fmtTime(r.publishedAt)}</td><td>${esc(r.by || '')}</td><td class="note">${esc(r.note || '')}</td><td>${Object.keys(r.values || {}).length}개</td>
+      <td>${fmtTime(r.publishedAt)}</td><td>${esc(r.by || '')}</td><td class="note">${esc(r.note || '')}</td><td>${Object.keys(r.values || {}).length}개</td><td>${CT_KINDS.reduce((n, k) => n + Object.keys((r.content || {})[k] || {}).length, 0)}개</td>
       <td><button class="ghost sm" type="button" data-load="${r.version}">초안으로 불러오기</button></td></tr>`).join('')}
     </tbody></table>`;
 }
 function statusChips() {
-  const unsaved = diff(ADM.draft, ADM.saved).length, pending = diff(ADM.saved, live()).length;
+  const unsaved = unsavedCount(), pending = pendingCount();
   const out = [];
   out.push(unsaved ? `<span class="ad-chip gold">저장하지 않은 변경 ${unsaved}개</span>`
     : `<span class="ad-chip ok">초안 저장됨${ADM.savedAt ? ` · ${fmtTime(ADM.savedAt)}${ADM.savedBy ? ` · ${esc(ADM.savedBy)}` : ''}` : ''}</span>`);
@@ -105,7 +111,7 @@ function render() {
   const s = BAL_SECTIONS.find(x => x.id === ADM.sec);
   const counts = Object.fromEntries(BAL_SECTIONS.map(x => [x.id, Object.keys(ADM.draft).filter(p => BAL_FIELDS[p] && BAL_FIELDS[p].sec === x.id).length]));
   const body = root.querySelector('.ad-body'), scroll = body ? body.scrollTop : 0;
-  const pending = diff(ADM.saved, live()).length || isDirty() || !(ADM.meta && ADM.meta.version); // the first release can be the defaults
+  const pending = pendingCount() || isDirty() || !(ADM.meta && ADM.meta.version); // the first release can be the defaults
   root.innerHTML = `
     <header class="ad-top">
       <div class="ad-title"><span class="eyebrow">GALAXY WAR · ADMIN</span><h1>갤럭시워 관리자</h1></div>
@@ -120,11 +126,12 @@ function render() {
       <div class="ad-status">${statusChips()}<span class="who">${esc(ADM.user.email || ADM.user.uid)} · <a href="../play/" target="_blank" rel="noopener">게임 열기</a> · <button class="link" data-ad="signout" type="button">로그아웃</button></span></div>
     </header>
     <nav class="ad-tabs" aria-label="설정 분류">${BAL_SECTIONS.map(x => `<button type="button" data-sec="${x.id}" aria-current="${x.id === ADM.sec ? 'page' : 'false'}">${x.title}${counts[x.id] ? `<em>${counts[x.id]}</em>` : ''}</button>`).join('')}
+      <button type="button" data-sec="content" aria-current="${ADM.sec === 'content' ? 'page' : 'false'}">추가 항목${ctCount() ? `<em>${ctCount()}</em>` : ''}</button>
       <button type="button" data-sec="releases" aria-current="${ADM.sec === 'releases' ? 'page' : 'false'}">배포 기록</button></nav>
     <div class="ad-body">${s ? `
       <div class="ad-desc"><h2>${s.title}</h2><p>${s.desc} · 금색 테두리 = 저장 전 변경, 점 = 기본값과 다름 · 칸에 마우스를 올리면 기본값이 보여요</p>
         <button class="ghost sm" data-ad="secdefaults" type="button"${counts[s.id] ? '' : ' disabled'}>이 탭 기본값</button></div>
-      <div class="ad-scroll">${sectionHtml(s)}</div>` : `
+      <div class="ad-scroll">${sectionHtml(s)}</div>` : ADM.sec === 'content' ? contentHtml() : `
       <div class="ad-desc"><h2>배포 기록</h2><p>[배포]를 누를 때마다 버전이 하나씩 쌓여요. 예전 버전을 초안으로 불러와 다시 배포하면 되돌릴 수 있어요.</p></div>
       <div class="ad-scroll">${releasesHtml()}</div>`}
     </div>`;
@@ -138,6 +145,122 @@ function gateHtml() {
     <dl><dt>이메일</dt><dd>${esc(ADM.user.email || '-')}</dd><dt>UID</dt><dd><code>${esc(ADM.user.uid)}</code></dd></dl>
     <p class="dim">Claude에게 "이 이메일을 관리자로 등록해줘"라고 말하면 <code>tools/add-admin.mjs</code>로 등록해요. 등록 후 새로고침하세요.</p>
     <button class="ghost sm" data-ad="signout" type="button">다른 계정으로 로그인</button>`);
+}
+
+/* ---------- 추가 항목: skins / planet skins / orbit skins created here (balance.js applyContent) ---------- */
+const CT_META = {
+  skins:  { title: '스킨', add: '스킨 추가', desc: '별자리에 새 스킨을 더해요. 성운 = 보물 상자에서 나옴, 스페셜 = Star Piece로 구매.' },
+  pskins: { title: '행성 스킨', add: '행성 스킨 추가', desc: '모든 행성에 쓸 수 있는 색(틴트)과 보너스예요.' },
+  oskins: { title: '궤도 스킨', add: '궤도 스킨 추가', desc: '궤도 모양은 기존 4가지 중에서 골라요.' },
+};
+const STAT_LABEL = { atk: '공격력', rate: '공격속도', crit: '치명타율', critDmg: '치명타 피해', hp: '최대 HP', heal: '회복량', poison: '독 피해',
+  tArmor: '아군 물리 방어', tMArmor: '아군 마법 방어', tEvade: '아군 회피율', pHp: '행성 HP' };
+const BONUS = { pskins: [['hp', '행성 HP +'], ['atk', '전체 공격력 +'], ['dmgRed', '받는 피해 -']], oskins: [['atk', '공격력 +'], ['rate', '공속 +'], ['hp', 'HP +']] };
+const ctCount = () => CT_KINDS.reduce((n, k) => n + Object.keys(ADM.content[k] || {}).length, 0);
+const ctInvalid = () => CT_KINDS.reduce((n, k) => n + Object.values(ADM.content[k] || {}).filter(d => contentProblems(k, d).length).length, 0);
+const hexToRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(',');
+const rgbToHex = c => '#' + String(c || '255,255,255').split(',').map(x => (+x).toString(16).padStart(2, '0')).join('');
+const opt = (v, label, cur) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(label)}</option>`;
+
+function newItem(k) {
+  const id = `${{ skins: 's', pskins: 'p', oskins: 'o' }[k]}_${Date.now().toString(36)}`;
+  if (k === 'skins') return { id, con: CON.sgr ? 'sgr' : ALL_CONS[0].id, tier: 'nebula', name: '', sig: '', stats: [{ key: 'atk', name: '' }, { key: 'rate', name: '' }],
+    chain: ['splash', 'nth', 'amp'].map(type => ({ name: '', type, p: { ...FX_DEFAULTS[type] } })) };
+  if (k === 'pskins') return { id, name: '', price: 800, bonus: {}, flavor: '', tint: '255,205,80' };
+  return { id, name: '', price: 400, bonus: {}, flavor: '', look: 'dust' };
+}
+const field = (label, inner, wide) => `<label class="ct-f${wide ? ' wide' : ''}"><span>${label}</span>${inner}</label>`;
+const inp = (k, d, path, t, v, extra = '') => `<input data-ct="${k}|${d.id}|${path}" data-t="${t}" ${t === 'text' ? 'type="text"' : t === 'color' ? 'type="color"' : 'type="number" step="any"'} value="${esc(v ?? '')}"${extra}>`;
+const sel = (k, d, path, opts) => `<select data-ct="${k}|${d.id}|${path}" data-t="sel">${opts}</select>`;
+
+function skinForm(d) {
+  const k = 'skins', con = CON[d.con] || ALL_CONS[0];
+  const chain = d.chain.map((ch, i) => {
+    const params = Object.entries(ch.p || {}).map(([pk, x]) => typeof x === 'boolean'
+      ? `<label class="pp"><span>${pk}</span><input type="checkbox" data-ct="${k}|${d.id}|chain/${i}/p/${pk}" data-t="bool"${x ? ' checked' : ''}></label>`
+      : `<label class="pp"><span>${pk}</span>${inp(k, d, `chain/${i}/p/${pk}`, 'num', x)}</label>`).join('');
+    return `<div class="ct-row"><b class="ct-n">${ROMAN[i + 1]}</b>
+      ${field('이름', inp(k, d, `chain/${i}/name`, 'text', ch.name, ' placeholder="각성 이름"'))}
+      ${field('효과', sel(k, d, `chain/${i}/type`, Object.keys(FX).map(t => opt(t, FX_LABEL[t] || t, ch.type)).join('')))}
+      <div class="pps">${params}</div><span class="fx-desc">${FX[ch.type] ? FX[ch.type](ch.p || {}) : ''}</span></div>`;
+  }).join('');
+  const stats = d.stats.map((st, i) => `<div class="ct-row"><b class="ct-n">${i + 1}</b>
+      ${field('능력치', sel(k, d, `stats/${i}/key`, Object.keys(STAT).map(t => opt(t, STAT_LABEL[t] || t, st.key)).join('')))}
+      ${field('카드 이름', inp(k, d, `stats/${i}/name`, 'text', st.name, ' placeholder="카드에 보일 이름"'))}
+      <span class="fx-desc">${STAT[st.key] ? STAT[st.key].txt(STAT[st.key].v) : ''}</span></div>`).join('');
+  return `<div class="ct-grid">
+      ${field('별자리', sel(k, d, 'con', ALL_CONS.map(c => opt(c.id, `${c.name}자리`, d.con)).join('')))}
+      ${field('등급', sel(k, d, 'tier', opt('nebula', '성운 (보물 상자)', d.tier) + opt('supernova', `스페셜 (구매 ${SKIN_TIER.supernova.price} Star Piece)`, d.tier)))}
+      ${field('이름', inp(k, d, 'name', 'text', d.name))}
+      ${field('설명', inp(k, d, 'sig', 'text', d.sig), true)}
+      ${field('공격 방식', sel(k, d, 'style', opt('', `별자리 기본 (${STYLE_LABEL[con.style]})`, d.style || '') + Object.entries(STYLE_LABEL).map(([v, l]) => opt(v, l, d.style)).join('')))}
+      ${field('속성', sel(k, d, 'kind', opt('', `별자리 기본 (${KIND_LABEL[con.kind]})`, d.kind || '') + Object.entries(KIND_LABEL).map(([v, l]) => opt(v, l, d.kind)).join('')))}
+      ${['atk', 'rate', 'hp'].map(m => field(`${{ atk: '공격력', rate: '공속', hp: 'HP' }[m]} ×`, inp(k, d, `mod/${m}`, 'mod', (d.mod || {})[m] ?? 1))).join('')}
+    </div>
+    <h4>능력치 카드 (레벨업 때 나옴)</h4>${stats}
+    <h4>각성 I~III</h4>${chain}`;
+}
+function cosmeticForm(k, d) {
+  return `<div class="ct-grid">
+      ${field('이름', inp(k, d, 'name', 'text', d.name))}
+      ${field('가격 (Star Piece)', inp(k, d, 'price', 'int', d.price))}
+      ${k === 'pskins' ? field('색', inp(k, d, 'tint', 'color', rgbToHex(d.tint))) : field('모양', sel(k, d, 'look', Object.entries(ORBIT_LOOKS).map(([v, l]) => opt(v, l, d.look)).join('')))}
+      ${BONUS[k].map(([b, l]) => field(`${l} (%)`, inp(k, d, `bonus/${b}`, 'pct', +(((d.bonus || {})[b] || 0) * 100).toFixed(4)))).join('')}
+      ${field('설명', inp(k, d, 'flavor', 'text', d.flavor), true)}
+    </div>`;
+}
+function itemCard(k, d) {
+  const probs = contentProblems(k, d), open = ADM.open === `${k}|${d.id}`;
+  const saved = (ADM.savedContent[k] || {})[d.id], released = ((liveRel().content || {})[k] || {})[d.id];
+  const tag = !saved ? '<span class="ad-chip gold">저장 전</span>' : !sameVal(saved, d) ? '<span class="ad-chip gold">변경됨</span>'
+    : !sameVal(released, d) ? '<span class="ad-chip warn">배포 대기</span>' : '<span class="ad-chip ok">게임 적용 중</span>';
+  const sub = k === 'skins' ? `${(CON[d.con] || {}).name || '?'}자리 · ${(SKIN_TIER[d.tier] || {}).name || '?'}` : `${d.price ?? '?'} Star Piece`;
+  return `<article class="ct-card${probs.length ? ' bad' : ''}">
+    <header><button class="ct-head" type="button" data-ctopen="${k}|${d.id}" aria-expanded="${open}"><b>${esc(d.name || '(이름 없음)')}</b><small>${esc(sub)}</small></button>
+      ${tag}<button class="ghost sm" type="button" data-ctdel="${k}|${d.id}">삭제</button></header>
+    ${probs.length ? `<p class="ct-probs">${probs.map(esc).join(' · ')}</p>` : ''}
+    ${open ? (k === 'skins' ? skinForm(d) : cosmeticForm(k, d)) : ''}
+  </article>`;
+}
+function contentHtml() {
+  return `<div class="ad-desc"><h2>추가 항목</h2><p>data.js 기본 항목 위에 새 항목을 더해요. [초안 저장] → [배포]하면 게임에 나와요. 이미지는 Storage 설정 후 붙일 수 있어요.
+    기본 항목의 이름·설명은 각 탭(별자리, 스킨 이름·설명, 행성, 행성 스킨, 궤도 스킨)의 글자 칸에서 고쳐요.</p></div>
+    ${CT_KINDS.map(k => { const items = Object.values(ADM.content[k] || {}); return `<section class="ct-sec">
+      <div class="ct-sec-h"><h3>${CT_META[k].title} <small>${items.length}개</small></h3><button class="cta sm" type="button" data-ctadd="${k}">+ ${CT_META[k].add}</button></div>
+      <p class="ct-desc">${CT_META[k].desc}</p>
+      ${items.length ? items.map(d => itemCard(k, d)).join('') : '<p class="empty">아직 없어요.</p>'}
+    </section>`; }).join('')}`;
+}
+async function contentClick(e) {
+  const a = e.target.closest('[data-ctadd]'), o = e.target.closest('[data-ctopen]'), x = e.target.closest('[data-ctdel]');
+  if (a) { const k = a.dataset.ctadd, d = newItem(k); ADM.content = { ...ADM.content, [k]: { ...(ADM.content[k] || {}), [d.id]: d } }; ADM.open = `${k}|${d.id}`; render(); return true; }
+  if (o) { ADM.open = ADM.open === o.dataset.ctopen ? null : o.dataset.ctopen; render(); return true; }
+  if (x) {
+    const [k, id] = x.dataset.ctdel.split('|'), d = ADM.content[k][id];
+    if (await confirmBox('항목 삭제', `"${esc(d.name || id)}"을(를) 지워요. 배포하면 게임에서도 사라지고, 이미 가진 플레이어는 기본 스킨으로 돌아가요.`, '삭제')) {
+      ADM.content = clone(ADM.content); delete ADM.content[k][id]; render();
+    }
+    return true;
+  }
+  return false;
+}
+function contentChange(el) {
+  const [k, id, path] = el.dataset.ct.split('|'), t = el.dataset.t;
+  const d = clone(ADM.content[k][id]), seg = path.split('/');
+  let v;
+  if (t === 'text' || t === 'sel') v = el.value;
+  else if (t === 'bool') v = el.checked;
+  else if (t === 'color') v = hexToRgb(el.value);
+  else { v = Number(el.value); if (el.value === '' || !Number.isFinite(v)) { toast('숫자를 입력해 주세요'); render(); return; } if (t === 'pct') v = +(v / 100).toFixed(6); if (t === 'int') v = Math.round(v); }
+  let o = d;
+  for (const s of seg.slice(0, -1)) { if (o[s] == null) o[s] = {}; o = o[s]; }
+  const last = seg[seg.length - 1];
+  if ((t === 'mod' && v === 1) || (t === 'pct' && v === 0) || (t === 'sel' && v === '' && (last === 'style' || last === 'kind'))) delete o[last]; // neutral → no field
+  else o[last] = v;
+  if (seg[0] === 'chain' && last === 'type') d.chain[+seg[1]].p = { ...(FX_DEFAULTS[v] || {}) };
+  if (d.mod && !Object.keys(d.mod).length) delete d.mod;
+  ADM.content = { ...ADM.content, [k]: { ...ADM.content[k], [id]: d } };
+  render();
 }
 
 /* ---------- Toast / dialogs ---------- */
@@ -166,8 +289,8 @@ onAuthStateChanged(auth, async user => {
   ADM.unsubs.push(onSnapshot(doc(db, 'config', 'balance'), snap => {
     const d = snap.exists() ? snap.data() : {};
     const keep = !first && isDirty(); // keep unsaved edits when someone else saves
-    ADM.saved = d.values || {}; ADM.savedAt = d.savedAt || null; ADM.savedBy = d.by || null;
-    if (!keep) ADM.draft = clone(ADM.saved);
+    ADM.saved = d.values || {}; ADM.savedContent = d.content || {}; ADM.savedAt = d.savedAt || null; ADM.savedBy = d.by || null;
+    if (!keep) { ADM.draft = clone(ADM.saved); ADM.content = clone(ADM.savedContent); }
     if (first) { first = false; ADM.phase = 'ready'; }
     render();
   }, err => { toast(`초안을 불러오지 못했어요 (${err.code})`); }));
@@ -178,20 +301,22 @@ onAuthStateChanged(auth, async user => {
 });
 
 async function saveDraft() {
-  const values = clone(ADM.draft);
-  await setDoc(doc(db, 'config', 'balance'), { v: 1, values, savedAt: new Date().toISOString(), by: ADM.user.email || ADM.user.uid });
+  const values = clone(ADM.draft), content = clone(ADM.content);
+  await setDoc(doc(db, 'config', 'balance'), { v: 1, values, content, savedAt: new Date().toISOString(), by: ADM.user.email || ADM.user.uid });
 }
 async function publish() {
-  const note = await confirmBox('배포', `초안을 새 버전으로 배포해요. 게임은 다음 실행 때 새 값을 받아요.<br>기본값과 다른 값 ${Object.keys(ADM.draft).length}개`, '배포', { input: '메모 (예: 궁수 공속 하향)' });
+  const bad = ctInvalid();
+  if (bad) { toast(`추가 항목 ${bad}개에 고칠 곳이 있어요 · 고치거나 지운 뒤 배포해 주세요`); ADM.sec = 'content'; render(); return; }
+  const note = await confirmBox('배포', `초안을 새 버전으로 배포해요. 게임은 다음 실행 때 새 값을 받아요.<br>기본값과 다른 값 ${Object.keys(ADM.draft).length}개 · 추가 항목 ${ctCount()}개`, '배포', { input: '메모 (예: 궁수 공속 하향)' });
   if (note === null) return;
   ADM.busy = true; render();
   try {
     if (isDirty()) await saveDraft();
-    const values = clone(ADM.draft), at = new Date().toISOString();
+    const values = clone(ADM.draft), content = clone(ADM.content), at = new Date().toISOString();
     const v = await runTransaction(db, async tx => {
       const m = await tx.get(doc(db, 'meta', 'current'));
       const next = ((m.exists() && m.data().version) || 0) + 1;
-      tx.set(doc(db, 'releases', String(next)), { version: next, values, publishedAt: at, by: ADM.user.email || ADM.user.uid, note });
+      tx.set(doc(db, 'releases', String(next)), { version: next, values, content, publishedAt: at, by: ADM.user.email || ADM.user.uid, note });
       tx.set(doc(db, 'meta', 'current'), { version: next, publishedAt: at });
       return next;
     });
@@ -202,19 +327,20 @@ async function publish() {
 
 /* ---------- Events ---------- */
 root.addEventListener('click', async e => {
+  if (await contentClick(e)) return;
   const t = e.target.closest('[data-sec]'); if (t) { ADM.sec = t.dataset.sec; render(); root.querySelector('.ad-body').scrollTop = 0; return; }
   const l = e.target.closest('[data-load]');
   if (l) {
     const r = ADM.releases.find(x => x.version === +l.dataset.load);
-    if (r && await confirmBox('초안으로 불러오기', `v${r.version}의 값으로 초안을 바꿔요. 저장하지 않은 변경은 사라져요. [배포]를 눌러야 게임에 나가요.`, '불러오기')) { ADM.draft = clone(r.values || {}); render(); }
+    if (r && await confirmBox('초안으로 불러오기', `v${r.version}의 값과 추가 항목으로 초안을 바꿔요. 저장하지 않은 변경은 사라져요. [배포]를 눌러야 게임에 나가요.`, '불러오기')) { ADM.draft = clone(r.values || {}); ADM.content = clone(r.content || {}); render(); }
     return;
   }
   const b = e.target.closest('[data-ad]'); if (!b) return;
   const act = b.dataset.ad;
   if (act === 'signin') signInWithPopup(auth, new GoogleAuthProvider()).catch(err => { if (err.code !== 'auth/popup-closed-by-user') toast(`로그인하지 못했어요 (${err.code})`); });
   else if (act === 'signout') signOut(auth);
-  else if (act === 'discard') { ADM.draft = clone(ADM.saved); render(); }
-  else if (act === 'defaults') { if (await confirmBox('전체 기본값', '모든 탭의 값을 게임 기본값(data.js)으로 되돌려요. 저장·배포해야 게임에 반영돼요.', '기본값으로')) { ADM.draft = {}; render(); } }
+  else if (act === 'discard') { ADM.draft = clone(ADM.saved); ADM.content = clone(ADM.savedContent); render(); }
+  else if (act === 'defaults') { if (await confirmBox('전체 기본값', '모든 탭의 값을 게임 기본값(data.js)으로 되돌려요. 추가 항목은 그대로 둬요. 저장·배포해야 게임에 반영돼요.', '기본값으로')) { ADM.draft = {}; render(); } }
   else if (act === 'secdefaults') { for (const p of Object.keys(ADM.draft)) if (BAL_FIELDS[p] && BAL_FIELDS[p].sec === ADM.sec) delete ADM.draft[p]; render(); }
   else if (act === 'save') {
     ADM.busy = true; render();
@@ -228,6 +354,7 @@ root.addEventListener('click', async e => {
 root.addEventListener('change', e => {
   const el = e.target;
   if (el.id === 'adImport') { adminImport(el.files[0]); el.value = ''; return; }
+  if (el.dataset.ct) { contentChange(el); return; }
   const path = el.dataset.path; if (!path) return;
   const f = BAL_FIELDS[path];
   if (f.kind === 'chain') {

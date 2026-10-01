@@ -786,20 +786,22 @@ function drawCon(sys, c, t) {
   ctx.globalAlpha = 1;
 }
 // Orbit skins (궤도 스킨): dash / dust / aurora / comet
+// Skins added in the admin site reuse one of these four looks (OSKIN[id].look)
 function drawOrbit(sys, r, t) {
   const rx = sys.R * r.rf, ry = sys.ry * r.rf, mine = sys.side === 'me', col = mine ? '245,196,81' : '255,123,138';
+  const look = (OSKIN[r.skin] && OSKIN[r.skin].look) || r.skin;
   ctx.save();
-  if (r.skin === 'dust') {
+  if (look === 'dust') {
     for (let i = 0; i < 48; i++) {
       const a = i / 48 * TAU + t * .05, tw = .25 + .5 * Math.sin(t * 2 + i * 1.7) ** 2;
       ctx.fillStyle = `rgba(230,225,255,${tw})`; ctx.beginPath(); ctx.arc(sys.cx + rx * Math.cos(a), sys.cy + ry * Math.sin(a), 1.3, 0, TAU); ctx.fill();
     }
-  } else if (r.skin === 'aurora') {
+  } else if (look === 'aurora') {
     ctx.strokeStyle = 'rgba(110,255,210,.16)'; ctx.lineWidth = 7;
     ctx.beginPath(); ctx.ellipse(sys.cx, sys.cy, rx, ry, 0, 0, TAU); ctx.stroke();
     ctx.strokeStyle = 'rgba(160,255,230,.55)'; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.ellipse(sys.cx, sys.cy, rx, ry, 0, 0, TAU); ctx.stroke();
-  } else if (r.skin === 'comet') {
+  } else if (look === 'comet') {
     ctx.strokeStyle = `rgba(${col},.14)`; ctx.lineWidth = 1; ctx.setLineDash([2, 8]);
     ctx.beginPath(); ctx.ellipse(sys.cx, sys.cy, rx, ry, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
     for (let k = 0; k < 3; k++) {

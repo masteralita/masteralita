@@ -32,12 +32,19 @@ const BAL_SECTIONS = [
   { id:'con', title:'별자리', desc:'별자리 기본 능력치 (등급 배율·파츠·스킨 보정 전)',
     rows: ALL_CONS.map(c => ({ id:c.id, label:`${c.name}자리`, sub:c.en })),
     cols: [{ key:'hp', label:'HP', kind:'int' }, { key:'atk', label:'공격력', kind:'num' }, { key:'rate', label:'공격속도(/s)', kind:'num' },
-           { key:'def', label:'물리 방어', kind:'int' }, { key:'mdef', label:'마법 방어', kind:'int' }],
+           { key:'def', label:'물리 방어', kind:'int' }, { key:'mdef', label:'마법 방어', kind:'int' },
+           { key:'name', label:'이름', kind:'text' }, { key:'en', label:'영문명', kind:'text' }, { key:'stat', label:'특징', kind:'text' }, { key:'sig', label:'설명', kind:'text' }],
     path: (r, c) => `con/${r}/${c}` },
   { id:'skin', title:'스킨·스킬', desc:'스킨별 능력치 보정(배율)과 각성 I~III 효과',
     rows: Object.values(SKIN).map(s => ({ id:s.id, label:s.name, sub:`${CON[s.con].name} · ${SKIN_TIER[s.tier].name}` })),
     cols: [{ key:'mod/atk', label:'공격력 ×', kind:'num', neutral:1 }, { key:'mod/rate', label:'공속 ×', kind:'num', neutral:1 }, { key:'mod/hp', label:'HP ×', kind:'num', neutral:1 },
            { key:'chain/0', label:'각성 I', kind:'chain' }, { key:'chain/1', label:'각성 II', kind:'chain' }, { key:'chain/2', label:'각성 III', kind:'chain' }],
+    path: (r, c) => `skin/${r}/${c}` },
+  { id:'skintext', title:'스킨 이름·설명', desc:'스킨, 각성, 능력치 카드에 보이는 글자',
+    rows: Object.values(SKIN).map(s => ({ id:s.id, label:s.name, sub:`${CON[s.con].name} · ${SKIN_TIER[s.tier].name}` })),
+    cols: [{ key:'name', label:'스킨 이름', kind:'text' }, { key:'sig', label:'설명', kind:'text' },
+           { key:'chain/0/name', label:'각성 I 이름', kind:'text' }, { key:'chain/1/name', label:'각성 II 이름', kind:'text' }, { key:'chain/2/name', label:'각성 III 이름', kind:'text' },
+           { key:'stats/0/1', label:'능력치 카드 1', kind:'text' }, { key:'stats/1/1', label:'능력치 카드 2', kind:'text' }],
     path: (r, c) => `skin/${r}/${c}` },
   { id:'planet', title:'행성', desc:'중심 행성 능력치와 특성 (궤도 수 1~2)',
     rows: PLANETS.map(p => ({ id:p.id, label:p.name, sub:p.en })),
@@ -45,7 +52,7 @@ const BAL_SECTIONS = [
            { key:'trait/atkMul', label:'공격력 ×', kind:'num', neutral:1 }, { key:'trait/rateMul', label:'공속 ×', kind:'num', neutral:1 },
            { key:'trait/regen', label:'초당 회복', kind:'num', neutral:0 }, { key:'trait/dmgRed', label:'받는 피해 감소', kind:'pct', neutral:0 },
            { key:'trait/energy', label:'시작 기력', kind:'int', neutral:0 }, { key:'trait/crit', label:'치명타율', kind:'pct', neutral:0 },
-           { key:'desc', label:'설명', kind:'text' }],
+           { key:'name', label:'이름', kind:'text' }, { key:'desc', label:'설명', kind:'text' }],
     path: (r, c) => `planet/${r}/${c}` },
   { id:'orbit', title:'궤도', desc:'궤도 기본 능력치 (그 궤도의 별자리에게 적용)',
     rows: [{ id:'single/0', label:'단일 궤도', sub:'궤도 1개 행성' }, { id:'dual/0', label:'안쪽 궤도', sub:'궤도 2개 행성' }, { id:'dual/1', label:'바깥 궤도', sub:'궤도 2개 행성' }],
@@ -54,12 +61,14 @@ const BAL_SECTIONS = [
   { id:'pskin', title:'행성 스킨', desc:'행성 스킨 가격과 보너스',
     rows: PLANET_SKINS.map(s => ({ id:s.id, label:s.name })),
     cols: [{ key:'price', label:'가격 💎', kind:'int' }, { key:'bonus/hp', label:'행성 HP +', kind:'pct', neutral:0 },
-           { key:'bonus/atk', label:'전체 공격력 +', kind:'pct', neutral:0 }, { key:'bonus/dmgRed', label:'받는 피해 -', kind:'pct', neutral:0 }],
+           { key:'bonus/atk', label:'전체 공격력 +', kind:'pct', neutral:0 }, { key:'bonus/dmgRed', label:'받는 피해 -', kind:'pct', neutral:0 },
+           { key:'name', label:'이름', kind:'text' }, { key:'flavor', label:'설명', kind:'text' }],
     path: (r, c) => `pskin/${r}/${c}` },
   { id:'oskin', title:'궤도 스킨', desc:'궤도 스킨 가격과 보너스 (그 궤도의 별자리)',
     rows: ORBIT_SKINS.map(s => ({ id:s.id, label:s.name })),
     cols: [{ key:'price', label:'가격 💎', kind:'int' }, { key:'bonus/atk', label:'공격력 +', kind:'pct', neutral:0 },
-           { key:'bonus/rate', label:'공속 +', kind:'pct', neutral:0 }, { key:'bonus/hp', label:'HP +', kind:'pct', neutral:0 }],
+           { key:'bonus/rate', label:'공속 +', kind:'pct', neutral:0 }, { key:'bonus/hp', label:'HP +', kind:'pct', neutral:0 },
+           { key:'name', label:'이름', kind:'text' }, { key:'flavor', label:'설명', kind:'text' }],
     path: (r, c) => `oskin/${r}/${c}` },
   { id:'grade', title:'등급·뽑기', desc:'등급 배율과 뽑기 가중치 (가중치 합 기준 확률)',
     rows: GRADES.map((g, i) => ({ id:String(i), label:g.name, sub:g.en })),
@@ -97,14 +106,14 @@ for (const s of BAL_SECTIONS) {
 function balGet(path) {
   const seg = path.split('/');
   let o = BAL_ROOTS[seg[0]];
-  if (seg[0] === 'skin' && seg[2] === 'chain') { const ch = o[seg[1]].chain[+seg[3]]; return { type: ch.type, p: { ...ch.p } }; }
+  if (seg[0] === 'skin' && seg[2] === 'chain' && seg.length === 4) { const ch = o[seg[1]].chain[+seg[3]]; return { type: ch.type, p: { ...ch.p } }; }
   for (let i = 1; i < seg.length; i++) { if (o == null) return undefined; o = o[seg[i]]; }
   return o;
 }
 function balSet(path, v) {
   const seg = path.split('/');
   let o = BAL_ROOTS[seg[0]];
-  if (seg[0] === 'skin' && seg[2] === 'chain') {
+  if (seg[0] === 'skin' && seg[2] === 'chain' && seg.length === 4) {
     const ch = o[seg[1]].chain[+seg[3]];
     ch.type = FX[v.type] ? v.type : ch.type; ch.p = { ...(v.p || FX_DEFAULTS[ch.type] || {}) }; // exactly the given params
     ch.desc = FX[ch.type](ch.p); return;
@@ -131,6 +140,49 @@ function applyBalance(values = {}) {
   for (const [p, v] of Object.entries(values)) if (BAL_FIELDS[p]) { try { balSet(p, v); } catch {} }
 }
 
+/* ---------- Added content (release.content) ---------- */
+// Items created in the admin site on top of data.js, keyed by id:
+//   skins:  { id, con, tier: nebula|supernova, name, sig, style?, kind?, mod?: {atk,rate,hp}, stats: [{ key: STAT key, name } ×2], chain: [{ name, type, p } ×3] }
+//   pskins: { id, name, price, bonus: {hp,atk,dmgRed}, flavor, tint: 'r,g,b' }
+//   oskins: { id, name, price, bonus: {atk,rate,hp}, flavor, look: dash|dust|aurora|comet }
+// (stats are objects, not [key, name] pairs, because Firestore can't store arrays inside arrays)
+// The game drops what the previous release added and adds the new set; invalid items are skipped.
+const ORBIT_LOOKS = { dash:'점선', dust:'별먼지', aurora:'오로라', comet:'유성' };
+const isNum = v => typeof v === 'number' && Number.isFinite(v);
+function contentProblems(kind, d) {
+  const out = [];
+  if (!d || typeof d.id !== 'string' || !d.id) return ['id가 없어요'];
+  if (!String(d.name || '').trim()) out.push('이름을 입력해 주세요');
+  if (kind === 'skins') {
+    if (!CON[d.con]) out.push('별자리를 골라 주세요');
+    if (!['nebula', 'supernova'].includes(d.tier)) out.push('등급은 성운 또는 스페셜이에요');
+    if (d.style && !STYLE_LABEL[d.style]) out.push('공격 방식이 올바르지 않아요');
+    if (d.kind && !KIND_LABEL[d.kind]) out.push('속성이 올바르지 않아요');
+    if (!Array.isArray(d.stats) || d.stats.length !== 2 || d.stats.some(x => !x || !STAT[x.key])) out.push('능력치 카드 2개를 골라 주세요');
+    if (!Array.isArray(d.chain) || d.chain.length !== 3 || d.chain.some(ch => !ch || !FX[ch.type])) out.push('각성 3개를 골라 주세요');
+    for (const [k, v] of Object.entries(d.mod || {})) if (!isNum(v) || v <= 0) out.push(`배율 ${k} 값이 올바르지 않아요`);
+  } else {
+    if (!isNum(d.price) || d.price < 0) out.push('가격을 입력해 주세요');
+    for (const [k, v] of Object.entries(d.bonus || {})) if (!isNum(v)) out.push(`보너스 ${k} 값이 올바르지 않아요`);
+    if (kind === 'oskins' && d.look && !ORBIT_LOOKS[d.look]) out.push('모양이 올바르지 않아요');
+  }
+  if (kind === 'skins' ? SKIN_BASE.has(d.id) : kind === 'pskins' ? PSKIN_BASE.has(d.id) : OSKIN_BASE.has(d.id)) out.push('기본 항목과 id가 같아요');
+  return out;
+}
+const SKIN_BASE = new Set(Object.keys(SKIN)), PSKIN_BASE = new Set(Object.keys(PSKIN)), OSKIN_BASE = new Set(Object.keys(OSKIN));
+const ADDED = { skins: [], pskins: [], oskins: [] };
+function applyContent(content) {
+  content = content || {};
+  for (const id of ADDED.skins) { const sk = SKIN[id]; if (sk) SKINS[sk.con] = SKINS[sk.con].filter(x => x.id !== id); delete SKIN[id]; }
+  for (const id of ADDED.pskins) { const i = PLANET_SKINS.findIndex(x => x.id === id); if (i >= 0) PLANET_SKINS.splice(i, 1); delete PSKIN[id]; }
+  for (const id of ADDED.oskins) { const i = ORBIT_SKINS.findIndex(x => x.id === id); if (i >= 0) ORBIT_SKINS.splice(i, 1); delete OSKIN[id]; }
+  ADDED.skins = []; ADDED.pskins = []; ADDED.oskins = [];
+  const items = kind => Object.values(content[kind] || {}).filter(d => !contentProblems(kind, d).length).map(d => JSON.parse(JSON.stringify(d)));
+  for (const sk of items('skins')) { sk.stats = sk.stats.map(x => [x.key, x.name || '']); prepSkin(sk, sk.con); SKINS[sk.con].push(sk); SKIN[sk.id] = sk; ADDED.skins.push(sk.id); }
+  for (const ps of items('pskins')) { ps.bonus = ps.bonus || {}; ps.flavor = ps.flavor || ''; PLANET_SKINS.push(ps); PSKIN[ps.id] = ps; ADDED.pskins.push(ps.id); }
+  for (const os of items('oskins')) { os.bonus = os.bonus || {}; os.flavor = os.flavor || ''; ORBIT_SKINS.push(os); OSKIN[os.id] = os; ADDED.oskins.push(os.id); }
+}
+
 /* ---------- Released balance from Firebase (docs/FIREBASE.md) ---------- */
 // The admin site publishes releases/{version} and bumps meta/current; both are public to read.
 // The game checks meta/current on launch and downloads the release only when the version changed.
@@ -140,6 +192,7 @@ const BAL_CACHE = 'gw-balance';
 function onBalance(fn) { BAL.listeners.push(fn); }
 function useBalance(rel, source) {
   BAL.values = rel.values || {}; BAL.version = rel.version || 0; BAL.publishedAt = rel.publishedAt || null; BAL.source = source;
+  applyContent(rel.content);
   applyBalance(BAL.values);
 }
 const fsPlain = f => 'mapValue' in f ? Object.fromEntries(Object.entries(f.mapValue.fields || {}).map(([k, x]) => [k, fsPlain(x)]))
