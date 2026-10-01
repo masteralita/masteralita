@@ -659,11 +659,8 @@ function drawBg(t) {
 
 function drawPlanet(sys, t) {
   const P = sys.planet, x = sys.cx, y = sys.cy, r = sys.pr;
-  let c1, c2, c3, glow, kind = P.kind, look = P.look || {};
-  if (kind === 'earth') { c1 = '#bfe0ff'; c2 = '#2f6be8'; c3 = '#081a4d'; glow = '80,150,255'; }
-  else if (kind === 'sun') { c1 = '#fff8d0'; c2 = '#ffae2e'; c3 = '#d8461a'; glow = '255,160,40'; }
-  else if (kind === 'moon') { c1 = '#f6f6fa'; c2 = '#a6a9bb'; c3 = '#3e4156'; glow = '200,205,235'; }
-  else { [c1, c2, c3] = look.c; glow = look.glow; }
+  const kind = P.kind, look = P.look || {};
+  let glow = { earth: '80,150,255', sun: '255,160,40', moon: '200,205,235' }[kind] || look.glow;
   if (kind === 'hole') { drawHole(x, y, r, t, P); return; }
   const tint = P.skin && PSKIN[P.skin] ? PSKIN[P.skin].tint : null;
   if (tint) glow = tint;
@@ -674,41 +671,10 @@ function drawPlanet(sys, t) {
     hg.addColorStop(0, `rgba(${glow},${isStar ? .55 : .32})`); hg.addColorStop(1, `rgba(${glow},0)`);
     ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(x, y, hr, 0, TAU); ctx.fill();
   }
-  if (look.ring) drawRing(x, y, r, true, glow);
-  const bg = ctx.createRadialGradient(x - r * .35, y - r * .4, r * .1, x, y, r);
-  bg.addColorStop(0, c1); bg.addColorStop(.55, c2); bg.addColorStop(1, c3);
-  ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
-  ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.clip();
-  if (kind === 'earth') {
-    ctx.fillStyle = 'rgba(70,170,90,.75)';
-    const o = (t * 8) % (r * 4);
-    for (const [bx, by, br] of [[-.3, -.1, .35], [.35, .25, .28], [.1, -.5, .2], [-.5, .45, .22]]) {
-      const px = x + ((bx * r + o) % (r * 2.4)) - r * .2;
-      ctx.beginPath(); ctx.ellipse(px, y + by * r, br * r * 1.3, br * r, .4, 0, TAU); ctx.fill();
-    }
-  } else if (kind === 'moon' || kind === 'rock') {
-    ctx.fillStyle = 'rgba(20,20,30,.28)';
-    for (const [bx, by, br] of [[-.3, -.2, .18], [.25, .15, .22], [-.05, .5, .12], [.4, -.4, .1]]) { ctx.beginPath(); ctx.arc(x + bx * r, y + by * r, br * r, 0, TAU); ctx.fill(); }
-  } else if (isStar) {
-    ctx.fillStyle = 'rgba(255,240,180,.25)';
-    for (let i = 0; i < 6; i++) { const a = t * .4 + i; ctx.beginPath(); ctx.arc(x + Math.cos(a) * r * .5, y + Math.sin(a * 1.3) * r * .4, r * .18, 0, TAU); ctx.fill(); }
-  } else if (kind === 'gas') {
-    ctx.lineWidth = r * (look.bands ? .16 : .08);
-    for (let i = -3; i <= 3; i++) {
-      ctx.strokeStyle = i % 2 ? `rgba(255,255,255,${look.bands ? .12 : .06})` : `rgba(0,0,0,${look.bands ? .18 : .06})`;
-      ctx.beginPath(); ctx.ellipse(x + Math.sin(t * .3 + i) * r * .05, y + i * r * .26, r * 1.1, r * .09, 0, 0, TAU); ctx.stroke();
-    }
-    if (look.bands) { ctx.fillStyle = 'rgba(160,40,20,.45)'; ctx.beginPath(); ctx.ellipse(x + r * .3, y + r * .28, r * .22, r * .12, 0, 0, TAU); ctx.fill(); }
-  }
-  if (!isStar) {
-    const sh = ctx.createLinearGradient(x - r * .6, y - r * .6, x + r, y + r);
-    sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(.55, 'rgba(0,0,10,.05)'); sh.addColorStop(1, 'rgba(0,0,15,.6)');
-    ctx.fillStyle = sh; ctx.fillRect(x - r, y - r, r * 2, r * 2);
-  }
-  if (tint) { ctx.globalCompositeOperation = 'color'; ctx.fillStyle = `rgba(${tint},.6)`; ctx.fillRect(x - r, y - r, r * 2, r * 2); ctx.globalCompositeOperation = 'source-over'; }
-  if (P.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${P.flash * 3})`; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
-  ctx.restore();
-  if (look.ring) drawRing(x, y, r, false, glow);
+  // pixel-art body (pixel.js): rotating surface, ring included; smoothing off keeps the dots crisp
+  const cv = pxPlanet(kind, look, Math.floor(t * (isStar ? 2 : 3)), tint), D = r * 2 * pxPlanetSpan(look);
+  ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(cv, x - D / 2, y - D / 2, D, D); ctx.restore();
+  if (P.flash > 0) { ctx.fillStyle = `rgba(255,255,255,${P.flash * 3})`; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }
   planetOverlays(sys, t);
 }
 function planetOverlays(sys, t) {
@@ -722,13 +688,6 @@ function planetOverlays(sys, t) {
     ctx.beginPath(); ctx.arc(x, y, r * 1.2, -Math.PI / 2, -Math.PI / 2 + TAU * clamp(G.pShield / (P.maxHp * .2), 0, 1)); ctx.stroke();
   }
   if (P.dot) { ctx.strokeStyle = sys.side === 'me' ? 'rgba(255,120,60,.6)' : 'rgba(157,255,106,.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r * 1.1, 0, TAU); ctx.stroke(); }
-}
-function drawRing(x, y, r, back, glow) {
-  ctx.save(); ctx.strokeStyle = `rgba(${glow},.55)`; ctx.lineWidth = r * .14;
-  ctx.beginPath(); ctx.ellipse(x, y, r * 1.8, r * .45, -.25, back ? Math.PI : 0, back ? TAU : Math.PI); ctx.stroke();
-  ctx.strokeStyle = `rgba(${glow},.25)`; ctx.lineWidth = r * .06;
-  ctx.beginPath(); ctx.ellipse(x, y, r * 2.05, r * .52, -.25, back ? Math.PI : 0, back ? TAU : Math.PI); ctx.stroke();
-  ctx.restore();
 }
 function drawHole(x, y, r, t, P) {
   const hg = ctx.createRadialGradient(x, y, r * .8, x, y, r * 3);
@@ -753,6 +712,28 @@ function drawMoonSat(sys, t, front) {
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, r, 0, TAU); ctx.fill();
 }
 
+// Painted art for default-skin constellations (img/con_*.webp); other skins keep the line drawing
+const CON_IMG = {};
+function conImg(c) {
+  if (c.skin.id !== c.def.id) return null;
+  let im = CON_IMG[c.def.id];
+  if (!im) { im = CON_IMG[c.def.id] = new Image(); im.src = `img/con_${c.def.id}.webp`; }
+  return im.complete && im.naturalWidth ? im : null;
+}
+function drawConArt(c, k, im, mine) {
+  const sz = k * 2.1, x = c.x - sz / 2, y = c.y - sz / 2;
+  const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, k * 1.15);   // side colour: soft halo behind the art
+  g.addColorStop(0, mine ? 'rgba(120,200,255,.28)' : 'rgba(255,80,100,.38)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c.x, c.y, k * 1.15, 0, TAU); ctx.fill();
+  const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;  // pixel art: keep the dots crisp
+  ctx.drawImage(im, x, y, sz, sz);
+  if (c.flash > 0 || (mine && c.chain)) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha *= c.flash > 0 ? .8 : .15 * c.chain; ctx.drawImage(im, x, y, sz, sz); ctx.restore();
+  }
+  ctx.imageSmoothingEnabled = sm;
+  if (!mine) { ctx.strokeStyle = 'rgba(255,90,110,.75)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(c.x, c.y + k * .85, k * .7, k * .16, 0, 0, TAU); ctx.stroke(); }
+}
 function drawCon(sys, c, t) {
   if (c.alpha <= 0) return;
   const k = conSize(sys) * c.s, pts = c.def.sh.pts.map(([px, py]) => [c.x + px * k, c.y + py * k * .85]);
@@ -760,18 +741,22 @@ function drawCon(sys, c, t) {
   const lineC = mine ? c.skin.pal.line : '255,123,138';
   ctx.globalAlpha = c.alpha * (c.stun > 0 ? .55 : 1);
   ctx.lineCap = 'round';
-  const glowW = mine && c.chain ? 5 + c.chain * 2 : 5;
-  for (const [w, a] of [[glowW * c.s, .18], [1.5 * c.s, .95]]) {
-    ctx.strokeStyle = `rgba(${lineC},${a})`; ctx.lineWidth = w;
-    ctx.beginPath();
-    for (const [i, j] of c.def.sh.edges) { ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[j][0], pts[j][1]); }
-    ctx.stroke();
+  const im = conImg(c);
+  if (im) drawConArt(c, k, im, mine);
+  else {
+    const glowW = mine && c.chain ? 5 + c.chain * 2 : 5;
+    for (const [w, a] of [[glowW * c.s, .18], [1.5 * c.s, .95]]) {
+      ctx.strokeStyle = `rgba(${lineC},${a})`; ctx.lineWidth = w;
+      ctx.beginPath();
+      for (const [i, j] of c.def.sh.edges) { ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[j][0], pts[j][1]); }
+      ctx.stroke();
   }
   ctx.fillStyle = c.flash > 0 ? '#ffffff' : mine ? c.skin.pal.star : '#fff1c2';
   for (const [px, py] of pts) { ctx.beginPath(); ctx.arc(px, py, 2.1 * c.s, 0, TAU); ctx.fill(); }
   const [kx, ky] = pts[c.def.sh.key];
   ctx.strokeStyle = c.def.special ? '#c35bff' : mine ? '#ff5a6e' : '#ff9a5a'; ctx.lineWidth = 1.6;
   ctx.beginPath(); ctx.arc(kx, ky, 6 * c.s, 0, TAU); ctx.stroke();
+  }
   if (c.invuln > 0) { ctx.strokeStyle = 'rgba(169,193,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(c.x, c.y, k * 1.1, 0, TAU); ctx.stroke(); }
   if (c.stun > 0) { ctx.strokeStyle = 'rgba(195,91,255,.8)'; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.arc(c.x, c.y, k * 1.15, t * 3, t * 3 + TAU); ctx.stroke(); ctx.setLineDash([]); }
   if (c.dot) { ctx.fillStyle = c.dot.burn ? 'rgba(255,138,74,.95)' : 'rgba(157,255,106,.9)'; for (let i = 0; i < (c.dot.stacks || 1); i++) { ctx.beginPath(); ctx.arc(c.x + k + i * 5, c.y - k * .6, 2.3, 0, TAU); ctx.fill(); } }
