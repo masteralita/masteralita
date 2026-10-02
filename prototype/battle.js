@@ -383,20 +383,62 @@ function heal(t, v) {
   if (got >= 1) { const [x, y] = posOf(t); say(x, y - 16, '+' + Math.round(got), '#8cf2c6', .8); }
   return v - got;
 }
+/* ---------- Planet explosion ---------- */
+// The losing planet swells and trembles (charge), detonates into debris + shockwaves, and the
+// result screen only opens once the blast has played out (BOOM.end seconds after the kill).
+const BOOM = { charge: .55, fade: 1.4, end: 2.3 };
+function explodePlanet(sys) {
+  if (!sys || sys.boom != null) return;
+  sys.boom = 0; sys.quake = 0;
+}
+function updateBoom(sys, dt) {
+  if (sys.boom == null) return;
+  const before = sys.boom; sys.boom += dt;
+  if (before < BOOM.charge && sys.boom >= BOOM.charge) { // detonation
+    const tint = sys.side === 'me' ? '#8cf2c6' : '#ffb27a';
+    burst(sys.cx, sys.cy, 70, '#ffe9a8'); burst(sys.cx, sys.cy, 50, '#ff7a3c'); burst(sys.cx, sys.cy, 40, tint);
+    for (let i = 0; i < 30; i++) { const a = rnd(0, TAU), v = rnd(120, 320); G.fx.push({ x: sys.cx, y: sys.cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v * .7, t: rnd(.8, 1.4), c: '#fff' }); }
+    if (!REDUCED_MOTION) G.shake = SHAKE_MAX * 2;
+  }
+}
+// Drawn in place of the planet: swelling + white-hot during the charge, then flash/fireball/shockwaves
+function drawBoom(sys, t) {
+  const b = sys.boom, x = sys.cx, y = sys.cy, r = sys.pr;
+  if (b < BOOM.charge) {
+    const f = b / BOOM.charge, j = REDUCED_MOTION ? 0 : r * .1 * f;
+    ctx.save(); ctx.translate(x + rnd(-1, 1) * j, y + rnd(-1, 1) * j); ctx.scale(1 + .25 * f, 1 + .25 * f); ctx.translate(-x, -y);
+    drawPlanet(sys, t); ctx.restore();
+    ctx.fillStyle = `rgba(255,240,210,${.85 * f * f})`; ctx.beginPath(); ctx.arc(x, y, r * (1 + .25 * f), 0, TAU); ctx.fill();
+    return;
+  }
+  const f = clamp((b - BOOM.charge) / BOOM.fade, 0, 1);
+  if (f >= 1) return;
+  const fr = r * (1.3 + 1.7 * f);
+  const g = ctx.createRadialGradient(x, y, 0, x, y, fr);
+  g.addColorStop(0, `rgba(255,255,240,${1 - f})`); g.addColorStop(.35, `rgba(255,190,90,${.9 * (1 - f)})`); g.addColorStop(1, 'rgba(255,90,40,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, fr, 0, TAU); ctx.fill();
+  for (const [k, col] of [[1, '255,230,170'], [.7, '255,140,70']]) {
+    const rr = r * (1 + 6 * f * k);
+    ctx.strokeStyle = `rgba(${col},${.9 * (1 - f)})`; ctx.lineWidth = 4 * (1 - f) + 1;
+    ctx.beginPath(); ctx.ellipse(x, y, rr, rr * .5, 0, 0, TAU); ctx.stroke();
+  }
+}
+
 function burst(x, y, n, c) {
   for (let i = 0; i < n; i++) { const a = rnd(0, TAU), v = rnd(30, 170); G.fx.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v * .6, t: rnd(.4, .9), c }); }
 }
 function onPlanetDown(side) {
   if (G.state !== 'fight') return;
   G.proj = [];
-  if (G.mode === 'pvp') { G.state = 'over'; banner(side === 'foe' ? 'VICTORY' : 'DEFEAT', '', 1); setTimeout(() => finishBattle(side === 'foe'), 1100); return; }
+  explodePlanet(sysOf(side));
+  if (G.mode === 'pvp') { G.state = 'over'; banner(side === 'foe' ? 'VICTORY' : 'DEFEAT', '', 1); setTimeout(() => finishBattle(side === 'foe'), BOOM.end * 1000); return; }
   if (side === 'foe') {
-    G.state = 'clear'; G.clearT = 1.6;
+    G.state = 'clear'; G.clearT = BOOM.end;
     gainXp(15 + G.wave * 2);
     banner('CLEAR', G.wave % 10 === 0 ? '구역 보스 격파' : '', 1.2);
   } else {
     G.state = 'over';
-    setTimeout(() => finishBattle(false), 1100);
+    setTimeout(() => finishBattle(false), BOOM.end * 1000);
   }
 }
 function gainXp(v) {
@@ -664,6 +706,7 @@ function periodic(c, sys, dt) {
 function updateSystem(sys, dt) {
   const dir = sys.side === 'me' ? 1 : -1, fighting = G.state === 'fight';
   sys.phase += sys.speed * dt;
+  updateBoom(sys, dt);
   if (sys.side === 'me') {
     const o = Math.floor(sys.phase / TAU);
     if (o > sys.orbits) { sys.orbits = o; if (fighting) G.energy = Math.min(G.maxEnergy, G.energy + 1); }
@@ -739,7 +782,8 @@ function update(dt) {
     if (G.mode === 'pvp' && G.timer <= 0) {
       const win = G.foe.planet.hp / G.foe.planet.maxHp < G.me.planet.hp / G.me.planet.maxHp;
       G.state = 'over'; G.proj = []; banner('TIME UP', win ? '남은 HP 비율로 승리' : '남은 HP 비율로 패배', 1);
-      setTimeout(() => finishBattle(win), 1100); return;
+      explodePlanet(win ? G.foe : G.me);
+      setTimeout(() => finishBattle(win), BOOM.end * 1000); return;
     }
     if (G.mode === 'arcade' && G.timer <= 0 && !G.enraged) { G.enraged = true; banner('적 폭주', '공격력 +50%', 1.2); }
     if (G.shield > 0) G.shield -= dt;
@@ -883,7 +927,7 @@ function drawCon(sys, c, t) {
   const k = conSize(sys) * c.s, pts = c.def.sh.pts.map(([px, py]) => [c.x + px * k, c.y + py * k * .85]);
   const mine = c.side === 'me';
   const lineC = mine ? c.skin.pal.line : '255,123,138';
-  ctx.globalAlpha = c.alpha * (c.stun > 0 ? .55 : 1);
+  ctx.globalAlpha = c.alpha * (c.stun > 0 ? .55 : 1) * (sys.conFade ?? 1);
   ctx.lineCap = 'round';
   const im = conImg(c);
   if (im) drawConArt(c, k, im, mine);
@@ -962,15 +1006,21 @@ function drawPreview(canvas, sys, t, dt) {
   ctx = c2; try { drawSystem(sys, t); } finally { ctx = mainCtx; }
 }
 function drawSystem(sys, t) {
+  const gone = sys.boom != null ? clamp((sys.boom - BOOM.charge) / .5, 0, 1) : 0; // constellations fade out with the blast
+  if (gone >= 1 && sys.boom > BOOM.charge + BOOM.fade) return;
+  ctx.save(); ctx.globalAlpha = 1 - gone;
   for (const r of sys.rings) drawOrbit(sys, r, t);
+  ctx.restore();
   const back = sys.cons.filter(c => c.depth < 0).sort((a, b) => a.y - b.y);
   const front = sys.cons.filter(c => c.depth >= 0).sort((a, b) => a.y - b.y);
-  back.forEach(c => drawCon(sys, c, t));
+  const cons = list => { if (gone < 1) { sys.conFade = 1 - gone; list.forEach(c => drawCon(sys, c, t)); sys.conFade = 1; } };
+  cons(back);
+  if (sys.boom != null) { drawBoom(sys, t); cons(front); return; }
   drawMoonSat(sys, t, false);
   const [qx, qy] = quakeOffset(sys);
   if (qx || qy) { ctx.save(); ctx.translate(qx, qy); drawPlanet(sys, t); ctx.restore(); } else drawPlanet(sys, t);
   drawMoonSat(sys, t, true);
-  front.forEach(c => drawCon(sys, c, t));
+  cons(front);
 }
 function drawReticle(t) {
   if (!G.focus || !alive(G.focus) || G.state !== 'fight') return;
