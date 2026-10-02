@@ -715,12 +715,12 @@ function drawMoonSat(sys, t, front) {
   ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(cv, sx - r, sy - r, r * 2, r * 2); ctx.restore();
 }
 
-// Painted art for default-skin constellations (img/con_*.webp); other skins keep the line drawing
+// Pixel art per skin (img/con_<skin id>.webp); the line drawing shows until it has loaded
 const CON_IMG = {};
 function conImg(c) {
-  if (c.skin.id !== c.def.id) return null;
-  let im = CON_IMG[c.def.id];
-  if (!im) { im = CON_IMG[c.def.id] = new Image(); im.src = `img/con_${c.def.id}.webp`; }
+  const id = c.skin.id;
+  let im = CON_IMG[id];
+  if (!im) { im = CON_IMG[id] = new Image(); im.src = `img/con_${id}.webp`; }
   return im.complete && im.naturalWidth ? im : null;
 }
 function drawConArt(c, k, im, mine) {

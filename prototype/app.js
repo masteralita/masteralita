@@ -543,13 +543,9 @@ function showGachaResult(list, title, extra = []) {
     <div class="mbtns"><button class="cta sm" data-act="ok" type="button">확인</button></div>`, () => { closeModal(); if (tab !== 'home') setTab(tab); else renderHome(); });
 }
 function conSvg(id, size, opts = {}) {
-  const d = CON[id], sh = d.sh, sk = SKIN[opts.skin || (save.cons[id] ? equippedSkin(id) : id)];
-  // default skin uses the painted art (img/con_*.webp); other skins keep their coloured line drawing
-  if (sk.id === id) return `<img class="csvg cimg${opts.dim ? ' dim' : ''}" src="img/con_${id}.webp" width="${size}" height="${size}" alt="" aria-hidden="true">`;
-  const P = sh.pts.map(([x, y]) => [x * 40, y * 34]);
-  const lines = sh.edges.map(([a, b]) => `<line x1="${P[a][0]}" y1="${P[a][1]}" x2="${P[b][0]}" y2="${P[b][1]}"/>`).join('');
-  const dots = P.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.2"/>`).join('');
-  return `<svg class="csvg${opts.dim ? ' dim' : ''}" style="--ln:rgb(${sk.pal.line});--st:${sk.pal.star}" viewBox="-50 -44 100 88" width="${size}" height="${Math.round(size * .88)}" aria-hidden="true"><g class="ln">${lines}</g><g class="dt">${dots}</g></svg>`;
+  const sk = SKIN[opts.skin || (save.cons[id] ? equippedSkin(id) : id)];
+  // every skin has its own pixel art: img/con_<skin id>.webp (classic skin id = constellation id)
+  return `<img class="csvg cimg${opts.dim ? ' dim' : ''}" src="img/con_${sk.id}.webp" width="${size}" height="${size}" alt="" aria-hidden="true">`;
 }
 
 /* ---------- 상점 (Store) ---------- */
@@ -705,7 +701,7 @@ function renderStars() {
     ${skinSection(starSel, o)}
     <section class="star-stage">
       <svg class="graph" style="--ln:rgb(${eq.pal.line})" viewBox="${-sw / 2} -125 ${sw} 250" role="img" aria-label="${d.name}자리 별 슬롯">
-        ${eq.id === starSel ? `<image class="art" href="img/con_${starSel}.webp" x="-110" y="-110" width="220" height="220"/>` : ''}
+        <image class="art" href="img/con_${eq.id}.webp" x="-110" y="-110" width="220" height="220"/>
         <g class="ln">${d.sh.edges.map(([a, c]) => pxLine(P[a], P[c])).join('')}</g>
         ${slotsSvg}
       </svg>
