@@ -136,7 +136,7 @@ function startPvp() {
   Object.assign(P, { side: 'foe', hp: Math.round(P.hp * m * 1.1), shred: 0 }); P.maxHp = P.hp;
   G.ghost = { name, lv: Math.max(1, save.lv + Math.floor(rnd(-2, 3))), planet: PLANET[pid].name };
   G.foe = makeSystem('foe', P, pool.map(d => { const c = makeCon(d, 'foe', { hp: m, atk: m }); if (d.special) c.def = d; return c; }));
-  G.timer = 60; G.enraged = false; G.focus = null; G.state = 'fight'; G.zone = ZONES[1];
+  G.timer = 60; G.enraged = false; G.focus = null; G.state = 'fight'; G.zone = ZONES[1]; resetHole();
   $('foeName').textContent = `${name} · ${P.name}`;
   $('waveNo').textContent = 'VS'; $('zoneChip').textContent = '비동기 대전';
   layout();
@@ -157,6 +157,7 @@ function startWave() {
     pool.map(d => makeCon(d, 'foe', { hp: WAVE.conHp * m, atk: WAVE.conAtk * m })));
   for (const c of G.me.cons) { c.dead = false; c.hp = c.maxHp; c.alpha = 1; c.stun = 0; c.dot = null; c.revived = false; c.molted = false; c.invuln = 0; }
   const P = G.me.planet; if (n > 1) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * .15);
+  resetHole();
   G.timer = WAVE.timer; G.enraged = false; G.bossCd = 5; G.bossCd2 = 8; G.focus = null; G.proj = []; G.beams = [];
   G.state = 'fight';
   const newZone = z !== G.zone || n === 1; G.zone = z;
@@ -165,6 +166,55 @@ function startWave() {
   layout();
   if (newZone) banner(z.en, `${z.name} 진입 · WAVE ${n}`, 2);
   else banner(bossTier ? `BOSS WAVE ${n}` : `WAVE ${n}`, look.name, 1.3);
+}
+
+/* ---------- Black hole ---------- */
+// 30 s into a fight (each PvP battle / each arcade wave) a black hole opens between the two systems
+// and drains both planets by a flat 50 HP per second, ignoring armor, shields and evasion.
+const HOLE = { at: 30, dmg: 50, every: 1 };
+function resetHole() { G.holeT = 0; G.holeCd = 0; G.holeOn = false; }
+function holePos() { return [W / 2, (G.foe.cy + G.me.cy) / 2]; }
+function updateHole(dt) {
+  G.holeT += dt;
+  if (!G.holeOn) {
+    if (G.holeT < HOLE.at) return;
+    G.holeOn = true; G.holeCd = HOLE.every; banner('블랙홀 출현', `양쪽 행성 매초 -${HOLE.dmg}`, 1.4);
+    return;
+  }
+  G.holeCd -= dt;
+  if (G.holeCd > 0) return;
+  G.holeCd += HOLE.every;
+  const [hx, hy] = holePos();
+  const hits = [G.me, G.foe].filter(s => s.planet.hp > 0).map(s => {
+    const P = s.planet, before = P.hp;
+    P.hp = Math.max(0, P.hp - HOLE.dmg); P.flash = .12;
+    say(s.cx + rnd(-10, 10), s.cy - 14, HOLE.dmg, '#c79bff', .9);
+    G.beams.push({ x1: hx, y1: hy, x2: s.cx, y2: s.cy, c: 'rgba(170,110,255,.7)', w: 2, t: .25, zig: true });
+    return { s, before };
+  });
+  const dead = hits.filter(h => h.s.planet.hp <= 0);
+  if (dead.length === 2) { // both drained at once: whoever had more HP left hangs on at 1
+    const keep = dead[0].before / dead[0].s.planet.maxHp >= dead[1].before / dead[1].s.planet.maxHp ? dead[0] : dead[1];
+    keep.s.planet.hp = 1; dead.splice(dead.indexOf(keep), 1);
+  }
+  for (const h of dead) { burst(h.s.cx, h.s.cy, 60, h.s.side === 'me' ? '#8cf2c6' : '#ffb27a'); onPlanetDown(h.s.side); }
+}
+function drawBlackHole(t) {
+  if (!G.holeOn || !G.me || !G.foe) return;
+  const [x, y] = holePos(), grow = clamp((G.holeT - HOLE.at) / .8, 0, 1);
+  const r = Math.min(G.me.pr, G.foe.pr) * .55 * grow * (1 + .04 * Math.sin(t * 3));
+  if (r < 1) return;
+  const hg = ctx.createRadialGradient(x, y, r * .5, x, y, r * 3.2);
+  hg.addColorStop(0, 'rgba(150,90,255,.4)'); hg.addColorStop(1, 'rgba(150,90,255,0)');
+  ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(x, y, r * 3.2, 0, TAU); ctx.fill();
+  const im = pxSprite('blackhole');
+  if (im && im.naturalWidth) { // same sprite metrics as drawHole: dark sphere radius ~20 px, centred at (49, 26)
+    const k = r / 20, sm = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(im, x - 49 * k, y - 26 * k, im.naturalWidth * k, im.naturalHeight * k); ctx.imageSmoothingEnabled = sm;
+  } else {
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(200,160,255,.9)'; ctx.lineWidth = 2; ctx.stroke();
+  }
 }
 
 /* ---------- Helpers ---------- */
@@ -650,6 +700,7 @@ function update(dt) {
     if (G.roar > 0) G.roar -= dt;
     skillTick(dt);
     bossAct(dt);
+    if (G.state === 'fight') updateHole(dt);
   } else if (G.state === 'clear') {
     G.clearT -= dt;
     if (G.clearT <= 0 && G.pendingLv === 0) { G.wave += 1; startWave(); }
@@ -893,6 +944,7 @@ function drawScene(t) {
     const oy = introOffset(sys);
     if (oy) { ctx.save(); ctx.translate(0, oy); drawSystem(sys, t); ctx.restore(); } else drawSystem(sys, t);
   }
+  drawBlackHole(t);
   drawReticle(t);
   for (const b of G.beams) {
     ctx.globalAlpha = clamp(b.t * 6, 0, 1); ctx.strokeStyle = b.c; ctx.lineWidth = b.w;
