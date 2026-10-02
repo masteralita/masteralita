@@ -324,10 +324,11 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .scard[aria-pressed="true"]{box-shadow:0 0 0 2px var(--gold)}
 .star-stage{position:relative;border-radius:16px;background:radial-gradient(80% 70% at 50% 50%,rgba(40,50,110,.35),rgba(0,0,0,.85));border:1px solid var(--line)}
 .graph{display:block;width:100%;height:auto;max-height:300px}
-.graph .ln line{stroke:var(--ln,var(--gold));stroke-width:2.4;stroke-linecap:round;opacity:.85}
+.graph{shape-rendering:crispEdges}.graph .art{image-rendering:pixelated;opacity:.4}
+.graph .ln rect{fill:var(--ln,var(--gold));opacity:.85}
 .slot{cursor:pointer}
 .slot .hit{fill:transparent}
-.slot .ring{fill:rgba(0,0,0,.4);stroke:var(--c);stroke-width:2.4}
+.slot .ring{fill:rgba(0,0,0,.45);stroke:var(--c);stroke-width:3}
 .slot .core{fill:#ffd76a}
 .slot.closed .ring{stroke-dasharray:3 3;opacity:.55}
 .slot.closed .core{fill:#555b80}

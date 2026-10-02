@@ -670,6 +670,18 @@ function renderStarList() {
         ${o ? `${gradeChip(o.g)}<small>전투력 ${fmt(conPower(c.id))}</small>` : '<span class="gchip" style="--g:#59608a">미보유</span><small>&nbsp;</small>'}
       </button>`; }).join('')}</div>`;
 }
+// 도트 별자리 그래프: edges become rows of square dots, slots become pixel frames with a plus-shaped star core
+function pxLine([x1, y1], [x2, y2]) {
+  const n = Math.max(1, Math.round(Math.hypot(x2 - x1, y2 - y1) / 7));
+  let out = '';
+  for (let k = 1; k < n; k++) out += `<rect x="${Math.round(x1 + (x2 - x1) * k / n) - 1.5}" y="${Math.round(y1 + (y2 - y1) * k / n) - 1.5}" width="3" height="3"/>`;
+  return out;
+}
+function pxSlot(x, y, r, col) {
+  const st = col ? ` style="fill:${col}"` : '';
+  return `<rect class="ring" x="${x - r}" y="${y - r}" width="${r * 2}" height="${r * 2}"/>
+      <rect class="core" x="${x - 6}" y="${y - 2}" width="12" height="4"${st}/><rect class="core" x="${x - 2}" y="${y - 6}" width="4" height="12"${st}/>`;
+}
 function renderStars() {
   if (starView === 'list') { renderStarList(); return; }
   const owned = ALL_CONS.filter(c => save.cons[c.id]);
@@ -683,8 +695,7 @@ function renderStars() {
     const t = slotType(d, i), s = o && o.slots[i], open = s && s.open, part = s && s.part;
     return `<g class="slot${i === slotSel ? ' sel' : ''}${open ? '' : ' closed'}" data-slot="${i}" style="--c:${SLOT[t].col}">
       <circle class="hit" cx="${x}" cy="${y}" r="22"/>
-      <circle class="ring" cx="${x}" cy="${y}" r="${i === d.sh.key ? 15 : 12}"/>
-      <circle class="core" cx="${x}" cy="${y}" r="4.5" ${part ? `style="fill:${GRADES[part.g].col}"` : ''}/>
+      ${pxSlot(x, y, i === d.sh.key ? 14 : 11, part ? GRADES[part.g].col : null)}
       ${part ? `<text x="${x + 13}" y="${y - 11}">+${part.en}</text>` : ''}
     </g>`;
   }).join('');
@@ -694,7 +705,8 @@ function renderStars() {
     ${skinSection(starSel, o)}
     <section class="star-stage">
       <svg class="graph" style="--ln:rgb(${eq.pal.line})" viewBox="${-sw / 2} -125 ${sw} 250" role="img" aria-label="${d.name}자리 별 슬롯">
-        <g class="ln">${d.sh.edges.map(([a, c]) => `<line x1="${P[a][0]}" y1="${P[a][1]}" x2="${P[c][0]}" y2="${P[c][1]}"/>`).join('')}</g>
+        ${eq.id === starSel ? `<image class="art" href="img/con_${starSel}.webp" x="-110" y="-110" width="220" height="220"/>` : ''}
+        <g class="ln">${d.sh.edges.map(([a, c]) => pxLine(P[a], P[c])).join('')}</g>
         ${slotsSvg}
       </svg>
       <div class="sname"><b>${eq.id === starSel ? d.name + '자리' : eq.name}</b> ${o ? gradeChip(o.g) : '<span class="gchip" style="--g:#59608a">미보유</span>'}</div>
