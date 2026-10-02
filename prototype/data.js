@@ -289,6 +289,38 @@ const PLANETS = [
   { id:'sun',     name:'태양',   en:'Sun',     kind:'sun',   hp:1800, orbits:2, unlock:2500, trait:{ rateMul:1.15 },   desc:'공격속도 +15%' },
 ];
 const PLANET = Object.fromEntries(PLANETS.map(p => [p.id, p]));
+/* ---------- Planet gauge skills (게이지 스킬): 3 per planet, paid with 기력 in battle ---------- */
+// Each skill: { type, name, cost (기력), v (power, fraction), dur (seconds, for timed types) }. Types are implemented in skills.js.
+// icon: which of the three skill images (img/sk_*.png) the button shows.
+const GSKILL = {
+  meteor:  { label:'유성 낙하',   icon:'meteor', timed:false, desc: s => `집중 대상에 유성 5개를 떨어뜨려요. 하나당 대상 최대 HP ${pct(s.v)} + 기본 피해.` },
+  strike:  { label:'행성 포격',   icon:'meteor', timed:false, desc: s => `적 행성에 최대 HP ${pct(s.v)} 피해를 바로 줘요. 별자리가 살아 있어도 맞아요.` },
+  burn:    { label:'지속 피해',   icon:'meteor', timed:true,  desc: s => `적 별자리 전체가 ${s.dur}초 동안 초당 최대 HP ${pct(s.v)} 피해를 입어요.` },
+  shield:  { label:'피해 감소',   icon:'shield', timed:true,  desc: s => `${s.dur}초 동안 내 행성과 별자리가 받는 피해 -${pct(s.v)}.` },
+  barrier: { label:'행성 보호막', icon:'shield', timed:false, desc: s => `행성에 최대 HP ${pct(s.v)}만큼 보호막을 씌워요.` },
+  heal:    { label:'회복',        icon:'shield', timed:false, desc: s => `행성과 내 별자리 HP를 최대 HP ${pct(s.v)}만큼 회복해요.` },
+  haste:   { label:'공속 증가',   icon:'nova',   timed:true,  desc: s => `${s.dur}초 동안 내 별자리 공격속도 +${pct(s.v)}.` },
+  rally:   { label:'공격력 증가', icon:'nova',   timed:true,  desc: s => `${s.dur}초 동안 내 별자리 공격력 +${pct(s.v)}.` },
+  crit:    { label:'치명타 증가', icon:'nova',   timed:true,  desc: s => `${s.dur}초 동안 내 별자리 치명타율 +${pct(s.v)}.` },
+  stun:    { label:'전체 기절',   icon:'nova',   timed:true,  desc: s => `적 별자리 전체를 ${s.dur}초 동안 기절시켜요.` },
+  slow:    { label:'전체 둔화',   icon:'nova',   timed:true,  desc: s => `${s.dur}초 동안 적 별자리 공격속도 -${pct(s.v)}.` },
+};
+const gsk = (type, name, cost, v, dur = 0) => ({ type, name, cost, v, dur });
+const PLANET_SKILLS = {
+  earth:   [gsk('meteor', '유성우', 3, .07),          gsk('shield', '성운 방패', 2, .7, 6),    gsk('haste', '초신성 가속', 4, 1, 6)],
+  moon:    [gsk('heal', '달빛 치유', 3, .2),           gsk('barrier', '조석 보호막', 2, .15),     gsk('stun', '월식', 4, 0, 2)],
+  mercury: [gsk('haste', '쾌속 공전', 3, 1, 6),        gsk('burn', '태양열 반사', 3, .04, 5),     gsk('stun', '수성 섬광', 4, 0, 1.5)],
+  venus:   [gsk('burn', '산성 구름', 3, .05, 5),       gsk('shield', '두꺼운 대기', 2, .75, 7),   gsk('barrier', '온실 장막', 3, .2)],
+  mars:    [gsk('rally', '전쟁의 함성', 3, .5, 6),     gsk('slow', '붉은 모래폭풍', 2, .4, 5),    gsk('meteor', '포보스 낙하', 4, .09)],
+  jupiter: [gsk('slow', '대적점 폭풍', 3, .5, 6),      gsk('barrier', '거대 자기장', 2, .2),      gsk('strike', '중력 붕괴', 5, .1)],
+  saturn:  [gsk('shield', '고리 방패', 2, .7, 7),      gsk('meteor', '고리 파편', 3, .07),        gsk('stun', '타이탄의 안개', 4, 0, 2)],
+  uranus:  [gsk('slow', '극지 냉기', 2, .4, 5),        gsk('stun', '자기 폭풍', 3, 0, 1.5),       gsk('haste', '기울어진 자전', 3, .8, 6)],
+  neptune: [gsk('meteor', '해일', 3, .08),             gsk('rally', '초음속 바람', 3, .5, 6),     gsk('strike', '심해 압력', 5, .1)],
+  pluto:   [gsk('crit', '정밀 조준', 2, .3, 6),        gsk('slow', '얼음 심연', 3, .4, 5),        gsk('strike', '저승의 일격', 4, .07)],
+  sun:     [gsk('burn', '태양 플레어', 3, .05, 5),     gsk('haste', '코로나 폭발', 4, 1, 6),      gsk('meteor', '홍염 낙하', 4, .09)],
+};
+for (const p of PLANETS) p.skills = PLANET_SKILLS[p.id];
+const skillDesc = s => (GSKILL[s.type] || GSKILL.meteor).desc(s);
 /* ---------- Orbits (궤도): belong to the planet, carry their own base stats and skin ---------- */
 // A planet with a single orbit gets a stronger orbit to make up for fewer constellations.
 const ORBIT_BASE = {

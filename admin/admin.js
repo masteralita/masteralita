@@ -48,6 +48,7 @@ const isDirty = () => unsavedCount() > 0;
 function showNum(kind, v) { return kind === 'pct' ? +(v * 100).toFixed(4) : v; }
 function parseCell(kind, raw) {
   if (kind === 'text') return String(raw ?? '');
+  if (kind === 'gskill') { const t = String(raw ?? '').trim(); return GSKILL[t] ? t : undefined; }
   const n = Number(String(raw).replace('%', '').trim());
   if (!Number.isFinite(n)) return undefined;
   if (kind === 'pct') return +(n / 100).toFixed(6);
@@ -82,6 +83,12 @@ function cellHtml(path, kind) {
     return `<td class="ce${cls}" title="${esc(title)}"><div class="chain-ed">
       <select data-path="${path}" data-part="type">${Object.keys(FX).map(t => `<option value="${t}"${t === v.type ? ' selected' : ''}>${FX_LABEL[t] || t}</option>`).join('')}</select>
       <div class="pps">${params}${bools}</div><span class="fx-desc">${FX[v.type](v.p)}</span></div></td>`;
+  }
+  if (kind === 'gskill') {
+    const base = path.replace(/\/type$/, ''), sk = { type: v, ...Object.fromEntries(['cost', 'v', 'dur'].map(k => [k, curVal(`${base}/${k}`)])) };
+    return `<td class="ce${cls}" title="${esc(title)}"><div class="chain-ed">
+      <select data-path="${path}">${Object.keys(GSKILL).map(t => `<option value="${t}"${t === v ? ' selected' : ''}>${GSKILL[t].label}</option>`).join('')}</select>
+      <span class="fx-desc">${esc(skillDesc(sk))}</span></div></td>`;
   }
   if (kind === 'orbits') return `<td class="${cls}" title="${esc(title)}"><select data-path="${path}"><option value="1"${v === 1 ? ' selected' : ''}>1</option><option value="2"${v === 2 ? ' selected' : ''}>2</option></select></td>`;
   if (kind === 'text') return `<td class="${cls}" title="${esc(title)}"><input class="txt" type="text" data-path="${path}" value="${esc(v ?? '')}"></td>`;
@@ -468,7 +475,7 @@ async function adminExport() {
   const fxs = X.utils.aoa_to_sheet(fx); fxs['!cols'] = [{ wch: 14 }, { wch: 16 }, { wch: 24 }, { wch: 60 }];
   X.utils.book_append_sheet(wb, fxs, '효과 목록');
   const guide = X.utils.aoa_to_sheet([['갤럭시워 밸런스 데이터'], ['· 각 시트의 값만 고치고 ID·키·머리글은 그대로 두세요.'], ['· (%) 표시가 있는 열은 퍼센트 숫자로 적어요 (12 = 12%).'],
-    ['· 각성 칸은 "효과키 파라미터=값" 형식이에요. 예) splash v=0.4  /  nth every=4 mul=3'], ['· 관리자 사이트의 [엑셀 가져오기]로 올린 뒤 [초안 저장] → [배포]를 누르면 게임에 반영돼요.']]);
+    ['· 각성 칸은 "효과키 파라미터=값" 형식이에요. 예) splash v=0.4  /  nth every=4 mul=3'], [`· 행성 스킬 종류 칸에는 키를 적어요: ${Object.entries(GSKILL).map(([k, g]) => `${k}(${g.label})`).join(', ')}`], ['· 관리자 사이트의 [엑셀 가져오기]로 올린 뒤 [초안 저장] → [배포]를 누르면 게임에 반영돼요.']]);
   guide['!cols'] = [{ wch: 80 }];
   X.utils.book_append_sheet(wb, guide, '안내');
   X.writeFile(wb, `galaxywar-balance-${new Date().toISOString().slice(0, 10)}.xlsx`);

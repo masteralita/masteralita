@@ -54,6 +54,11 @@ const BAL_SECTIONS = [
            { key:'trait/energy', label:'시작 기력', kind:'int', neutral:0 }, { key:'trait/crit', label:'치명타율', kind:'pct', neutral:0 },
            { key:'name', label:'이름', kind:'text' }, { key:'desc', label:'설명', kind:'text' }],
     path: (r, c) => `planet/${r}/${c}` },
+  { id:'pskill', title:'행성 스킬', desc:'행성마다 전투 게이지 스킬 3개 (기력으로 발동). 위력은 종류마다 뜻이 달라요: 피해·회복·보호막은 최대 HP 대비, 버프·둔화는 증가/감소량',
+    rows: PLANETS.flatMap(p => [0, 1, 2].map(k => ({ id:`${p.id}/${k}`, label:`${p.name} ${k + 1}`, sub:k ? '' : p.en }))),
+    cols: [{ key:'type', label:'종류', kind:'gskill' }, { key:'name', label:'스킬 이름', kind:'text' }, { key:'cost', label:'기력', kind:'int' },
+           { key:'v', label:'위력', kind:'pct' }, { key:'dur', label:'지속(초)', kind:'num' }],
+    path: (r, c) => { const [pid, k] = r.split('/'); return `planet/${pid}/skills/${k}/${c}`; } },
   { id:'orbit', title:'궤도', desc:'궤도 기본 능력치 (그 궤도의 별자리에게 적용)',
     rows: [{ id:'single/0', label:'단일 궤도', sub:'궤도 1개 행성' }, { id:'dual/0', label:'안쪽 궤도', sub:'궤도 2개 행성' }, { id:'dual/1', label:'바깥 궤도', sub:'궤도 2개 행성' }],
     cols: [{ key:'name', label:'이름', kind:'text' }, { key:'atk', label:'공격력 +', kind:'pct' }, { key:'rate', label:'공속 +', kind:'pct' }, { key:'hp', label:'HP +', kind:'pct' }],
@@ -119,6 +124,7 @@ function balSet(path, v) {
     ch.type = FX[v.type] ? v.type : ch.type; ch.p = { ...(v.p || FX_DEFAULTS[ch.type] || {}) }; // exactly the given params
     ch.desc = FX[ch.type](ch.p); return;
   }
+  if (seg[0] === 'planet' && seg[2] === 'skills' && seg[4] === 'type' && !GSKILL[v]) return; // unknown skill type: keep the current one
   const f = BAL_FIELDS[path], k = seg[seg.length - 1], isNeutral = f && f.neutral !== undefined && v === f.neutral;
   for (let i = 1; i < seg.length - 1; i++) {
     if (o[seg[i]] == null) { if (isNeutral) return; o[seg[i]] = {}; } // don't create containers just to hold a neutral value
