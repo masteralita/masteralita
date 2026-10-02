@@ -22,13 +22,13 @@ addEventListener('resize', resize);
 const G = {
   state: 'title', shake: 0, mode: 'arcade', ghost: null, kills: 0, wave: 1, timer: 40, energy: 2, maxEnergy: 10, focus: null, me: null, foe: null, zone: ZONES[0],
   proj: [], beams: [], fx: [], texts: [], shield: 0, nova: 0, roar: 0, roarV: .3, pShield: 0, enraged: false, bossCd: 6, bossCd2: 8,
-  paused: false, choosing: false, clearT: 0, introT: 0, goT: 0, lv: 1, xp: 0, pendingLv: 0, taken: [],
+  paused: false, choosing: false, clearT: 0, introT: 0, goT: 0, lv: 1, xp: 0, tapXp: 0, pendingLv: 0, taken: [],
   T: { armor: 0, marmor: 0, evade: 0, dmgRed: 0, planetRed: 0 },
 };
 const SHIELD_T = 6, NOVA_T = 6;
 const SHAKE_MAX = 4.5; // px — kept small on purpose
 const REDUCED_MOTION = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-const xpNeed = lv => 30 + 18 * (lv - 1);
+const xpNeed = lv => Math.round(LVUP.need * Math.pow(LVUP.growth, lv - 1));
 
 function makeCon(def, side, mult) {
   const hp = Math.round(def.hp * mult.hp);
@@ -88,11 +88,11 @@ function startRun(mode) {
   G.me = buildMySystem();
   const P = G.me.planet;
   Object.assign(G, { mode, wave: 1, kills: 0, energy: 2 + P.energy, shield: 0, nova: 0, roar: 0, pShield: 0, proj: [], beams: [], fx: [], texts: [],
-    lv: 1, xp: 0, pendingLv: 0, taken: [], zone: ZONES[0], choosing: false, paused: false });
+    lv: 1, xp: 0, tapXp: 0, pendingLv: 0, taken: [], zone: ZONES[0], choosing: false, paused: false });
   G.T = { armor: 0, marmor: 0, evade: 0, dmgRed: 0, planetRed: P.dmgRed };
   $('myName').textContent = P.name;
   showBattleUi(true);
-  if (mode === 'pvp') startPvp(); else startWave();
+  if (mode === 'pvp') { startPvp(); maxOutPvp(); } else startWave();
   beginIntro();
 }
 // Battle opening: both systems slide in (foe from the top, me from the bottom), then 3·2·1 and the fight starts.
@@ -240,6 +240,7 @@ function applyDamage(t, dmg, kind, { src = null, tier = 0, color = null, silent 
   const armor = Math.max(0, (kind === 'magic' ? t.mArmor - (t.shred || 0) : t.dArmor) + (t.side === 'me' && !t.isPlanet ? (kind === 'magic' ? G.T.marmor : G.T.armor) : 0));
   let d = dmg * 100 / (100 + armor);
   if (t.isPlanet && t.side === 'me' && G.pShield > 0) { const a = Math.min(G.pShield, d); G.pShield -= a; d -= a; }
+  if (src && src.side === 'me' && !src.isPlanet && t.side === 'foe') gainXp(Math.min(d, t.hp));
   t.hp -= d; t.flash = .12;
   if (t.side === 'me' && t.isPlanet && d > 0 && !REDUCED_MOTION) G.shake = Math.min(SHAKE_MAX, G.shake + 1 + 40 * d / t.maxHp);
   if (!silent) {
@@ -272,7 +273,6 @@ function killCon(t, src) {
   if (G.focus === t) G.focus = null;
   if (t.side === 'foe') {
     G.kills += 1;
-    gainXp(6 + G.wave);
     if ((e = E(src, 'energyKill'))) { G.energy = Math.min(G.maxEnergy, G.energy + e.v); say(x, y - 26, '기력 +' + e.v, '#f5c451', 1); }
     if (t.dot && G.me.cons.some(s => E(s, 'poisonSpread'))) {
       const live = G.foe.cons.filter(x => !x.dead && x !== t), n = live[Math.floor(Math.random() * live.length)];
@@ -296,7 +296,6 @@ function onPlanetDown(side) {
   if (G.mode === 'pvp') { G.state = 'over'; banner(side === 'foe' ? 'VICTORY' : 'DEFEAT', '', 1); setTimeout(() => finishBattle(side === 'foe'), 1100); return; }
   if (side === 'foe') {
     G.state = 'clear'; G.clearT = 1.6;
-    gainXp(15 + G.wave * 2);
     banner('CLEAR', G.wave % 10 === 0 ? '구역 보스 격파' : '', 1.2);
   } else {
     G.state = 'over';
@@ -306,7 +305,18 @@ function onPlanetDown(side) {
 function gainXp(v) {
   if (G.mode !== 'arcade') return;
   G.xp += v;
-  while (G.xp >= xpNeed(G.lv)) { G.xp -= xpNeed(G.lv); G.lv += 1; G.pendingLv += 1; }
+  while (G.xp >= xpNeed(G.lv)) { G.xp -= xpNeed(G.lv); G.lv += 1; G.pendingLv += 1; G.tapXp = 0; }
+}
+// A tap on the battlefield counts as one average constellation hit, up to LVUP.tapCap of this level's need
+function tapFill(x, y) {
+  if (G.mode !== 'arcade') return;
+  const live = G.me.cons.filter(c => !c.dead);
+  if (!live.length) return;
+  const room = xpNeed(G.lv) * LVUP.tapCap - G.tapXp;
+  if (room <= 0) return;
+  const v = Math.min(room, live.reduce((s, c) => s + conAtk(c), 0) / live.length);
+  G.tapXp += v; gainXp(v);
+  say(x, y - 10, '+' + Math.max(1, Math.round(v)), '#c9a2ff', .6, 11);
 }
 function perkOptions() {
   const opts = [];
@@ -355,7 +365,34 @@ function openLevelUp() {
   $('lvup').hidden = false;
   const first = $('cards').querySelector('button'); if (first) first.focus({ preventScroll: true });
 }
-function applyPerk(o) {
+// 대전 has no in-battle level up: both sides start with every stat card and awakening already taken.
+// Awakening effects only run on my side (E() is mine-only), so the ghost gets PVP_FOE_AWAKEN on HP/attack instead.
+const PVP_FOE_AWAKEN = 1.25;
+function maxOutPvp() {
+  for (const id of new Set(G.me.cons.map(c => c.def.id))) {
+    const S = G.me.cons.find(c => c.def.id === id).skin;
+    for (const [k] of S.stats) for (let n = 1; n <= STAT_MAX; n++) applyPerk({ type: 'stat', id, k, lvl: n }, true);
+    for (let n = 1; n <= 3; n++) applyPerk({ type: 'chain', id, lvl: n }, true);
+  }
+  G.me.planet.hp = G.me.planet.maxHp;
+  const F = G.foe, pBase = F.planet.maxHp;
+  for (const id of new Set(F.cons.map(c => c.def.id))) {
+    const cons = F.cons.filter(c => c.def.id === id);
+    for (const [k] of cons[0].skin.stats) {
+      const v = STAT[k].v * STAT_MAX;
+      for (const c of cons) if (k in c.m) c.m[k] += v;
+      if (k === 'tArmor') F.cons.forEach(x => x.dArmor += v);
+      if (k === 'tMArmor') F.cons.forEach(x => x.mArmor += v);
+      if (k === 'pHp') F.planet.maxHp += Math.round(pBase * v);
+    }
+  }
+  for (const c of F.cons) {
+    c.atkBase *= PVP_FOE_AWAKEN; c.baseHp = Math.round(c.baseHp * PVP_FOE_AWAKEN);
+    c.maxHp = Math.round(c.baseHp * (1 + c.m.hp)); c.hp = c.maxHp;
+  }
+  F.planet.hp = F.planet.maxHp;
+}
+function applyPerk(o, quiet = false) {
   if (o.type === 'repair') { heal(G.me.planet, G.me.planet.maxHp * .3); G.taken.push('행성 수리'); return; }
   const cons = G.me.cons.filter(c => c.def.id === o.id);
   const d = CON[o.id];
@@ -363,6 +400,7 @@ function applyPerk(o) {
     const ch = cons[0].skin.chain[o.lvl - 1];
     for (const c of cons) { c.chain = o.lvl; c.fxOn[ch.type] = ch.p; c.fxT[ch.type] = 0; }
     if (FX_TEAM[ch.type]) G.T[FX_TEAM[ch.type]] += ch.p.v;
+    if (quiet) return;
     G.taken.push(`${cons[0].skin.name} ${ROMAN[o.lvl]} ${o.name}`);
     banner(`각성 ${ROMAN[o.lvl]}`, `${cons[0].skin.name} · ${o.name}`, 1.2);
     return;
@@ -377,7 +415,7 @@ function applyPerk(o) {
   if (o.k === 'tMArmor') G.T.marmor += v;
   if (o.k === 'tEvade') G.T.evade += v;
   if (o.k === 'pHp') { const P = G.me.planet, add = Math.round(P.baseHp * v); P.maxHp += add; P.hp += add; }
-  G.taken.push(`${d.name} ${o.name} +${o.lvl}`);
+  if (!quiet) G.taken.push(`${d.name} ${o.name} +${o.lvl}`);
 }
 
 /* ---------- Firing ---------- */
@@ -524,6 +562,7 @@ cv.addEventListener('pointerdown', e => {
     say(mine.x, mine.y - 24, 'Lv ' + mine.lv, '#f5c451', 1); burst(mine.x, mine.y, 14, '#f5c451');
     return;
   }
+  tapFill(x, y);
   const foe = hitCon(G.foe);
   if (foe) { G.focus = foe; return; }
   if (Math.hypot(G.foe.cx - x, G.foe.cy - y) < G.foe.pr * 1.4) {
@@ -928,8 +967,11 @@ function hud() {
   $('myHp').style.transform = `scaleX(${clamp(mp.hp / mp.maxHp, 0, 1)})`;
   $('foeHpTxt').textContent = `${Math.ceil(fp.hp).toLocaleString()} / ${fp.maxHp.toLocaleString()}`;
   $('myHpTxt').textContent = `${Math.ceil(mp.hp).toLocaleString()} / ${mp.maxHp.toLocaleString()}` + (G.pShield > 1 ? ` (+${Math.round(G.pShield)})` : '');
-  $('xpBar').style.transform = `scaleX(${clamp(G.xp / xpNeed(G.lv), 0, 1)})`;
-  $('lvTxt').textContent = `Lv ${G.lv - G.pendingLv}`;
+  const pvp = G.mode === 'pvp';
+  $('xpBar').style.transform = `scaleX(${pvp ? 1 : clamp(G.xp / xpNeed(G.lv), 0, 1)})`;
+  $('lvTxt').textContent = pvp ? 'MAX' : `Lv ${G.lv - G.pendingLv}`;
+  const need = xpNeed(G.lv);
+  $('xpTxt').textContent = pvp ? '' : `${Math.floor(G.xp).toLocaleString()} / ${need.toLocaleString()} · 터치 ${Math.floor(100 * G.tapXp / need)}/${Math.round(100 * LVUP.tapCap)}%`;
   const tm = $('timer');
   tm.textContent = G.enraged ? '폭주' : Math.max(0, G.timer).toFixed(1);
   tm.classList.toggle('rage', G.enraged);

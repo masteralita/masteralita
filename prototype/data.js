@@ -358,6 +358,9 @@ const INCOME = { dustBase:90, dustPerLv:10, pieceRate:1, capHours:12,
 /* ---------- Arcade wave scaling ---------- */
 const WAVE = { planetHp:900, planetGrowth:1.2, statGrowth:1.13, deepFrom:20, deepGrowth:1.03,
   midBossHp:1.8, zoneBossHp:2.6, conHp:.9, conAtk:.8, timer:40 };
+// 아케이드 레벨업 게이지: my constellations' hits fill it (damage dealt), the need grows each level,
+// and tapping the battlefield can fill up to tapCap of each level's need (one constellation hit per tap).
+const LVUP = { need:900, growth:1.35, tapCap:.1 };
 const CHEST_STEP = 10, CHEST_MAX = 1000;
 // per chest: 성운 스킨 → Star Dust → Star Piece → 별자리 카드 (cumulative bands)
 const CHEST_ODDS = { skin:.12, dust:.5, piece:.23, con:.15 };

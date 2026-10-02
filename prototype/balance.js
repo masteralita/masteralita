@@ -10,7 +10,7 @@
 const BAL_ROOTS = {
   con: CON, skin: SKIN, planet: PLANET, orbit: ORBIT_BASE, pskin: PSKIN, oskin: OSKIN,
   grade: GRADES, gacha: GACHA, tier: SKIN_TIER, chest: CHEST_ODDS, adchest: AD_CHEST,
-  income: INCOME, slot: SLOT, enhance: ENHANCE_RATE, wave: WAVE,
+  income: INCOME, slot: SLOT, enhance: ENHANCE_RATE, wave: WAVE, lvup: LVUP,
 };
 
 // Param defaults per effect type, taken from the first skin that uses it (for switching an awakening's type)
@@ -93,6 +93,7 @@ const BAL_SECTIONS = [
       ['wave/statGrowth', '적 별자리 능력치 증가 (웨이브마다 ×)', 'num'], ['wave/deepFrom', '외우주 가속 시작 웨이브', 'int'],
       ['wave/deepGrowth', '외우주 추가 증가 (×)', 'num'], ['wave/midBossHp', '중간 보스 HP 배율', 'num'], ['wave/zoneBossHp', '구역 보스 HP 배율', 'num'],
       ['wave/conHp', '적 별자리 HP 배율', 'num'], ['wave/conAtk', '적 별자리 공격력 배율', 'num'], ['wave/timer', '웨이브 제한 시간 (초)', 'int'],
+      ['lvup/need', '아케이드 레벨업 · Lv1 필요 피해량', 'int'], ['lvup/growth', '아케이드 레벨업 · 필요량 증가 (레벨마다 ×)', 'num'], ['lvup/tapCap', '아케이드 레벨업 · 터치로 채울 수 있는 비율 (레벨마다)', 'num'],
     ] },
 ];
 // Flatten into fields: path → { kind, neutral, label }
