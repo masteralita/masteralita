@@ -297,6 +297,14 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .stats dd{margin:0;font-family:var(--f-disp);font-size:14px;font-variant-numeric:tabular-nums}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .actions .wide{grid-column:1/-1}
+.psk{display:grid;gap:8px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(15,22,52,.6)}
+.psk h3{margin:0;font-size:14px}
+.psk h3 small{font-weight:400;color:var(--dim);font-size:11px;margin-left:6px}
+.psk-row{display:grid;grid-template-columns:32px 1fr;gap:10px;align-items:start}
+.psk-row img{width:32px;height:32px;image-rendering:pixelated}
+.psk-row b{font-size:13px}
+.psk-row .cs{font-family:var(--f-disp);font-size:11px;color:var(--gold);margin-left:4px;font-weight:400}
+.psk-row p{margin:2px 0 0;font-size:12px;line-height:1.45;opacity:.85}
 .planet-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .pcell{position:relative;display:grid;justify-items:center;gap:4px;padding:12px 4px 10px;border-radius:12px;border:1px solid var(--line);background:rgba(15,22,52,.7)}
 .pcell[aria-pressed="true"]{border-color:var(--gold)}
@@ -519,9 +527,9 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
     <div class="lvrow"><span class="lv" id="lvTxt">Lv 1</span><div class="bar xp"><i id="xpBar"></i></div></div>
     <div class="energy"><span class="lbl">기력</span><div class="pips" id="pips"></div></div>
     <div class="skills">
-      <button class="skill" id="skMeteor" type="button"><span class="ic"><img src="img/sk_meteor.png" alt="" aria-hidden="true"></span><span class="nm">유성우</span><span class="cs">기력 3</span><i class="dur"></i></button>
-      <button class="skill" id="skShield" type="button"><span class="ic"><img src="img/sk_shield.png" alt="" aria-hidden="true"></span><span class="nm">성운 방패</span><span class="cs">기력 2</span><i class="dur" id="durShield"></i></button>
-      <button class="skill" id="skNova" type="button"><span class="ic"><img src="img/sk_nova.png" alt="" aria-hidden="true"></span><span class="nm">초신성 가속</span><span class="cs">기력 4</span><i class="dur" id="durNova"></i></button>
+      <button class="skill" id="sk0" type="button"><span class="ic"><img src="img/sk_meteor.png" alt="" aria-hidden="true"></span><span class="nm">유성우</span><span class="cs">기력 3</span><i class="dur"></i></button>
+      <button class="skill" id="sk1" type="button"><span class="ic"><img src="img/sk_shield.png" alt="" aria-hidden="true"></span><span class="nm">성운 방패</span><span class="cs">기력 2</span><i class="dur"></i></button>
+      <button class="skill" id="sk2" type="button"><span class="ic"><img src="img/sk_nova.png" alt="" aria-hidden="true"></span><span class="nm">초신성 가속</span><span class="cs">기력 4</span><i class="dur"></i></button>
     </div>
     <div class="hint">적 별자리 탭 <b>집중 공격</b> · 내 별자리 탭 <b>레벨업 (기력 1)</b></div>
   </div>
@@ -648,6 +656,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 <script src="balance.js"></script>
 <script src="pixel.js"></script>
 <script src="battle.js"></script>
+<script src="skills.js"></script>
 <script src="ads.js"></script>
 <script src="app.js"></script>
 <script type="module" src="cloud.js"></script>

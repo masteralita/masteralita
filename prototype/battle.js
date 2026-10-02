@@ -25,7 +25,6 @@ const G = {
   paused: false, choosing: false, clearT: 0, introT: 0, goT: 0, lv: 1, xp: 0, pendingLv: 0, taken: [],
   T: { armor: 0, marmor: 0, evade: 0, dmgRed: 0, planetRed: 0 },
 };
-const SHIELD_T = 6, NOVA_T = 6;
 const SHAKE_MAX = 4.5; // px — kept small on purpose
 const REDUCED_MOTION = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const xpNeed = lv => 30 + 18 * (lv - 1);
@@ -91,7 +90,7 @@ function startRun(mode) {
     lv: 1, xp: 0, pendingLv: 0, taken: [], zone: ZONES[0], choosing: false, paused: false });
   G.T = { armor: 0, marmor: 0, evade: 0, dmgRed: 0, planetRed: P.dmgRed };
   $('myName').textContent = P.name;
-  showBattleUi(true);
+  showBattleUi(true); setupSkills();
   if (mode === 'pvp') { startPvp(); maxOutPvp(); } else startWave();
   beginIntro();
 }
@@ -177,7 +176,7 @@ function posOf(t) { if (t.isPlanet) { const s = sysOf(t.side); return [s.cx, s.c
 function alive(t) { return !!t && (t.isPlanet ? t.hp > 0 : !t.dead); }
 function say(x, y, v, c, t = .9, size) { G.texts.push({ x, y, v, c, t, size }); }
 
-function critRate(c) { return .05 + c.m.crit + (c.side === 'me' ? G.me.planet.crit + Math.max(0, G.T.evade - .75) * 2 : 0); }
+function critRate(c) { return .05 + c.m.crit + (c.side === 'me' ? G.me.planet.crit + skillCrit() + Math.max(0, G.T.evade - .75) * 2 : 0); }
 function critDmg(c) { const e = E(c, 'critDmg'); return 1.5 + c.m.critDmg + (e ? e.v : 0); }
 function evadeRate() { return Math.min(.75, G.T.evade); }
 function conAtk(c) {
@@ -232,7 +231,7 @@ function applyDamage(t, dmg, kind, { src = null, tier = 0, color = null, silent 
       for (const l of G.me.cons) if (E(l, 'evadeCounter') && !l.dead) fire(l, true);
       return;
     }
-    if (G.shield > 0) dmg *= .3;
+    if (G.shield > 0) dmg *= 1 - G.shieldV;
     if (G.enraged) dmg *= 1.5;
     dmg *= 1 - G.T.dmgRed;
     if (t.isPlanet) dmg *= 1 - G.T.planetRed;
@@ -518,24 +517,7 @@ function afterHit(c, t, dmg, bounced, p) {
   if ((e = E(c, 'planetChip')) && !t.isPlanet) applyDamage(other(c.side).planet, dmg * e.v, c.kind === 'magic' ? 'magic' : 'phys', { src: c, silent: true });
 }
 
-/* ---------- Skills ---------- */
-function useSkill(kind) {
-  if (G.state !== 'fight' || G.paused || G.choosing) return;
-  const cost = { meteor: 3, shield: 2, nova: 4 }[kind];
-  if (G.energy < cost) return;
-  G.energy -= cost;
-  if (kind === 'meteor') {
-    let t = G.focus && alive(G.focus) ? G.focus : null;
-    if (!t) { const live = G.foe.cons.filter(c => !c.dead); t = live.length ? live[0] : G.foe.planet; }
-    const [tx] = posOf(t);
-    for (let i = 0; i < 5; i++) G.proj.push({ x: tx + rnd(-60, 60) - 90, y: -20 - i * 40, t, src: null, sp: 700, dmg: 40 + t.maxHp * .07 + G.wave * 6, kind: 'magic', col: '#ffe9a8', w: 4, len: 26, meteor: true });
-    banner('유성우', '', .7);
-  } else if (kind === 'shield') { G.shield = SHIELD_T; banner('성운 방패', '', .7); }
-  else { G.nova = NOVA_T; banner('초신성 가속', '', .7); }
-}
-$('skMeteor').addEventListener('click', () => useSkill('meteor'));
-$('skShield').addEventListener('click', () => useSkill('shield'));
-$('skNova').addEventListener('click', () => useSkill('nova'));
+/* ---------- Skills: skills.js (per-planet gauge skills) ---------- */
 
 /* ---------- Tap targeting / in-battle level up ---------- */
 function conSize(sys) { return sys.R * .22; }
@@ -604,7 +586,7 @@ function updateSystem(sys, dt) {
     // periodic awakenings
     if (c.side === 'me') periodic(c, sys, dt);
     let rate = c.rate * (1 + c.m.rate) * (sys.side === 'me' ? sys.planet.rateMul : 1);
-    if (sys.side === 'me' && G.nova > 0) rate *= 2;
+    if (sys.side === 'me' && G.nova > 0) rate *= 1 + G.novaV;
     if (c.slow > 0) rate *= 1 - (c.slowV || .3);
     c.cd -= dt * rate;
     if (c.cd <= 0) { c.cd += 1; fire(c); }
@@ -666,6 +648,7 @@ function update(dt) {
     if (G.shield > 0) G.shield -= dt;
     if (G.nova > 0) G.nova -= dt;
     if (G.roar > 0) G.roar -= dt;
+    skillTick(dt);
     bossAct(dt);
   } else if (G.state === 'clear') {
     G.clearT -= dt;
@@ -963,11 +946,6 @@ function hud() {
   tm.textContent = G.enraged ? '폭주' : Math.max(0, G.timer).toFixed(1);
   tm.classList.toggle('rage', G.enraged);
   pipEls.forEach((p, i) => p.classList.toggle('on', i < G.energy));
-  for (const [id, cost] of [['skMeteor', 3], ['skShield', 2], ['skNova', 4]]) {
-    const b = $(id), ok = G.energy >= cost && G.state === 'fight';
-    b.disabled = !ok; b.classList.toggle('ready', ok);
-  }
-  $('durShield').style.width = `${clamp(G.shield / SHIELD_T, 0, 1) * 100}%`;
-  $('durNova').style.width = `${clamp(G.nova / NOVA_T, 0, 1) * 100}%`;
+  skillHud();
 }
 

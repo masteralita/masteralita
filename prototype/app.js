@@ -625,6 +625,12 @@ function renderPlanets() {
         <button class="cta sm" data-pact="up" type="button" ${lv >= PLANET_MAX_LV ? 'disabled' : ''}>${lv >= PLANET_MAX_LV ? 'MAX' : `강화 <b class="dust">${fmt(planetUpCost(lv))}</b>`}</button>`
       : `<button class="cta sm wide" data-pact="unlock" type="button">해금 <b class="piece">${fmt(d.unlock)}</b></button>`}
     </div>
+    <section class="psk">
+      <h3>게이지 스킬 <small>전투에서 기력을 써서 발동해요</small></h3>
+      ${(d.skills || []).map(s => `
+        <div class="psk-row"><img src="img/sk_${(GSKILL[s.type] || GSKILL.meteor).icon}.png" alt="" aria-hidden="true">
+          <div><b>${s.name} <span class="cs">기력 ${s.cost}</span></b><p>${skillDesc(s)}</p></div></div>`).join('')}
+    </section>
     <p class="fine">강화할 때마다 행성 HP +8% (최대 Lv ${PLANET_MAX_LV})</p>
     <div class="planet-grid">
       ${PLANETS.map(p => `
