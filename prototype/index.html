@@ -44,12 +44,13 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .bar i{display:block;height:100%;width:100%;transform-origin:left;transition:transform .12s linear}
 .bar.foe i{background:linear-gradient(90deg,#ff3d5a,#ff8a6a)}
 .bar.me i{background:linear-gradient(90deg,#2fcf8f,#8cf2c6)}
-.bar.xp{height:4px}
+.bar.xp{height:8px}
 .bar.xp i{background:linear-gradient(90deg,#c35bff,#f5c451)}
 .hud-bot{bottom:0;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));display:grid;gap:9px;background:linear-gradient(0deg,rgba(6,10,26,.95) 60%,rgba(6,10,26,0))}
 .lvrow{display:flex;align-items:center;gap:8px}
 .lvrow .lv{font-family:var(--f-disp);font-weight:700;font-size:12px;color:var(--gold);white-space:nowrap;min-width:36px}
 .lvrow .bar{flex:1}
+.lvrow .num{font-family:var(--f-disp);font-variant-numeric:tabular-nums;font-size:11px;color:var(--dim);white-space:nowrap}
 .energy{display:flex;align-items:center;gap:8px}
 .energy .lbl{font-size:12px;color:var(--dim);white-space:nowrap;min-width:36px}
 .pips{display:flex;gap:4px;flex:1}
@@ -516,7 +517,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
       <div class="bar-label"><b id="myName">지구</b><span class="num" id="myHpTxt">0</span></div>
       <div class="bar me"><i id="myHp"></i></div>
     </div>
-    <div class="lvrow"><span class="lv" id="lvTxt">Lv 1</span><div class="bar xp"><i id="xpBar"></i></div></div>
+    <div class="lvrow"><span class="lv" id="lvTxt">Lv 1</span><div class="bar xp"><i id="xpBar"></i></div><span class="num" id="xpTxt"></span></div>
     <div class="energy"><span class="lbl">기력</span><div class="pips" id="pips"></div></div>
     <div class="skills">
       <button class="skill" id="skMeteor" type="button"><span class="ic"><img src="img/sk_meteor.png" alt="" aria-hidden="true"></span><span class="nm">유성우</span><span class="cs">기력 3</span><i class="dur"></i></button>
