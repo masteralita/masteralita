@@ -13,42 +13,42 @@ const ZODIAC = [
   { id:'sgr', name:'궁수', en:'Sagittarius', stat:'공격속도', kind:'phys', style:'arrow', hp:240, atk:8, rate:2.4, def:10, mdef:10,
     sig:'빠르게 화살을 연사해요.',
     sh: shape([[-.9,.5],[-.5,.1],[-.1,.3],[.2,-.1],[.6,.1],[.5,-.5],[.1,-.6],[-.3,-.3],[.9,-.3]], '0-1 1-2 2-3 3-4 4-5 5-6 6-7 7-1 3-7 4-8', 3) },
-  { id:'cap', name:'염소', en:'Capricorn', stat:'물리 공격', kind:'phys', style:'shot', hp:260, atk:24, rate:.9, def:12, mdef:8,
-    sig:'묵직한 물리탄을 쏴요.',
+  { id:'cap', name:'염소', en:'Capricorn', stat:'물리 공격', kind:'phys', style:'missile', hp:260, atk:24, rate:.9, def:12, mdef:8,
+    sig:'점점 빨라지는 유도 미사일을 쏴요.',
     sh: shape([[-.9,-.3],[-.3,-.1],[.3,-.4],[.9,-.5],[.6,.3],[.1,.6],[-.5,.3]], '0-1 1-2 2-3 3-4 4-5 5-6 6-0', 2) },
-  { id:'aqr', name:'물병', en:'Aquarius', stat:'마법 방어', kind:'magic', style:'orb', hp:300, atk:13, rate:1, def:10, mdef:45,
-    sig:'마법 구체를 쏘고, 마법 공격에 강해요.',
+  { id:'aqr', name:'물병', en:'Aquarius', stat:'마법 방어', kind:'magic', style:'drop', hp:300, atk:13, rate:1, def:10, mdef:45,
+    sig:'물방울을 포물선으로 던지고, 마법 공격에 강해요.',
     sh: shape([[-.9,-.6],[-.5,-.2],[-.1,-.5],[.2,-.1],[.5,-.4],[.3,.3],[.7,.6],[-.2,.5]], '0-1 1-2 2-3 3-4 3-5 5-6 5-7', 3) },
-  { id:'psc', name:'물고기', en:'Pisces', stat:'마법 공격', kind:'magic', style:'orb', hp:230, atk:22, rate:.95, def:8, mdef:15,
-    sig:'강한 마법 구체를 쏴요.',
+  { id:'psc', name:'물고기', en:'Pisces', stat:'마법 공격', kind:'magic', style:'curve', hp:230, atk:22, rate:.95, def:8, mdef:15,
+    sig:'양쪽으로 휘어 들어가는 유도 레이저를 쏴요.',
     sh: shape([[-.9,-.7],[-.6,-.2],[-.3,.3],[0,.7],[.4,.4],[.8,.2],[.9,.6],[.6,.7]], '0-1 1-2 2-3 3-4 4-5 5-6 6-7 7-5', 3) },
-  { id:'ari', name:'양', en:'Aries', stat:'방어력', kind:'phys', style:'shot', hp:300, atk:12, rate:1, def:45, mdef:10,
-    sig:'물리 공격에 강한 방어형이에요.',
+  { id:'ari', name:'양', en:'Aries', stat:'방어력', kind:'phys', style:'bullet', hp:300, atk:12, rate:1, def:45, mdef:10,
+    sig:'빠른 총알을 쏘는, 물리 공격에 강한 방어형이에요.',
     sh: shape([[-.8,-.3],[-.2,-.5],[.4,-.2],[.8,.4]], '0-1 1-2 2-3', 1) },
-  { id:'tau', name:'황소', en:'Taurus', stat:'HP', kind:'phys', style:'shot', hp:520, atk:11, rate:.9, def:15, mdef:15,
-    sig:'HP가 가장 높은 탱커예요.',
+  { id:'tau', name:'황소', en:'Taurus', stat:'HP', kind:'phys', style:'boulder', hp:520, atk:11, rate:.9, def:15, mdef:15,
+    sig:'바위를 던지는, HP가 가장 높은 탱커예요.',
     sh: shape([[-.9,-.7],[-.4,-.2],[0,0],[.3,.2],[.9,-.1],[.2,.6],[-.3,.3]], '0-1 1-2 2-3 3-4 2-6 6-5 3-5', 2) },
   { id:'gem', name:'쌍둥이', en:'Gemini', stat:'물리·마법 공격', kind:'both', style:'twin', hp:240, atk:11, rate:1, def:10, mdef:10,
     sig:'물리탄과 마법탄을 동시에 쏴요.',
     sh: shape([[-.6,-.9],[-.5,-.3],[-.6,.3],[-.8,.8],[.3,-.9],[.4,-.3],[.3,.3],[.5,.8]], '0-1 1-2 2-3 4-5 5-6 6-7 1-5', 0) },
-  { id:'cnc', name:'게', en:'Cancer', stat:'물리 방어', kind:'phys', style:'shot', hp:320, atk:12, rate:1, def:40, mdef:12,
-    sig:'단단한 껍질로 버티는 방어형이에요.',
+  { id:'cnc', name:'게', en:'Cancer', stat:'물리 방어', kind:'phys', style:'bubble', hp:320, atk:12, rate:1, def:40, mdef:12,
+    sig:'거품을 뿜고, 단단한 껍질로 버티는 방어형이에요.',
     sh: shape([[0,-.2],[-.5,-.8],[.1,.2],[-.6,.7],[.7,.5]], '0-1 0-2 2-3 2-4', 0) },
   { id:'leo', name:'사자', en:'Leo', stat:'공격력', kind:'phys', style:'beam', hp:260, atk:30, rate:.7, def:14, mdef:10,
-    sig:'즉시 명중하는 강한 레이저를 쏴요.',
+    sig:'즉시 명중하는 굵은 직선 레이저를 쏴요.',
     sh: shape([[-.9,.4],[-.3,.3],[.2,.4],[.5,-.1],[.3,-.5],[.6,-.8],[.9,-.5],[-.2,-.1]], '0-1 1-2 2-3 3-4 4-5 5-6 1-7 7-3', 2) },
   { id:'vir', name:'처녀', en:'Virgo', stat:'HP 회복', kind:'magic', style:'heal', hp:250, atk:9, rate:.8, def:10, mdef:18,
     sig:'공격할 때마다 행성과 다친 별자리를 회복해요.',
     sh: shape([[-.9,-.2],[-.4,0],[0,-.3],[.4,-.1],[.8,-.5],[.1,.3],[.4,.8],[-.3,.6]], '0-1 1-2 2-3 3-4 2-5 5-6 5-7', 6) },
-  { id:'lib', name:'천칭', en:'Libra', stat:'물리·마법 방어', kind:'magic', style:'orb', hp:300, atk:12, rate:1, def:30, mdef:30,
-    sig:'물리와 마법 모두 버티는 균형형이에요.',
+  { id:'lib', name:'천칭', en:'Libra', stat:'물리·마법 방어', kind:'magic', style:'sword', hp:300, atk:12, rate:1, def:30, mdef:30,
+    sig:'날아가는 검을 던지는, 물리와 마법 모두 버티는 균형형이에요.',
     sh: shape([[0,-.8],[-.6,-.1],[.6,-.2],[-.4,.7],[.5,.6]], '0-1 0-2 1-2 1-3 2-4', 0) },
   { id:'sco', name:'전갈', en:'Scorpio', stat:'상태이상 감소', kind:'phys', style:'poison', hp:260, atk:10, rate:1, def:14, mdef:14,
     sig:'독을 걸고, 아군의 기절 시간을 줄여줘요.',
     sh: shape([[-.9,-.8],[-.7,-.4],[-.8,0],[-.4,.1],[0,.2],[.3,.5],[.6,.8],[.9,.5],[.8,.1]], '0-1 1-2 1-3 3-4 4-5 5-6 6-7 7-8', 3) },
 ];
-const SPECIAL = { id:'oph', name:'뱀주인', en:'Ophiuchus', stat:'행성 직접 타격', kind:'magic', style:'beam', hp:220, atk:18, rate:.6, def:10, mdef:10, special:true,
-  sig:'적 별자리를 무시하고 행성을 바로 공격해요.',
+const SPECIAL = { id:'oph', name:'뱀주인', en:'Ophiuchus', stat:'행성 직접 타격', kind:'magic', style:'serpent', hp:220, atk:18, rate:.6, def:10, mdef:10, special:true,
+  sig:'꿈틀대는 뱀 레이저로 적 별자리를 무시하고 행성을 바로 공격해요.',
   sh: shape([[-.5,-.9],[.3,-.8],[.7,0],[.4,.8],[-.3,.8],[-.7,.1],[0,-.1]], '0-1 1-2 2-3 3-4 4-5 5-0 6-0 6-3', 6) };
 const ALL_CONS = [...ZODIAC, SPECIAL];
 const CON = Object.fromEntries(ALL_CONS.map(c => [c.id, c]));
@@ -140,7 +140,7 @@ const SKINS = {
       chain: c3(['화염 화살','applyPoison',{ v:.35, burn:true }], ['연쇄 폭발','splash',{ v:.4 }], ['태양 화살','nth',{ every:4, mul:3 }]) },
   ],
   cap: [
-    { id:'cap', tier:'classic', name:'염소', sig:'묵직한 물리탄을 쏴요.', stats:[['atk','단단한 뿔'],['critDmg','급소 찌르기']],
+    { id:'cap', tier:'classic', name:'염소', sig:'점점 빨라지는 유도 미사일을 쏴요.', stats:[['atk','단단한 뿔'],['critDmg','급소 찌르기']],
       chain: c3(['뿔 들이받기','stun',{ p:.2, dur:1 }], ['산악 돌파','execute',{ th:.5, mul:1.4 }], ['거인의 일격','nth',{ every:5, mul:3 }]) },
     { id:'cap_nb', tier:'nebula', name:'심연의 뿔', style:'orb', kind:'magic', sig:'심연의 구체로 적을 묶어요.', stats:[['atk','심연의 힘'],['crit','어둠의 눈']],
       chain: c3(['심연 속박','stun',{ p:.25, dur:1.2 }], ['공허의 부식','shred',{ v:12, max:48 }], ['심연 개방','amp',{ mul:1.5 }]) },
@@ -148,7 +148,7 @@ const SKINS = {
       chain: c3(['용암 파편','splash',{ v:.5 }], ['녹이는 열기','execute',{ th:.5, mul:1.5 }], ['화산 폭발','quake',{ every:7, mul:1.6 }]) },
   ],
   aqr: [
-    { id:'aqr', tier:'classic', name:'물병', sig:'마법 구체를 쏘고, 마법 공격에 강해요.', stats:[['tMArmor','물의 장막'],['atk','수압']],
+    { id:'aqr', tier:'classic', name:'물병', sig:'물방울을 포물선으로 던지고, 마법 공격에 강해요.', stats:[['tMArmor','물의 장막'],['atk','수압']],
       chain: c3(['물결','splash',{ v:.5 }], ['정화의 비','cleanse',{ every:8, heal:.08 }], ['범람','amp',{ mul:1.6 }]) },
     { id:'aqr_nb', tier:'nebula', name:'은하수 물병', sig:'은하수를 흘려 적 사이를 튕겨요.', stats:[['tMArmor','별빛 장막'],['rate','흐르는 별']],
       chain: c3(['은하 물줄기','bounce',{ v:.55 }], ['별비','cleanse',{ every:7, heal:.1 }], ['쏟아지는 은하','extraProj',{ n:1 }]) },
@@ -156,7 +156,7 @@ const SKINS = {
       chain: c3(['끓는 안개','slow',{ v:.3, dur:3 }], ['증기 폭발','splash',{ v:.6 }], ['임계점','nth',{ every:4, mul:2.5 }]) },
   ],
   psc: [
-    { id:'psc', tier:'classic', name:'물고기', sig:'강한 마법 구체를 쏴요.', stats:[['atk','심해의 힘'],['rate','유영']],
+    { id:'psc', tier:'classic', name:'물고기', sig:'양쪽으로 휘어 들어가는 유도 레이저를 쏴요.', stats:[['atk','심해의 힘'],['rate','유영']],
       chain: c3(['쌍어','extraProj',{ n:1 }], ['심해의 저주','shred',{ v:10, max:40 }], ['회유','bounce',{ v:.6 }]) },
     { id:'psc_nb', tier:'nebula', name:'심해 성어', sig:'독을 품은 심해의 구체를 쏴요.', stats:[['poison','심해 독'],['atk','수압']],
       chain: c3(['심해의 저주','shred',{ v:12, max:48 }], ['해파리 독','applyPoison',{ v:.5 }], ['소용돌이','bounce',{ v:.7 }]) },
@@ -164,7 +164,7 @@ const SKINS = {
       chain: c3(['불꽃 조준','focus',{ v:.1, max:8 }], ['열선','critDmg',{ v:.6 }], ['관통 불꽃','pierceBeam',{ v:.7 }]) },
   ],
   ari: [
-    { id:'ari', tier:'classic', name:'양', sig:'물리 공격에 강한 방어형이에요.', stats:[['tArmor','양털 갑옷'],['hp','두꺼운 털']],
+    { id:'ari', tier:'classic', name:'양', sig:'빠른 총알을 쏘는, 물리 공격에 강한 방어형이에요.', stats:[['tArmor','양털 갑옷'],['hp','두꺼운 털']],
       chain: c3(['황금 양털','teamGuard',{ v:.15 }], ['돌진','counter',{ p:.25 }], ['불굴','revive',{ hp:.4 }]) },
     { id:'ari_nb', tier:'nebula', name:'꿈꾸는 양', style:'orb', kind:'magic', sig:'꿈의 장막으로 행성을 감싸요.', stats:[['tMArmor','꿈의 장막'],['hp','포근한 털']],
       chain: c3(['자장가','teamGuard',{ v:.1 }], ['꿈의 방패','shieldPulse',{ every:12, v:.1 }], ['다시 꾸는 꿈','revive',{ hp:.5 }]) },
@@ -172,7 +172,7 @@ const SKINS = {
       chain: c3(['불꽃 돌진','counter',{ p:.35 }], ['타오르는 분노','rage',{ max:1 }], ['화염 가시','reflect',{ v:.3 }]) },
   ],
   tau: [
-    { id:'tau', tier:'classic', name:'황소', sig:'HP가 가장 높은 탱커예요.', stats:[['hp','강인한 몸'],['pHp','대지의 뿌리']],
+    { id:'tau', tier:'classic', name:'황소', sig:'바위를 던지는, HP가 가장 높은 탱커예요.', stats:[['hp','강인한 몸'],['pHp','대지의 뿌리']],
       chain: c3(['분노의 뿔','rage',{ max:1 }], ['지진','quake',{ every:6, mul:2 }], ['대지의 가호','planetGuard',{ v:.15 }]) },
     { id:'tau_nb', tier:'nebula', name:'플레이아데스', style:'orb', kind:'magic', sig:'일곱 자매 성단이 행성을 지켜요.', stats:[['pHp','성단의 품'],['hp','푸른 별빛']],
       chain: c3(['성단의 가호','planetGuard',{ v:.12 }], ['일곱 자매','cleanse',{ every:10, heal:.1 }], ['성단 방벽','shieldPulse',{ every:10, v:.12 }]) },
@@ -188,7 +188,7 @@ const SKINS = {
       chain: c3(['쌍둥이 광선','twinBeam',{ v:.8 }], ['공명','critDmg',{ v:.6 }], ['마무리','execute',{ th:.4, mul:1.6 }]) },
   ],
   cnc: [
-    { id:'cnc', tier:'classic', name:'게', sig:'단단한 껍질로 버티는 방어형이에요.', stats:[['tArmor','껍질 연마'],['hp','단단한 등딱지']],
+    { id:'cnc', tier:'classic', name:'게', sig:'거품을 뿜고, 단단한 껍질로 버티는 방어형이에요.', stats:[['tArmor','껍질 연마'],['hp','단단한 등딱지']],
       chain: c3(['가시 껍질','reflect',{ v:.25 }], ['집게','slow',{ v:.3, dur:3 }], ['탈피','molt',{ th:.3, dur:3 }]) },
     { id:'cnc_nb', tier:'nebula', name:'달빛 게', style:'orb', kind:'magic', sig:'달빛으로 적의 발을 묶어요.', stats:[['tMArmor','달빛 껍질'],['hp','조수']],
       chain: c3(['밀물','slow',{ v:.4, dur:3 }], ['달의 허물','molt',{ th:.35, dur:4 }], ['조석의 수호','planetGuard',{ v:.1 }]) },
@@ -196,7 +196,7 @@ const SKINS = {
       chain: c3(['용암 가시','reflect',{ v:.35 }], ['조이기','stun',{ p:.2, dur:1 }], ['부수기','execute',{ th:.5, mul:1.5 }]) },
   ],
   leo: [
-    { id:'leo', tier:'classic', name:'사자', sig:'즉시 명중하는 강한 레이저를 쏴요.', stats:[['atk','맹수의 이빨'],['critDmg','사냥 본능']],
+    { id:'leo', tier:'classic', name:'사자', sig:'즉시 명중하는 굵은 직선 레이저를 쏴요.', stats:[['atk','맹수의 이빨'],['critDmg','사냥 본능']],
       chain: c3(['포효','roar',{ every:10, dur:4, v:.3 }], ['레굴루스','pierceBeam',{ v:.7 }], ['왕의 위엄','energyKill',{ v:1 }]) },
     { id:'leo_nb', tier:'nebula', name:'별무리 사자', style:'orb', kind:'magic', sig:'별무리를 흩뿌려 무리를 이끌어요.', stats:[['atk','별의 갈기'],['rate','무리 사냥']],
       chain: c3(['별무리 포효','roar',{ every:10, dur:4, v:.25 }], ['흩날리는 별','splash',{ v:.5 }], ['무리의 왕','energyKill',{ v:1 }]) },
@@ -212,7 +212,7 @@ const SKINS = {
       chain: c3(['불씨','energyPulse',{ every:15 }], ['재에서 피어남','lowHpHeal',{ th:.4, mul:2.5 }], ['불사조의 노래','nthHeal',{ every:3, v:.15 }]) },
   ],
   lib: [
-    { id:'lib', tier:'classic', name:'천칭', sig:'물리와 마법 모두 버티는 균형형이에요.', stats:[['tEvade','기울어진 저울'],['tMArmor','공정한 법정']],
+    { id:'lib', tier:'classic', name:'천칭', sig:'날아가는 검을 던지는, 물리와 마법 모두 버티는 균형형이에요.', stats:[['tEvade','기울어진 저울'],['tMArmor','공정한 법정']],
       chain: c3(['저울질','balance',{ mul:1.3 }], ['심판','pctDmg',{ v:.02 }], ['평형','evadeCounter',{}]) },
     { id:'lib_nb', tier:'nebula', name:'성간 저울', sig:'별의 무게로 적을 짓눌러요.', stats:[['tEvade','별의 기울기'],['atk','무게']],
       chain: c3(['중력','pctDmg',{ v:.025 }], ['되갚음','evadeCounter',{}], ['균형의 장막','teamGuard',{ v:.1 }]) },
@@ -228,7 +228,7 @@ const SKINS = {
       chain: c3(['번지는 불','poisonSpread',{}], ['화염 폭발','splash',{ v:.4 }], ['초열 꼬리','nth',{ every:4, mul:3 }]) },
   ],
   oph: [
-    { id:'oph', tier:'classic', name:'뱀주인', sig:'적 별자리를 무시하고 행성을 바로 공격해요.', stats:[['atk','뱀의 독니'],['rate','치유의 지팡이']],
+    { id:'oph', tier:'classic', name:'뱀주인', sig:'꿈틀대는 뱀 레이저로 적 별자리를 무시하고 행성을 바로 공격해요.', stats:[['atk','뱀의 독니'],['rate','치유의 지팡이']],
       chain: c3(['의술','leech',{ v:.1 }], ['독사의 입맞춤','applyPoison',{ v:.4, planetOnly:true }], ['아스클레피오스','twinBeam',{ v:.8 }]) },
     { id:'oph_nb', tier:'nebula', name:'성운 뱀', style:'orb', sig:'성운 독을 행성에 스며들게 해요.', stats:[['poison','성운 독'],['atk','휘감기']],
       chain: c3(['생명 흡수','leech',{ v:.15 }], ['성운 독','applyPoison',{ v:.5, planetOnly:true }], ['탈피하는 뱀','extraProj',{ n:1 }]) },
@@ -242,7 +242,8 @@ function prepSkin(s, cid) {
   for (const ch of s.chain) ch.desc = FX[ch.type](ch.p);
 }
 for (const [cid, list] of Object.entries(SKINS)) for (const s of list) prepSkin(s, cid);
-const STYLE_LABEL = { arrow:'화살', shot:'탄환', orb:'구체', beam:'레이저', heal:'회복', poison:'독침', twin:'쌍탄' };
+const STYLE_LABEL = { arrow:'화살', shot:'탄환', bullet:'총알', missile:'미사일', drop:'물방울', bubble:'거품', boulder:'바위', sword:'날아가는 검',
+  curve:'곡선 유도 레이저', orb:'구체', beam:'직선 레이저', serpent:'뱀 레이저', heal:'회복', poison:'독침', twin:'쌍탄' };
 const KIND_LABEL = { phys:'물리', magic:'마법', both:'물리·마법' };
 const STAT_MAX = 3;
 

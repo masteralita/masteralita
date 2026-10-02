@@ -551,13 +551,22 @@ function projOf(c, t, over = {}) {
   const mine = c.side === 'me';
   const col = mine ? c.skin.pal.proj : '#ff7b8a';
   const atk = conAtk(c);
-  const burn = mine && c.skin.tier === 'supernova';
+  const burn = mine && c.skin.tier === 'supernova', k = c.kind === 'magic' ? 'magic' : 'phys';
   const S = {
     arrow:  { sp: 520, dmg: atk, kind: c.kind === 'magic' ? 'magic' : 'phys', col, w: 1.6, len: 12 },
     shot:   { sp: 360, dmg: atk, kind: c.kind === 'magic' ? 'magic' : 'phys', col, w: 3, len: 6 },
     orb:    { sp: 240, dmg: atk, kind: 'magic', col: mine ? c.skin.pal.proj : '#ff8ad0', w: 4.5, len: 0, orb: true },
-    poison: { sp: 300, dmg: atk * .6, kind: c.kind === 'magic' ? 'magic' : 'phys', col: burn ? '#ff8a4a' : mine && c.skin.tier === 'nebula' ? '#c77dff' : '#9dff6a', w: 3, len: 5, poison: atk * .5 * (1 + c.m.poison), burn },
+    poison: { sp: 300, dmg: atk * .6, kind: c.kind === 'magic' ? 'magic' : 'phys', col: burn ? '#ff8a4a' : mine && c.skin.tier === 'nebula' ? '#c77dff' : '#9dff6a', w: 3, len: 5, poison: atk * .5 * (1 + c.m.poison), burn, look: 'sting', arc: -26 },
+    // look = how it is drawn, arc = lob height (visual only), steer = homing turn rate, acc = acceleration
+    bullet:  { sp: 620, dmg: atk, kind: k, col, w: 2.6, len: 5, look: 'bullet' },
+    missile: { sp: 110, acc: 900, spMax: 560, dmg: atk, kind: k, col, w: 3, len: 10, look: 'missile', steer: 2.2, swerve: rnd(.9, 1.3) * (Math.random() < .5 ? -1 : 1) },
+    drop:    { sp: 260, dmg: atk, kind: 'magic', col: mine ? c.skin.pal.proj : '#7fc8ff', w: 3, len: 0, look: 'drop', arc: 46 },
+    bubble:  { sp: 200, dmg: atk, kind: k, col: mine ? c.skin.pal.proj : '#9ad8ff', w: 3, len: 0, look: 'bubble', wobble: 7 },
+    boulder: { sp: 230, dmg: atk, kind: k, col: '#b08a64', w: 3, len: 15, look: 'boulder', arc: 58, rock: Math.floor(Math.random() * 4) },
+    sword:   { sp: 430, dmg: atk, kind: k, col, w: 2, len: 16, look: 'sword', arc: -18 },
+    curve:   { sp: 380, dmg: atk, kind: 'magic', col, w: 2.4, len: 0, look: 'curve', steer: 3.2, swerve: 1.25 * ((c.shots & 1) ? 1 : -1), trail: [] },
   }[c.style] || { sp: 320, dmg: atk, kind: 'magic', col, w: 3, len: 0, orb: true };
+  if (c.style === 'arrow') S.look = 'arrow';
   return Object.assign({ x: c.x, y: c.y, t, src: c }, S, over);
 }
 // One volley of a constellation's basic attack (style comes from its skin)
@@ -565,19 +574,19 @@ function volley(c, t, mul) {
   const sys = sysOf(c.side), mine = c.side === 'me', [tx, ty] = posOf(t);
   let e;
   switch (c.style) {
-    case 'arrow': case 'orb': case 'shot': case 'poison': {
+    case 'arrow': case 'orb': case 'shot': case 'poison': case 'bullet': case 'missile': case 'drop': case 'bubble': case 'boulder': case 'sword': case 'curve': {
       const p = projOf(c, t); p.dmg *= mul; G.proj.push(p);
       if ((e = E(c, 'extraProj'))) for (let i = 0; i < e.n; i++) G.proj.push(Object.assign(projOf(c, t), { dmg: p.dmg, x: c.x + 8 * (i + 1), y: c.y - 4, sp: p.sp * .88 }));
       break;
     }
     case 'twin':
-      G.proj.push(projOf(c, t, { x: c.x - 4, sp: 380, kind: 'phys', w: 2.4, len: 8, orb: false, dmg: conAtk(c) * mul }));
+      G.proj.push(projOf(c, t, { x: c.x - 4, sp: 520, kind: 'phys', w: 2.4, len: 5, orb: false, look: 'bullet', dmg: conAtk(c) * mul }));
       G.proj.push(projOf(c, t, { x: c.x + 4, sp: 300, kind: 'magic', col: '#9fb8ff', w: 3.5, len: 0, orb: true, dmg: conAtk(c) * mul }));
       if ((e = E(c, 'extraProj'))) G.proj.push(projOf(c, t, { x: c.x, y: c.y - 6, sp: 340, kind: 'magic', col: '#c9b6ff', w: 3, len: 0, orb: true, dmg: conAtk(c) * mul }));
       break;
-    case 'beam': {
-      const col = mine ? c.skin.pal.proj : '#ff7b8a';
-      G.beams.push({ x1: c.x, y1: c.y, x2: tx, y2: ty, t: .18, c: col, w: c.def.special ? 3 : 2.4 });
+    case 'beam': case 'serpent': {
+      const col = mine ? c.skin.pal.proj : '#ff7b8a', wave = c.style === 'serpent';
+      G.beams.push({ x1: c.x, y1: c.y, x2: tx, y2: ty, t: wave ? .3 : .2, t0: wave ? .3 : .2, c: col, w: c.def.special ? 3 : 2.6, wave, ph: rnd(0, TAU) });
       beamHit(c, t, conAtk(c) * mul);
       if ((e = E(c, 'pierceBeam'))) {
         const t2 = randomOtherEnemy(c, t) || (t.isPlanet ? null : other(c.side).planet);
@@ -651,7 +660,7 @@ function afterHit(c, t, dmg, bounced, p) {
   }
   if ((e = E(c, 'bounce')) && p && !bounced) {
     const n = randomOtherEnemy(c, t);
-    if (n) { const [x, y] = posOf(t); G.proj.push(Object.assign({}, p, { x, y, t: n, dmg: dmg * e.v, bounced: true })); }
+    if (n) { const [x, y] = posOf(t); G.proj.push(Object.assign({}, p, { x, y, t: n, dmg: dmg * e.v, bounced: true, init: false })); }
   }
   if ((e = E(c, 'planetChip')) && !t.isPlanet) applyDamage(other(c.side).planet, dmg * e.v, c.kind === 'magic' ? 'magic' : 'phys', { src: c, silent: true });
 }
@@ -803,19 +812,133 @@ function update(dt) {
     if (!p) continue; // a planet kill can clear the list mid-loop
     if (!alive(p.t)) { G.proj.splice(i, 1); continue; }
     const [tx, ty] = posOf(p.t);
+    if (!p.init) projInit(p, tx, ty);
+    p.age += dt;
+    if (p.acc) p.sp = Math.min(p.spMax, p.sp + p.acc * dt);
     const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
     const step = p.sp * dt;
     if (d <= step + 6) {
       G.proj.splice(i, 1);
       if (p.src || p.meteor) onProjHit(p); else strike(null, p.t, p.dmg, p.kind);
       if (p.meteor) burst(tx, ty, 10, '#ffe9a8');
+      if (p.look) projImpact(p, tx, ty);
       continue;
     }
-    p.vx = dx / d; p.vy = dy / d; p.x += p.vx * step; p.y += p.vy * step;
+    if (p.steer && p.age < 2.5) { // homing: turn toward the target, turning harder the longer it flies so it always lands
+      const cur = Math.atan2(p.vy, p.vx), turn = (p.steer + p.age * 7) * dt;
+      let da = Math.atan2(dy, dx) - cur;
+      da = Math.atan2(Math.sin(da), Math.cos(da));
+      const a = cur + clamp(da, -turn, turn); p.vx = Math.cos(a); p.vy = Math.sin(a);
+    } else { p.vx = dx / d; p.vy = dy / d; }
+    p.x += p.vx * step; p.y += p.vy * step;
+    projVisual(p, d);
   }
   for (let i = G.beams.length - 1; i >= 0; i--) { G.beams[i].t -= dt; if (G.beams[i].t <= 0) G.beams.splice(i, 1); }
+  if (G.rings) for (let i = G.rings.length - 1; i >= 0; i--) { const r = G.rings[i]; r.t -= dt; r.r += 110 * dt; if (r.t <= 0) G.rings.splice(i, 1); }
   for (let i = G.fx.length - 1; i >= 0; i--) { const f = G.fx[i]; f.t -= dt; f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= .96; f.vy *= .96; if (f.t <= 0) G.fx.splice(i, 1); }
   for (let i = G.texts.length - 1; i >= 0; i--) { const t = G.texts[i]; t.t -= dt; t.y -= 26 * dt; if (t.t <= 0) G.texts.splice(i, 1); }
+}
+
+/* ---------- Projectile looks: launch, visual path, impact ---------- */
+function projInit(p, tx, ty) {
+  p.init = true; p.age = 0; p.d0 = Math.max(1, Math.hypot(tx - p.x, ty - p.y));
+  const a = Math.atan2(ty - p.y, tx - p.x) + (p.swerve || 0);
+  p.vx = Math.cos(a); p.vy = Math.sin(a);
+  p.nx = -(ty - p.y) / p.d0; p.ny = (tx - p.x) / p.d0; p.lift = 0; // arc bends sideways off the launch line
+  if (p.trail) p.trail = [];
+  p.rx = p.x; p.ry = p.y; p.ra = a;
+}
+// Where the projectile is drawn: its real position plus a lob arc or a wobble (hit timing is unchanged)
+function projVisual(p, d) {
+  let ox = 0, oy = 0;
+  if (p.arc) { p.lift = Math.sin(Math.PI * clamp(1 - d / p.d0, 0, 1)); const o = p.arc * Math.min(1, p.d0 / 260) * p.lift; ox = p.nx * o; oy = p.ny * o; }
+  if (p.wobble) { const w = Math.sin(p.age * 13) * p.wobble * Math.min(1, d / 40); ox += -p.vy * w; oy += p.vx * w; }
+  const nx = p.x + ox, ny = p.y + oy;
+  if (Math.hypot(nx - p.rx, ny - p.ry) > .01) p.ra = Math.atan2(ny - p.ry, nx - p.rx);
+  p.rx = nx; p.ry = ny;
+  if (p.trail) { p.trail.push(nx, ny); if (p.trail.length > 28) p.trail.splice(0, 2); }
+  if (p.look === 'missile' && save.settings.glow !== false && Math.random() < .7)
+    G.fx.push({ x: nx - Math.cos(p.ra) * 7, y: ny - Math.sin(p.ra) * 7, vx: rnd(-12, 12), vy: rnd(-12, 12), t: rnd(.25, .45), c: Math.random() < .4 ? '#ffb15a' : '#9aa3b8' });
+}
+function projImpact(p, x, y) {
+  const fx = (n, c, v, up = 0) => { for (let i = 0; i < n; i++) { const a = rnd(0, TAU), s = rnd(v * .3, v); G.fx.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s * .7 - up, t: rnd(.3, .6), c }); } };
+  switch (p.look) {
+    case 'missile': fx(12, '#ffb15a', 170); fx(6, '#fff1c4', 90); fx(6, '#9aa3b8', 70); G.rings = (G.rings || []).concat({ x, y, r: 4, t: .3, c: '#ffb15a' }); break;
+    case 'drop': fx(10, p.col, 120, 50); break;
+    case 'bubble': fx(8, '#e8f6ff', 90); G.rings = (G.rings || []).concat({ x, y, r: 5, t: .22, c: p.col }); break;
+    case 'boulder': fx(10, '#b08a64', 110); fx(5, '#6e5a48', 60); break;
+    case 'sword': fx(6, '#ffffff', 140); break;
+    case 'curve': fx(6, p.col, 100); break;
+    case 'sting': fx(5, p.col, 70); break;
+    default: fx(3, p.col, 80);
+  }
+}
+function drawProj(p) {
+  const x = p.rx ?? p.x, y = p.ry ?? p.y, a = p.ra ?? Math.atan2(p.vy || 1, p.vx || 0), c = p.col;
+  ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = p.w; ctx.lineCap = 'round';
+  const at = (fn) => { ctx.save(); ctx.translate(x, y); ctx.rotate(a); fn(); ctx.restore(); };
+  switch (p.look) {
+    case 'arrow': at(() => { // shaft, head, fletching
+      ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(0, 0); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-2, -3); ctx.lineTo(-2, 3); ctx.closePath(); ctx.fill();
+      ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-14, 0); ctx.lineTo(-17, -3); ctx.moveTo(-14, 0); ctx.lineTo(-17, 3); ctx.moveTo(-11, 0); ctx.lineTo(-14, -3); ctx.moveTo(-11, 0); ctx.lineTo(-14, 3); ctx.stroke();
+    }); break;
+    case 'bullet': at(() => { // tracer + capsule
+      ctx.globalAlpha = .35; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-20, 0); ctx.lineTo(-3, 0); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(2, 0); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, -1, 3, 2);
+    }); break;
+    case 'missile': at(() => { // body, nose, fins, flame
+      ctx.scale(1.3, 1.3);
+      ctx.fillStyle = Math.random() < .5 ? '#ffd36a' : '#ff7a3a'; ctx.beginPath(); ctx.moveTo(-6, -2); ctx.lineTo(-11 - rnd(0, 4), 0); ctx.lineTo(-6, 2); ctx.fill();
+      ctx.fillStyle = c; ctx.fillRect(-6, -2.2, 10, 4.4);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(4, -2.2); ctx.lineTo(8, 0); ctx.lineTo(4, 2.2); ctx.fill();
+      ctx.fillStyle = '#c9d2e6'; ctx.beginPath(); ctx.moveTo(-6, -2.2); ctx.lineTo(-8, -5); ctx.lineTo(-3, -2.2); ctx.moveTo(-6, 2.2); ctx.lineTo(-8, 5); ctx.lineTo(-3, 2.2); ctx.fill();
+    }); break;
+    case 'drop': at(() => { // teardrop with highlight, swelling at the top of its lob
+      ctx.scale(1 + .45 * (p.lift || 0), 1 + .45 * (p.lift || 0));
+      ctx.beginPath(); ctx.moveTo(-10, 0); ctx.quadraticCurveTo(-2, -5, 2, -4); ctx.arc(2, 0, 4, -Math.PI / 2, Math.PI / 2); ctx.quadraticCurveTo(-2, 5, -10, 0); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.globalAlpha = .85; ctx.fillRect(2, -2.5, 2, 2); ctx.globalAlpha = 1;
+    }); break;
+    case 'bubble': {
+      const r = 5.5 + Math.sin(p.age * 18) * .7;
+      ctx.globalAlpha = .18; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+      ctx.globalAlpha = .95; ctx.lineWidth = 1.4; ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.fillRect(x - r * .5, y - r * .6, 1.8, 1.8); ctx.globalAlpha = 1;
+      break;
+    }
+    case 'boulder': {
+      const im = pxSprite('rock_' + p.rock), spin = p.age * 7;
+      if (im) pxDraw(ctx, im, x, y, p.len * (1 + .5 * (p.lift || 0)), spin);
+      else { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, 6, 0, TAU); ctx.fill(); }
+      break;
+    }
+    case 'sword': {
+      const blade = () => { // blade, guard, grip
+        ctx.strokeStyle = '#eef3ff'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(10, 0); ctx.stroke();
+        ctx.fillStyle = '#eef3ff'; ctx.beginPath(); ctx.moveTo(10, -1.2); ctx.lineTo(13, 0); ctx.lineTo(10, 1.2); ctx.fill();
+        ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-3, -4); ctx.lineTo(-3, 4); ctx.stroke();
+        ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(-8, 0); ctx.stroke();
+      };
+      for (let k = 2; k >= 1; k--) { ctx.globalAlpha = .18 * (3 - k); ctx.save(); ctx.translate(x - Math.cos(a) * k * 7, y - Math.sin(a) * k * 7); ctx.rotate(a); blade(); ctx.restore(); }
+      ctx.globalAlpha = 1; at(blade);
+      break;
+    }
+    case 'curve': {
+      const tr = p.trail || [];
+      if (tr.length >= 4) for (const [lw, al] of [[6, .22], [2.2, 1]]) {
+        ctx.lineWidth = lw; ctx.globalAlpha = al; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(tr[0], tr[1]);
+        for (let k = 2; k < tr.length; k += 2) ctx.lineTo(tr[k], tr[k + 1]);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+      break;
+    }
+    case 'sting': at(() => { // needle with a venom drop at the tip
+      ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(2, 0); ctx.stroke();
+      ctx.beginPath(); ctx.arc(3, 0, 2.2, 0, TAU); ctx.fill();
+    }); break;
+  }
 }
 
 /* ---------- Draw ---------- */
@@ -1045,15 +1168,30 @@ function drawScene(t) {
   drawBlackHole(t);
   drawReticle(t);
   for (const b of G.beams) {
-    ctx.globalAlpha = clamp(b.t * 6, 0, 1); ctx.strokeStyle = b.c; ctx.lineWidth = b.w;
-    ctx.beginPath(); ctx.moveTo(b.x1, b.y1);
-    if (b.zig) { for (let i = 1; i < 8; i++) { const f = i / 8; ctx.lineTo(b.x1 + (b.x2 - b.x1) * f + rnd(-8, 8), b.y1 + (b.y2 - b.y1) * f + rnd(-8, 8)); } }
-    ctx.lineTo(b.x2, b.y2); ctx.stroke();
+    const al = clamp(b.t * 6, 0, 1);
+    const path = () => {
+      ctx.beginPath(); ctx.moveTo(b.x1, b.y1);
+      if (b.zig) { for (let i = 1; i < 8; i++) { const f = i / 8; ctx.lineTo(b.x1 + (b.x2 - b.x1) * f + rnd(-8, 8), b.y1 + (b.y2 - b.y1) * f + rnd(-8, 8)); } }
+      if (b.wave) { // serpent: a sine wave that slithers along the beam and tapers at both ends
+        const dx = b.x2 - b.x1, dy = b.y2 - b.y1, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L, ph = b.ph + (b.t0 - b.t) * 30;
+        for (let i = 1; i < 24; i++) { const f = i / 24, o = Math.sin(f * 14 + ph) * 9 * Math.sin(Math.PI * f); ctx.lineTo(b.x1 + dx * f + nx * o, b.y1 + dy * f + ny * o); }
+      }
+      ctx.lineTo(b.x2, b.y2); ctx.stroke();
+    };
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = b.c;
+    if (b.t0) { ctx.globalAlpha = al * .3; ctx.lineWidth = b.w * 3.2; path(); } // glow
+    ctx.globalAlpha = al; ctx.lineWidth = b.w; path();
+    if (b.t0 && !b.wave) { ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1, b.w * .4); path(); } // hot core
+  }
+  for (let i = (G.rings || []).length - 1; i >= 0; i--) {
+    const r = G.rings[i]; ctx.globalAlpha = clamp(r.t * 4, 0, 1); ctx.strokeStyle = r.c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, TAU); ctx.stroke();
   }
   ctx.globalAlpha = 1;
   for (const p of G.proj) {
     ctx.strokeStyle = p.col; ctx.fillStyle = p.col; ctx.lineWidth = p.w; ctx.lineCap = 'round';
-    if (p.orb) { // pixel orb: a plus-shaped glow around a square core
+    if (p.look) drawProj(p);
+    else if (p.orb) { // pixel orb: a plus-shaped glow around a square core
       const u = Math.max(2, Math.round(p.w * .8)), x = Math.round(p.x), y = Math.round(p.y);
       ctx.globalAlpha = .3; ctx.fillRect(x - u * 2, y - u, u * 4, u * 2); ctx.fillRect(x - u, y - u * 2, u * 2, u * 4);
       ctx.globalAlpha = 1; ctx.fillRect(x - u, y - u, u * 2, u * 2); ctx.fillStyle = '#fff'; ctx.fillRect(x - u / 2, y - u / 2, u, u);
