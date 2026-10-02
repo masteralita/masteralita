@@ -92,7 +92,7 @@ function startRun(mode) {
   G.T = { armor: 0, marmor: 0, evade: 0, dmgRed: 0, planetRed: P.dmgRed };
   $('myName').textContent = P.name;
   showBattleUi(true);
-  if (mode === 'pvp') startPvp(); else startWave();
+  if (mode === 'pvp') { startPvp(); maxOutPvp(); } else startWave();
   beginIntro();
 }
 // Battle opening: both systems slide in (foe from the top, me from the bottom), then 3·2·1 and the fight starts.
@@ -355,7 +355,34 @@ function openLevelUp() {
   $('lvup').hidden = false;
   const first = $('cards').querySelector('button'); if (first) first.focus({ preventScroll: true });
 }
-function applyPerk(o) {
+// 대전 has no in-battle level up: both sides start with every stat card and awakening already taken.
+// Awakening effects only run on my side (E() is mine-only), so the ghost gets PVP_FOE_AWAKEN on HP/attack instead.
+const PVP_FOE_AWAKEN = 1.25;
+function maxOutPvp() {
+  for (const id of new Set(G.me.cons.map(c => c.def.id))) {
+    const S = G.me.cons.find(c => c.def.id === id).skin;
+    for (const [k] of S.stats) for (let n = 1; n <= STAT_MAX; n++) applyPerk({ type: 'stat', id, k, lvl: n }, true);
+    for (let n = 1; n <= 3; n++) applyPerk({ type: 'chain', id, lvl: n }, true);
+  }
+  G.me.planet.hp = G.me.planet.maxHp;
+  const F = G.foe, pBase = F.planet.maxHp;
+  for (const id of new Set(F.cons.map(c => c.def.id))) {
+    const cons = F.cons.filter(c => c.def.id === id);
+    for (const [k] of cons[0].skin.stats) {
+      const v = STAT[k].v * STAT_MAX;
+      for (const c of cons) if (k in c.m) c.m[k] += v;
+      if (k === 'tArmor') F.cons.forEach(x => x.dArmor += v);
+      if (k === 'tMArmor') F.cons.forEach(x => x.mArmor += v);
+      if (k === 'pHp') F.planet.maxHp += Math.round(pBase * v);
+    }
+  }
+  for (const c of F.cons) {
+    c.atkBase *= PVP_FOE_AWAKEN; c.baseHp = Math.round(c.baseHp * PVP_FOE_AWAKEN);
+    c.maxHp = Math.round(c.baseHp * (1 + c.m.hp)); c.hp = c.maxHp;
+  }
+  F.planet.hp = F.planet.maxHp;
+}
+function applyPerk(o, quiet = false) {
   if (o.type === 'repair') { heal(G.me.planet, G.me.planet.maxHp * .3); G.taken.push('행성 수리'); return; }
   const cons = G.me.cons.filter(c => c.def.id === o.id);
   const d = CON[o.id];
@@ -363,6 +390,7 @@ function applyPerk(o) {
     const ch = cons[0].skin.chain[o.lvl - 1];
     for (const c of cons) { c.chain = o.lvl; c.fxOn[ch.type] = ch.p; c.fxT[ch.type] = 0; }
     if (FX_TEAM[ch.type]) G.T[FX_TEAM[ch.type]] += ch.p.v;
+    if (quiet) return;
     G.taken.push(`${cons[0].skin.name} ${ROMAN[o.lvl]} ${o.name}`);
     banner(`각성 ${ROMAN[o.lvl]}`, `${cons[0].skin.name} · ${o.name}`, 1.2);
     return;
@@ -377,7 +405,7 @@ function applyPerk(o) {
   if (o.k === 'tMArmor') G.T.marmor += v;
   if (o.k === 'tEvade') G.T.evade += v;
   if (o.k === 'pHp') { const P = G.me.planet, add = Math.round(P.baseHp * v); P.maxHp += add; P.hp += add; }
-  G.taken.push(`${d.name} ${o.name} +${o.lvl}`);
+  if (!quiet) G.taken.push(`${d.name} ${o.name} +${o.lvl}`);
 }
 
 /* ---------- Firing ---------- */
@@ -928,8 +956,9 @@ function hud() {
   $('myHp').style.transform = `scaleX(${clamp(mp.hp / mp.maxHp, 0, 1)})`;
   $('foeHpTxt').textContent = `${Math.ceil(fp.hp).toLocaleString()} / ${fp.maxHp.toLocaleString()}`;
   $('myHpTxt').textContent = `${Math.ceil(mp.hp).toLocaleString()} / ${mp.maxHp.toLocaleString()}` + (G.pShield > 1 ? ` (+${Math.round(G.pShield)})` : '');
-  $('xpBar').style.transform = `scaleX(${clamp(G.xp / xpNeed(G.lv), 0, 1)})`;
-  $('lvTxt').textContent = `Lv ${G.lv - G.pendingLv}`;
+  const pvp = G.mode === 'pvp';
+  $('xpBar').style.transform = `scaleX(${pvp ? 1 : clamp(G.xp / xpNeed(G.lv), 0, 1)})`;
+  $('lvTxt').textContent = pvp ? 'MAX' : `Lv ${G.lv - G.pendingLv}`;
   const tm = $('timer');
   tm.textContent = G.enraged ? '폭주' : Math.max(0, G.timer).toFixed(1);
   tm.classList.toggle('rage', G.enraged);
