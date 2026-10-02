@@ -1072,9 +1072,9 @@ $('pauseBtn').addEventListener('click', () => setPaused(true));
 $('resumeBtn').addEventListener('click', () => setPaused(false));
 $('quitBtn').addEventListener('click', () => {
   setPaused(false);
-  if (G.state === 'fight' || G.state === 'clear') { G.state = 'over'; finishBattle(false); }
+  if (G.state === 'fight' || G.state === 'clear' || G.state === 'intro') { G.state = 'over'; finishBattle(false); }
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden && G.state === 'fight' && !G.choosing) setPaused(true); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && (G.state === 'fight' || G.state === 'intro') && !G.choosing) setPaused(true); });
 
 /* ---------- Loop ---------- */
 let last = performance.now(), lastDraw = 0, incT = 0;

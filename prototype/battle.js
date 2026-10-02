@@ -22,7 +22,7 @@ addEventListener('resize', resize);
 const G = {
   state: 'title', shake: 0, mode: 'arcade', ghost: null, kills: 0, wave: 1, timer: 40, energy: 2, maxEnergy: 10, focus: null, me: null, foe: null, zone: ZONES[0],
   proj: [], beams: [], fx: [], texts: [], shield: 0, nova: 0, roar: 0, roarV: .3, pShield: 0, enraged: false, bossCd: 6, bossCd2: 8,
-  paused: false, choosing: false, clearT: 0, lv: 1, xp: 0, pendingLv: 0, taken: [],
+  paused: false, choosing: false, clearT: 0, introT: 0, goT: 0, lv: 1, xp: 0, pendingLv: 0, taken: [],
   T: { armor: 0, marmor: 0, evade: 0, dmgRed: 0, planetRed: 0 },
 };
 const SHIELD_T = 6, NOVA_T = 6;
@@ -93,6 +93,36 @@ function startRun(mode) {
   $('myName').textContent = P.name;
   showBattleUi(true);
   if (mode === 'pvp') startPvp(); else startWave();
+  beginIntro();
+}
+// Battle opening: both systems slide in (foe from the top, me from the bottom), then 3·2·1 and the fight starts.
+// While G.state is 'intro' nothing attacks, the timer holds and taps/skills are ignored (they all check 'fight').
+const INTRO_SLIDE = 2, INTRO_COUNT = 3;
+function beginIntro() { G.state = 'intro'; G.introT = REDUCED_MOTION ? INTRO_SLIDE : 0; G.goT = 0; }
+function updateIntro(dt) {
+  G.introT += dt;
+  if (G.introT >= INTRO_SLIDE + INTRO_COUNT) { G.state = 'fight'; G.goT = .7; }
+}
+const easeOut = x => 1 - Math.pow(1 - clamp(x, 0, 1), 3);
+// How far a system is still pushed off-screen during the slide-in (0 once it has landed)
+function introOffset(sys) {
+  if (G.state !== 'intro') return 0;
+  const k = 1 - easeOut(G.introT / INTRO_SLIDE);
+  return sys.side === 'foe' ? -k * (sys.cy + sys.R) : k * (H - sys.cy + sys.R);
+}
+function drawCountdown() {
+  let v, f;
+  if (G.state === 'intro' && G.introT >= INTRO_SLIDE) { const c = G.introT - INTRO_SLIDE; v = String(INTRO_COUNT - Math.floor(c)); f = c % 1; }
+  else if (G.goT > 0) { v = 'START'; f = 1 - G.goT / .7; }
+  else return;
+  const size = (v === 'START' ? 46 : 84) * (1.35 - .35 * easeOut(f * 4));
+  ctx.save();
+  ctx.globalAlpha = f > .75 ? (1 - f) * 4 : 1;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `700 ${Math.round(size)}px "Chakra Petch", sans-serif`;
+  ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(10,8,30,.85)'; ctx.strokeText(v, W / 2, H / 2);
+  ctx.fillStyle = '#f5c451'; ctx.shadowColor = 'rgba(245,196,81,.7)'; ctx.shadowBlur = 18; ctx.fillText(v, W / 2, H / 2);
+  ctx.restore();
 }
 // 비동기 대전: another player's saved formation, simulated as a ghost
 function startPvp() {
@@ -594,6 +624,8 @@ function update(dt) {
   if (!G.me) return;
   if (G.state === 'fight' && G.pendingLv > 0 && !G.choosing) { openLevelUp(); return; }
   updateSystem(G.me, dt); updateSystem(G.foe, dt);
+  if (G.state === 'intro') updateIntro(dt);
+  if (G.goT > 0) G.goT -= dt;
 
   if (G.state === 'fight') {
     G.timer -= dt;
@@ -846,7 +878,10 @@ function draw(t) {
 function drawScene(t) {
   drawBg(t);
   if (!G.me) return;
-  drawSystem(G.foe, t); drawSystem(G.me, t);
+  for (const sys of [G.foe, G.me]) {
+    const oy = introOffset(sys);
+    if (oy) { ctx.save(); ctx.translate(0, oy); drawSystem(sys, t); ctx.restore(); } else drawSystem(sys, t);
+  }
   drawReticle(t);
   for (const b of G.beams) {
     ctx.globalAlpha = clamp(b.t * 6, 0, 1); ctx.strokeStyle = b.c; ctx.lineWidth = b.w;
@@ -880,6 +915,7 @@ function drawScene(t) {
     ctx.fillStyle = tx.c; ctx.fillText(tx.v, tx.x, tx.y);
   }
   ctx.globalAlpha = 1;
+  drawCountdown();
 }
 
 /* ---------- HUD ---------- */
