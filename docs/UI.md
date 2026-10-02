@@ -37,3 +37,16 @@
 | `con_<id>.webp` (13종: sgr cap aqr psc ari tau gem cnc leo vir lib sco oph) | 240×240 | `conSvg()`(카드·뽑기·편성)와 battle.js `drawCon()`(로비·전투 캔버스)의 기본 스킨 별자리 그림 (다른 스킨은 기존 선 그림, 적은 빨간 후광) |
 
 별자리 그림은 2026-10-01 SpriteCook 시트 1장(4×4)으로 만들어 잘랐어요. 잠긴 별자리는 `.cimg.dim` 으로 흑백 처리돼요.
+
+## 도트 그림으로 전면 교체 (2026-10-02, SpriteCook · Gemini 3.1 Flash · pixel)
+톤 기준: 벤치마킹/벤치_클라우디아 구매 확인 팝업의 도트 캐릭터 (SpriteCook에 스타일 참조로 올림). 위 표의 그림을 모두 같은 크기·이름의 도트 PNG로 바꿨고(`card_*`, `banner_*` 는 .webp → .png), 아래 그림을 새로 추가했어요. 모두 `image-rendering: pixelated` 로 확대해요.
+
+| 파일 | 쓰일 곳 |
+|---|---|
+| `rock_0~3.png` | 로비 낙하 운석(app.js `drawHome`), 보스 "고리 파편 낙하" 투사체 |
+| `meteor_fire.png` | 유성우 스킬·유성 소환 투사체 (battle.js, 진행 방향으로 회전) |
+| `chest_closed.png` | 로비 낙하 보물상자·대기 보물상자 (`drawChest`) |
+| `blackhole.png` | 블랙홀 행성 (`drawHole`) |
+| `sk_meteor/shield/nova.png` | 전투 스킬 버튼 아이콘 |
+
+스프라이트 로더는 pixel.js 끝의 `pxSprite()` / `pxDraw()` 예요. 달은 행성과 같은 pixel.js 렌더러로 그리고, 운석 꼬리·요격탄·폭발·구체 투사체는 사각 도트로 그려요.

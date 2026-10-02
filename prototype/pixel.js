@@ -141,3 +141,21 @@ function pxPlanetUrl(pid, tint = null) {
   const k = pid + '|' + (tint || ''), d = PLANET[pid];
   return PX_URL[k] || (PX_URL[k] = pxPlanet(d.kind, d.look || {}, 0, tint).toDataURL());
 }
+
+/* Pixel sprites drawn by SpriteCook (img/*.png): meteors, chest, black hole.
+   pxSprite() returns the image once it has loaded, else null so callers can fall back. */
+const PX_SPR = {};
+function pxSprite(name) {
+  let im = PX_SPR[name];
+  if (!im) { im = PX_SPR[name] = new Image(); im.src = `img/${name}.png`; }
+  return im.complete && im.naturalWidth ? im : null;
+}
+['rock_0', 'rock_1', 'rock_2', 'rock_3', 'meteor_fire', 'chest_closed', 'blackhole'].forEach(pxSprite);
+// draw a sprite centred on (x, y), scaled to width w, rotated by a, with crisp pixels
+function pxDraw(ctx, im, x, y, w, a = 0) {
+  const h = w * im.naturalHeight / im.naturalWidth, sm = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = false;
+  if (a) { ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.drawImage(im, -w / 2, -h / 2, w, h); ctx.restore(); }
+  else ctx.drawImage(im, x - w / 2, y - h / 2, w, h);
+  ctx.imageSmoothingEnabled = sm;
+}
