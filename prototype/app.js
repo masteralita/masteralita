@@ -44,10 +44,12 @@ function normalizeForm() {
 // ov (skin previews): pskin = planet skin, oskin = { orbit: skin }, onlyCon + conSkin = one constellation in a given skin
 function buildMySystem(ov = {}) {
   normalizeForm();
-  const pid = save.mainPlanet, ps = save.planets[pid];
+  const pid = ov.pid || save.mainPlanet, ps = save.planets[pid], n = PLANET[pid].orbits;
+  ps.skin = ps.skin || 'basic'; ps.orbitSkins = ps.orbitSkins || [];
   const oSk = [0, 1].map(k => (ov.oskin && ov.oskin[k]) || ps.orbitSkins[k] || 'dash');
   const P = makePlayerPlanet(pid, ps.lv, { skin: ov.pskin || ps.skin, orbitSkins: oSk });
-  const cons = [], ringOf = [], form = ov.onlyCon ? [[ov.onlyCon], []] : save.form;
+  const cons = [], ringOf = [], form = ov.onlyCon ? [[ov.onlyCon], []]
+    : pid !== save.mainPlanet && n === 1 ? [save.team.slice(0, ORBIT_CAP), []] : save.form; // previewing another planet: show the current team on its orbits
   form.forEach((a, k) => a.forEach(id => {
     const os = orbitStats(pid, k), ob = (OSKIN[oSk[k]] || OSKIN.dash).bonus;
     cons.push(makeMyCon(id, { atk: os.atk + (ob.atk || 0), rate: os.rate + (ob.rate || 0), hp: os.hp + (ob.hp || 0) }, ov.onlyCon ? ov.conSkin : null));
@@ -209,7 +211,7 @@ function setTab(t) {
   ({ store: renderStore, planets: renderPlanets, home: renderHome, stars: renderStars, team: renderTeam })[t]();
   if (t === 'home') requestAnimationFrame(layoutHome);
 }
-document.querySelector('.nav').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; if (b.dataset.tab === 'stars') starView = 'list'; setTab(b.dataset.tab); });
+document.querySelector('.nav').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (!b) return; if (b.dataset.tab === 'stars') starView = 'list'; if (b.dataset.tab === 'planets') planetView = 'list'; setTab(b.dataset.tab); });
 
 function renderTopBar() {
   $('tbLv').textContent = save.lv;
@@ -599,15 +601,31 @@ $('pane-store').addEventListener('click', e => {
   else if (k === 'piece') { gain('piece', +b.dataset.n); toast(`Star Piece ${fmt(+b.dataset.n)} 지급 (테스트)`); }
 });
 
-/* ---------- 행성 (Planets) ---------- */
-let planetSel = null;
+/* ---------- 행성 (Planets): list → detail ---------- */
+let planetSel = null, planetView = 'list';
+function renderPlanetList() {
+  const owned = PLANETS.filter(p => save.planets[p.id]).length;
+  $('pane-planets').innerHTML = `
+    <div class="sec-h"><h2>행성</h2><span>보유 ${owned} / ${PLANETS.length} · 눌러서 상세 보기</span></div>
+    <div class="planet-list">
+      ${PLANETS.map(p => { const o = save.planets[p.id]; return `
+        <button class="prow${o ? '' : ' locked'}" type="button" data-pid="${p.id}">
+          <span class="orb" style="${orbStyle(p.id, o && PSKIN[o.skin] && PSKIN[o.skin].tint)}${o ? '' : ';filter:grayscale(.85) brightness(.55)'}"></span>
+          <span class="pr-txt"><b>${p.name} ${o ? `<small>Lv ${o.lv}</small>` : ''}</b><span class="mini">${p.desc} · 궤도 ${p.orbits}개</span></span>
+          ${save.mainPlanet === p.id ? '<em class="tag">대표</em>' : o ? '<em class="own">보유</em>' : `<em class="piece">${fmt(p.unlock)}</em>`}
+        </button>`; }).join('')}
+    </div>`;
+}
 function renderPlanets() {
-  planetSel = planetSel || save.mainPlanet;
+  if (planetView === 'list' || !PLANET[planetSel]) { renderPlanetList(); return; }
   const d = PLANET[planetSel], own = save.planets[planetSel];
   const lv = own ? own.lv : 1;
+  if (own) { own.skin = own.skin || 'basic'; own.orbitSkins = own.orbitSkins || []; }
   $('pane-planets').innerHTML = `
+    <div class="detail-head"><button class="back" type="button" data-pact="list" aria-label="행성 목록으로">‹ 목록</button>
+      <b>${d.name}</b><span>${d.en.toUpperCase()}</span></div>
     <section class="planet-hero">
-      <span class="orb xl" style="${orbStyle(planetSel)}"></span>
+      <span class="orb xl" style="${orbStyle(planetSel, own && PSKIN[own.skin] && PSKIN[own.skin].tint)}"></span>
       <div class="ph-txt">
         <span class="eyebrow">${d.en.toUpperCase()}</span>
         <h2>${d.name} ${own ? `<small>Lv ${lv}</small>` : ''}</h2>
@@ -625,30 +643,30 @@ function renderPlanets() {
         <button class="cta sm" data-pact="up" type="button" ${lv >= PLANET_MAX_LV ? 'disabled' : ''}>${lv >= PLANET_MAX_LV ? 'MAX' : `강화 <b class="dust">${fmt(planetUpCost(lv))}</b>`}</button>`
       : `<button class="cta sm wide" data-pact="unlock" type="button">해금 <b class="piece">${fmt(d.unlock)}</b></button>`}
     </div>
+    <p class="fine">강화할 때마다 행성 HP +8% (최대 Lv ${PLANET_MAX_LV})</p>
+    <section class="psk">
+      <h3>스킨 <small>${own ? '눌러서 미리 보고 구매하거나 적용해요' : '행성을 해금하면 스킨을 적용할 수 있어요'}</small></h3>
+      <div class="skin-line"><span class="lbl">행성 스킨</span><b>${own ? (PSKIN[own.skin] || PSKIN.basic).name : '-'}</b><button class="ghost sm" data-pact="pskin" type="button" ${own ? '' : 'disabled'}>변경</button></div>
+      ${Array.from({ length: d.orbits }, (_, k) => `
+      <div class="skin-line"><span class="lbl">${d.orbits === 1 ? '궤도 스킨' : `궤도 ${k + 1} 스킨`}</span><b>${own ? (OSKIN[own.orbitSkins[k]] || OSKIN.dash).name : '-'}</b><button class="ghost sm" data-pact="oskin" data-k="${k}" type="button" ${own ? '' : 'disabled'}>변경</button></div>`).join('')}
+    </section>
     <section class="psk">
       <h3>게이지 스킬 <small>전투에서 기력을 써서 발동해요</small></h3>
       ${(d.skills || []).map(s => `
         <div class="psk-row"><img src="img/sk_${(GSKILL[s.type] || GSKILL.meteor).icon}.png" alt="" aria-hidden="true">
           <div><b>${s.name} <span class="cs">기력 ${s.cost}</span></b><p>${skillDesc(s)}</p></div></div>`).join('')}
-    </section>
-    <p class="fine">강화할 때마다 행성 HP +8% (최대 Lv ${PLANET_MAX_LV})</p>
-    <div class="planet-grid">
-      ${PLANETS.map(p => `
-        <button class="pcell" type="button" data-pid="${p.id}" aria-pressed="${p.id === planetSel}">
-          <span class="orb" style="${orbStyle(p.id)}${save.planets[p.id] ? '' : ';filter:grayscale(.85) brightness(.55)'}"></span>
-          <span class="pn">${p.name}</span>
-          <span class="pl">${save.planets[p.id] ? 'Lv ' + save.planets[p.id].lv : '미보유'}</span>
-          ${save.mainPlanet === p.id ? '<span class="tag">대표</span>' : ''}
-        </button>`).join('')}
-    </div>`;
+    </section>`;
 }
 $('pane-planets').addEventListener('click', e => {
-  const c = e.target.closest('[data-pid]'); if (c) { planetSel = c.dataset.pid; renderPlanets(); return; }
+  const c = e.target.closest('[data-pid]'); if (c) { planetSel = c.dataset.pid; planetView = 'detail'; renderPlanets(); $('pane-planets').closest('.panes').scrollTop = 0; return; }
   const a = e.target.closest('[data-pact]'); if (!a) return;
-  const d = PLANET[planetSel];
-  if (a.dataset.pact === 'unlock') { if (spend('piece', d.unlock)) { save.planets[planetSel] = { lv: 1 }; persist(); toast(`${d.name} 해금`); renderPlanets(); } }
-  else if (a.dataset.pact === 'up') { const o = save.planets[planetSel]; if (spend('dust', planetUpCost(o.lv))) { o.lv += 1; persist(); toast(`${d.name} Lv ${o.lv}`); renderPlanets(); } }
-  else if (a.dataset.pact === 'main') {
+  const d = PLANET[planetSel], act = a.dataset.pact;
+  if (act === 'list') { planetView = 'list'; renderPlanets(); return; }
+  if (act === 'pskin') { openSkinList('p', 0, planetSel); return; }
+  if (act === 'oskin') { openSkinList('o', +a.dataset.k, planetSel); return; }
+  if (act === 'unlock') { if (spend('piece', d.unlock)) { save.planets[planetSel] = { lv: 1, skin: 'basic', orbitSkins: [] }; persist(); toast(`${d.name} 해금`); renderPlanets(); } }
+  else if (act === 'up') { const o = save.planets[planetSel]; if (spend('dust', planetUpCost(o.lv))) { o.lv += 1; persist(); toast(`${d.name} Lv ${o.lv}`); renderPlanets(); } }
+  else if (act === 'main') {
     save.mainPlanet = planetSel;
     normalizeForm();
     persist(); toast(`대표 행성을 ${d.name}(으)로 바꿨어요`); renderPlanets(); enterHome(); setTab('planets');
@@ -814,11 +832,12 @@ function skinBonusText(kind, b) {
 }
 // 행성 / 궤도 스킨 목록: owned first, then not owned; the preview follows the selection.
 // kind 'p' = planet skin, 'o' = orbit skin for orbit k
-function openSkinList(kind, k) {
-  const pid = save.mainPlanet, ps = save.planets[pid], isP = kind === 'p';
+function openSkinList(kind, k, pid = save.mainPlanet) {
+  const ps = save.planets[pid], isP = kind === 'p';
+  ps.skin = ps.skin || 'basic'; ps.orbitSkins = ps.orbitSkins || [];
   const LIST = isP ? PLANET_SKINS : ORBIT_SKINS, MAP = isP ? PSKIN : OSKIN, ownKey = isP ? 'pSkins' : 'oSkins';
   const cur = isP ? (PSKIN[ps.skin] ? ps.skin : 'basic') : (OSKIN[ps.orbitSkins[k]] ? ps.orbitSkins[k] : 'dash');
-  const ov = id => isP ? { pskin: id } : { oskin: { [k]: id } };
+  const ov = id => isP ? { pid, pskin: id } : { pid, oskin: { [k]: id } };
   const owned = LIST.filter(s => save[ownKey].includes(s.id)), locked = LIST.filter(s => !save[ownKey].includes(s.id));
   let sel = cur;
   const item = s => `<button class="skin-item" type="button" role="radio" data-os="${s.id}" aria-checked="${s.id === sel}">
@@ -849,7 +868,8 @@ function openSkinList(kind, k) {
       if (isP) ps.skin = sel; else ps.orbitSkins[k] = sel;
       persist(); closeModal();
       toast(`${MAP[sel].name} 스킨을 ${act === 'buy' ? '구매하고 ' : ''}장착했어요`);
-      renderTeam(); enterHomeSystemOnly();
+      if (tab === 'planets') renderPlanets(); else renderTeam();
+      if (pid === save.mainPlanet) enterHomeSystemOnly();
     }
   });
   $('modalBody').querySelector('.skin-list').addEventListener('click', e => {
@@ -937,7 +957,7 @@ function renderTeam() {
 }
 $('pane-team').addEventListener('click', e => {
   const pid = save.mainPlanet, ps = save.planets[pid];
-  if (e.target.closest('[data-tact="planet"]')) { planetSel = pid; setTab('planets'); return; }
+  if (e.target.closest('[data-tact="planet"]')) { planetView = 'list'; setTab('planets'); return; }
   const osb = e.target.closest('[data-oskin]'); if (osb) { openSkinList('o', +osb.dataset.oskin); return; }
   if (e.target.closest('[data-pskin]')) { openSkinList('p'); return; }
   const sl = e.target.closest('[data-slot]'); if (!sl) return;

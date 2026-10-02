@@ -306,6 +306,16 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .psk-row .cs{font-family:var(--f-disp);font-size:11px;color:var(--gold);margin-left:4px;font-weight:400}
 .psk-row p{margin:2px 0 0;font-size:12px;line-height:1.45;opacity:.85}
 .planet-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.planet-list{display:grid;gap:8px}
+.prow{display:grid;grid-template-columns:48px 1fr auto;gap:12px;align-items:center;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:rgba(15,22,52,.7);text-align:left}
+.prow .orb{width:44px;height:44px}
+.prow .pr-txt{display:grid;gap:2px;min-width:0}
+.prow b{font-size:14px}
+.prow b small{font-family:var(--f-disp);font-size:11px;color:var(--dim);font-weight:400;margin-left:4px}
+.prow em{font-style:normal;font-size:11px;font-family:var(--f-disp);padding:2px 8px;border-radius:999px;background:rgba(0,0,0,.4)}
+.prow em.tag{background:var(--gold);color:#1d1403;font-family:var(--f-body);font-weight:700}
+.prow em.own{color:var(--ok)}
+.prow.locked b{color:var(--dim)}
 .pcell{position:relative;display:grid;justify-items:center;gap:4px;padding:12px 4px 10px;border-radius:12px;border:1px solid var(--line);background:rgba(15,22,52,.7)}
 .pcell[aria-pressed="true"]{border-color:var(--gold)}
 .pcell .orb{width:36px;height:36px}

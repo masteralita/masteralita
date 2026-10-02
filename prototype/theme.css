@@ -22,13 +22,13 @@
 .shell.see-through{background:transparent}
 
 /* ---------- Frames: bevelled silver panel (padding-box inner + border-box metal) ---------- */
-.hcard,.pcell,.team-planet,.orbit-card,.slot-panel,.star-stage,.lv-row,.mail-row,.notice-row,.set-group,.planet-hero,
+.hcard,.pcell,.prow,.team-planet,.orbit-card,.slot-panel,.star-stage,.lv-row,.mail-row,.notice-row,.set-group,.planet-hero,
 .skin-item,.con-pick,.oslot,.tslot,.lv-me,.doc-body,.sk-preview,.ccell.locked,.skin-card{
   border:2px solid transparent!important;
   background:var(--inner) padding-box,var(--metal) border-box!important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 3px 8px rgba(0,0,0,.45);
 }
-.ccell.locked,.skin-card:not([aria-pressed="true"]),.oslot.empty{background:var(--inner) padding-box,var(--metal-dim) border-box!important}
+.ccell.locked,.prow.locked,.skin-card:not([aria-pressed="true"]),.oslot.empty{background:var(--inner) padding-box,var(--metal-dim) border-box!important}
 /* owned constellations keep their grade colour in the frame */
 .ccell:not(.locked){border:2px solid transparent!important;
   background:radial-gradient(90% 70% at 50% 35%,color-mix(in srgb,var(--g) 18%,transparent),transparent 70%) padding-box,var(--inner) padding-box,
