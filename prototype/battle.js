@@ -581,7 +581,7 @@ function bossAct(dt) {
       const P = G.me.planet;
       if (B.ability === 'burn') { P.dot = { dps: P.maxHp * .012, t: 5 }; banner('태양 플레어', '행성이 불타요', .9); }
       else if (B.ability === 'meteor') {
-        for (let i = 0; i < 4; i++) G.proj.push({ x: G.me.cx + rnd(-80, 80), y: -30 - i * 50, t: P, src: G.foe.cons.find(c => !c.dead) || null, sp: 520, dmg: P.maxHp * .04, kind: 'phys', col: '#e0b6ff', w: 4, len: 22 });
+        for (let i = 0; i < 4; i++) G.proj.push({ x: G.me.cx + rnd(-80, 80), y: -30 - i * 50, t: P, src: G.foe.cons.find(c => !c.dead) || null, sp: 520, dmg: P.maxHp * .04, kind: 'phys', col: '#e0b6ff', w: 4, len: 22, debris: Math.floor(Math.random() * 4) });
         banner('고리 파편 낙하', '', .9);
       } else if (B.ability === 'drain') { if (G.energy > 0) { G.energy -= 1; say(G.me.cx, G.me.cy - G.me.pr - 12, '기력 -1', '#c35bff', 1); } }
     }
@@ -693,7 +693,11 @@ function drawHole(x, y, r, t, P) {
   const hg = ctx.createRadialGradient(x, y, r * .8, x, y, r * 3);
   hg.addColorStop(0, 'rgba(255,170,90,.35)'); hg.addColorStop(1, 'rgba(255,170,90,0)');
   ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(x, y, r * 3, 0, TAU); ctx.fill();
-  for (const back of [true, false]) {
+  const im = pxSprite('blackhole');
+  if (im) { // pixel black hole (img/blackhole.png): its dark sphere is ~20 of 98 px wide-radius, centred at (49, 26)
+    const k = r / 20, w = im.naturalWidth * k, h = im.naturalHeight * k, sm = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(im, x - 49 * k, y - 26 * k, w, h); ctx.imageSmoothingEnabled = sm;
+  } else for (const back of [true, false]) {
     if (!back) { ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); ctx.strokeStyle = 'rgba(255,220,170,.9)'; ctx.lineWidth = 2; ctx.stroke(); }
     for (let i = 0; i < 3; i++) {
       ctx.strokeStyle = `rgba(255,${170 + i * 25},${90 + i * 40},${.7 - i * .18})`; ctx.lineWidth = r * (.22 - i * .05);
@@ -707,9 +711,8 @@ function drawMoonSat(sys, t, front) {
   if (sys.planet.kind !== 'earth') return;
   const a = t * .9, sx = sys.cx + Math.cos(a) * sys.pr * 1.75, sy = sys.cy + Math.sin(a) * sys.pr * .55;
   if ((Math.sin(a) > 0) !== front) return;
-  const r = sys.pr * .22, g = ctx.createRadialGradient(sx - r * .3, sy - r * .3, 0, sx, sy, r);
-  g.addColorStop(0, '#f4f4f8'); g.addColorStop(1, '#5a5d70');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, r, 0, TAU); ctx.fill();
+  const r = sys.pr * .22, cv = pxPlanet('moon', {}, Math.floor(t * 2));   // pixel moon, same renderer as the planets
+  ctx.save(); ctx.imageSmoothingEnabled = false; ctx.drawImage(cv, sx - r, sy - r, r * 2, r * 2); ctx.restore();
 }
 
 // Painted art for default-skin constellations (img/con_*.webp); other skins keep the line drawing
@@ -854,7 +857,16 @@ function drawScene(t) {
   ctx.globalAlpha = 1;
   for (const p of G.proj) {
     ctx.strokeStyle = p.col; ctx.fillStyle = p.col; ctx.lineWidth = p.w; ctx.lineCap = 'round';
-    if (p.orb) { ctx.beginPath(); ctx.arc(p.x, p.y, p.w, 0, TAU); ctx.fill(); ctx.globalAlpha = .3; ctx.beginPath(); ctx.arc(p.x, p.y, p.w * 2.2, 0, TAU); ctx.fill(); ctx.globalAlpha = 1; }
+    if (p.orb) { // pixel orb: a plus-shaped glow around a square core
+      const u = Math.max(2, Math.round(p.w * .8)), x = Math.round(p.x), y = Math.round(p.y);
+      ctx.globalAlpha = .3; ctx.fillRect(x - u * 2, y - u, u * 4, u * 2); ctx.fillRect(x - u, y - u * 2, u * 2, u * 4);
+      ctx.globalAlpha = 1; ctx.fillRect(x - u, y - u, u * 2, u * 2); ctx.fillStyle = '#fff'; ctx.fillRect(x - u / 2, y - u / 2, u, u);
+    }
+    else if (p.meteor && pxSprite('meteor_fire')) { // pixel fireball: rock head on the projectile, tail trailing behind
+      const im = pxSprite('meteor_fire'), w = p.len * .8, h = w * im.naturalHeight / im.naturalWidth, vx = p.vx || 0, vy = p.vy || 1, back = h / 2 - w * .45;
+      pxDraw(ctx, im, p.x - vx * back, p.y - vy * back, w, Math.atan2(vy, vx) - Math.PI / 2);
+    }
+    else if (p.debris !== undefined && pxSprite('rock_' + p.debris)) pxDraw(ctx, pxSprite('rock_' + p.debris), p.x, p.y, p.len, p.y * .03);
     else { const vx = p.vx || 0, vy = p.vy || 1; ctx.beginPath(); ctx.moveTo(p.x - vx * p.len, p.y - vy * p.len); ctx.lineTo(p.x, p.y); ctx.stroke(); }
   }
   for (const f of G.fx) { ctx.globalAlpha = clamp(f.t * 1.6, 0, 1); ctx.fillStyle = f.c; ctx.fillRect(f.x - 1.2, f.y - 1.2, 2.4, 2.4); }

@@ -293,7 +293,7 @@ function updateHome(dt) {
     HOME.spawn = rnd(.6, 1.1);
     const x = rnd(W * .05, W * .95), tx = s.cx + rnd(-s.R, s.R), vy = rnd(38, 62);
     const pts = Array.from({ length: 8 }, (_, i) => [Math.cos(i / 8 * TAU) * rnd(.72, 1), Math.sin(i / 8 * TAU) * rnd(.72, 1)]);
-    HOME.rocks.push({ x, y: -24, vx: (tx - x) / ((s.cy + 24) / vy), vy, r: rnd(8, 15), rot: 0, vr: rnd(-1.2, 1.2), pts, hp: 1, locked: 0 });
+    HOME.rocks.push({ x, y: -24, vx: (tx - x) / ((s.cy + 24) / vy), vy, r: rnd(8, 15), rot: rnd(0, TAU), vr: rnd(-1.2, 1.2), pts, v: Math.floor(Math.random() * 4), hp: 1, locked: 0 });
   }
   // 낙하 보물상자: at most one falling or waiting at a time
   HOME.chestCd -= dt;
@@ -350,6 +350,12 @@ function chestBroken(r) {
   burst(r.x, r.y, 26, '#ffd76a'); HOME.booms.push({ x: r.x, y: r.y, r: 18, t: .45, col: '#ffd76a' });
 }
 function drawChest(x, y, w, open, flash) {
+  const im = pxSprite('chest_closed');
+  if (im) { // pixel chest (img/chest_closed.png); a hit flashes it white
+    pxDraw(ctx, im, x, y, w * 1.15);
+    if (flash > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .7; pxDraw(ctx, im, x, y, w * 1.15); ctx.restore(); }
+    return;
+  }
   const h = w * .72;
   ctx.fillStyle = flash > 0 ? '#fff' : '#e39a1f';
   const g = ctx.createLinearGradient(x, y - h / 2, x, y + h / 2);
@@ -359,18 +365,24 @@ function drawChest(x, y, w, open, flash) {
   ctx.fillStyle = '#6b3c05'; ctx.fillRect(x - w / 2, y - h / 2 + h * .32, w, h * .09);
   ctx.fillStyle = '#fff1c2'; ctx.fillRect(x - w * .08, y - h / 2 + h * .22, w * .16, h * .3);
 }
+// blocky fire trail behind a falling rock: squares shrink and cool from white-hot to ember
+const TRAIL_COL = ['#fff1a8', '#ffd24a', '#ff9a2a', '#ff6a2a', '#d8452a', '#8a2c3a'];
+function pixelTrail(x, y, ux, uy, r) {
+  const u = Math.max(2, Math.round(r / 5));
+  TRAIL_COL.forEach((c, i) => {
+    const d = r * .7 + i * r * .62, sz = u * Math.max(1, Math.round((6 - i) * .55 + 1));
+    ctx.globalAlpha = 1 - i * .13; ctx.fillStyle = c;
+    ctx.fillRect(Math.round((x - ux * d - sz / 2) / u) * u, Math.round((y - uy * d - sz / 2) / u) * u, sz, sz);
+  });
+  ctx.globalAlpha = 1;
+}
 function drawHome(t) {
   drawBg(t);
   const s = HOME.sys; if (!s) return;
   for (const r of HOME.rocks) {
     // fiery entry trail, then the rock itself
-    const sp = Math.hypot(r.vx, r.vy), ux = r.vx / sp, uy = r.vy / sp, len = r.r * 4.5;
-    if (save.settings.glow) {
-      const g = ctx.createLinearGradient(r.x, r.y, r.x - ux * len, r.y - uy * len);
-      g.addColorStop(0, 'rgba(255,170,90,.55)'); g.addColorStop(1, 'rgba(255,120,60,0)');
-      ctx.strokeStyle = g; ctx.lineWidth = r.r * 1.3; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(r.x, r.y); ctx.lineTo(r.x - ux * len, r.y - uy * len); ctx.stroke();
-    }
+    const sp = Math.hypot(r.vx, r.vy), ux = r.vx / sp, uy = r.vy / sp;
+    if (save.settings.glow) pixelTrail(r.x, r.y, ux, uy, r.r);
     if (r.kind === 'chest') {
       ctx.save(); ctx.globalAlpha = .35 + .15 * Math.sin(t * 6); ctx.fillStyle = '#ffd76a';
       ctx.beginPath(); ctx.arc(r.x, r.y, r.r * 1.9, 0, TAU); ctx.fill(); ctx.restore();
@@ -378,25 +390,32 @@ function drawHome(t) {
       for (let i = 0; i < AD_CHEST.hp; i++) { ctx.fillStyle = i < r.hp ? '#ffd76a' : 'rgba(255,255,255,.2)'; ctx.fillRect(r.x - 12 + i * 9, r.y + r.r + 6, 7, 3); }
       continue;
     }
+    const rim = pxSprite('rock_' + (r.v || 0));
+    if (rim) pxDraw(ctx, rim, r.x, r.y, r.r * 2.3, r.rot);
+    else {
     ctx.save(); ctx.translate(r.x, r.y); ctx.rotate(r.rot);
     const rg = ctx.createRadialGradient(-r.r * .3, -r.r * .3, 0, 0, 0, r.r);
     rg.addColorStop(0, '#b3a7bf'); rg.addColorStop(1, '#4e4658');
     ctx.fillStyle = rg; ctx.strokeStyle = 'rgba(255,190,130,.6)'; ctx.lineWidth = 1.2;
     ctx.beginPath(); r.pts.forEach(([px, py], i) => i ? ctx.lineTo(px * r.r, py * r.r) : ctx.moveTo(px * r.r, py * r.r)); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
+    }
     if (r.locked) { ctx.strokeStyle = 'rgba(245,196,81,.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(r.x, r.y, r.r + 5, 0, TAU); ctx.stroke(); }
   }
   drawSystem(s, t);
   for (const p of HOME.shots) {
-    ctx.strokeStyle = p.col; ctx.lineCap = 'round';
-    p.trail.forEach(([x, y], i) => { if (!i) return; const [x0, y0] = p.trail[i - 1]; ctx.globalAlpha = i / p.trail.length; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x, y); ctx.stroke(); });
-    ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, TAU); ctx.fill();
+    ctx.fillStyle = p.col; // dotted pixel trail, white-hot square head
+    p.trail.forEach(([x, y], i) => { ctx.globalAlpha = (i + 1) / p.trail.length; ctx.fillRect(Math.round(x) - 1.5, Math.round(y) - 1.5, 3, 3); });
+    ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; ctx.fillRect(Math.round(p.x) - 2, Math.round(p.y) - 2, 4, 4);
   }
   for (const b of HOME.booms) {
     const k = 1 - b.t / .45;
-    ctx.globalAlpha = 1 - k; ctx.strokeStyle = b.col; ctx.lineWidth = 2.5 * (1 - k) + .5;
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r + k * 26, 0, TAU); ctx.stroke();
-    ctx.fillStyle = `rgba(255,230,180,${.6 * (1 - k)})`; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (1 - k) + 2, 0, TAU); ctx.fill();
+    // pixel blast: a ring of square sparks flying out around a shrinking hot core
+    const rr = b.r + k * 26, u = Math.max(2, Math.round(4 * (1 - k)));
+    ctx.globalAlpha = 1 - k; ctx.fillStyle = b.col;
+    for (let i = 0; i < 12; i++) { const a = i * TAU / 12; ctx.fillRect(Math.round(b.x + Math.cos(a) * rr - u / 2), Math.round(b.y + Math.sin(a) * rr - u / 2), u, u); }
+    const c = Math.round((b.r * (1 - k) + 2) * .6);
+    ctx.fillStyle = `rgba(255,230,180,${.6 * (1 - k)})`; ctx.fillRect(Math.round(b.x - c), Math.round(b.y - c), c * 2, c * 2);
   }
   for (const f of G.fx) { ctx.globalAlpha = clamp(f.t * 1.6, 0, 1); ctx.fillStyle = f.c; ctx.fillRect(f.x - 1.4, f.y - 1.4, 2.8, 2.8); }
   ctx.globalAlpha = 1;
