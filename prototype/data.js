@@ -432,9 +432,13 @@ const ESKILL = {
   mr_regen:     { grade:'MR',  ...gsk('regen', '영원의 샘', 5, 0.056, 7.0) },
 };
 const STARTER_SKILLS = ['r_shield', 'r_haste']; // every player owns these two from the start
-// 스킬 뽑기 (상점): weights per grade, and Star Dust paid back for a skill already owned
-const SKILL_GACHA = { name:'스킬 뽑기', cur:'piece', cost:250, cost10:2250,
-  w:{ R:55, SR:28, SSR:12, LR:4, MR:1 }, dupe:{ R:200, SR:600, SSR:2000, LR:4000, MR:8000 } };
+// 스킬 뽑기 (상점): free = Star Dust (R~SSR), paid = Star Piece (R~MR); weights per grade, and Star Dust paid back for a skill already owned
+const SKILL_GACHA = {
+  free: { name:'무료 스킬 뽑기', cur:'dust',  cost:5000, cost10:45000, w:{ R:75, SR:22, SSR:3, LR:0, MR:0 } },
+  paid: { name:'유료 스킬 뽑기', cur:'piece', cost:250,  cost10:2250,  w:{ R:55, SR:28, SSR:12, LR:4, MR:1 } },
+  dupe: { R:200, SR:600, SSR:2000, LR:4000, MR:8000 },
+};
+const SKILL_DRAWS = ['free', 'paid'];
 const skillDesc = s => (GSKILL[s.type] || GSKILL.meteor).desc(s);
 /* ---------- Orbits (궤도): belong to the planet, carry their own base stats and skin ---------- */
 // A planet with a single orbit gets a stronger orbit to make up for fewer constellations.

@@ -167,7 +167,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .gear{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:rgba(15,22,52,.9);font-size:17px;display:grid;place-items:center;color:var(--dim)}
 .panes{overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0}
 .pane{display:grid;gap:16px;align-content:start;padding-inline:16px;padding-block:16px 24px}
-.nav{display:grid;grid-template-columns:repeat(5,1fr);padding-inline:8px;padding-top:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom,0px));background:rgba(8,12,30,.97);border-top:1px solid var(--line)}
+.nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));padding-inline:8px;padding-top:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom,0px));background:rgba(8,12,30,.97);border-top:1px solid var(--line)}
 .nav button{display:grid;justify-items:center;gap:3px;padding-block:6px;border:0;background:none;color:var(--dim);font-family:var(--f-disp);font-size:10px;letter-spacing:.08em;border-radius:10px}
 .nav button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .nav button[aria-current="page"]{color:var(--gold);background:rgba(245,196,81,.08)}
@@ -305,6 +305,19 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .esk-cats{display:flex;gap:6px;flex-wrap:wrap}
 .esk-cats button{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(8,12,30,.7);color:var(--dim)}
 .esk-cats button[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+.skf{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.skf button{flex:none;font-size:12px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:rgba(8,12,30,.7);color:var(--dim)}
+.skf button[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+.sk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.skc{position:relative;display:grid;justify-items:center;gap:4px;padding:10px 4px 9px;border-radius:12px;border:1px solid color-mix(in srgb,var(--g) 60%,#26305f);background:radial-gradient(90% 70% at 50% 15%,color-mix(in srgb,var(--g) 18%,transparent),rgba(8,12,30,.88));min-width:0}
+.skc img{width:40px;height:40px;image-rendering:pixelated}
+.skc b{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.skc.locked{border-style:dashed;border-color:var(--line);background:rgba(8,12,30,.6)}
+.skc.locked img{filter:grayscale(1) brightness(.45)}
+.skc.locked b{color:var(--dim)}
+.skc .tm{position:absolute;top:5px;right:5px;font-style:normal;font-size:9.5px;padding:0 5px;border-radius:6px;background:var(--gold);color:#1d1403;font-weight:700}
+.sk-detail{display:grid;justify-items:center;gap:6px;text-align:center}
+.sk-detail img{width:56px;height:56px;image-rendering:pixelated}
 .psk-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .esk-list{max-height:52vh}
 .esk-item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(8,12,30,.7)}
@@ -658,14 +671,16 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
       <div class="pane" id="pane-planets" hidden></div>
       <div class="pane" id="pane-stars" hidden></div>
       <div class="pane" id="pane-team" hidden></div>
+      <div class="pane" id="pane-skills" hidden></div>
     </div>
 
     <nav class="nav" aria-label="메인 메뉴">
-      <button type="button" data-tab="store"><img src="img/nav_store.png" alt="" aria-hidden="true">상점</button>
-      <button type="button" data-tab="planets"><img src="img/nav_planets.png" alt="" aria-hidden="true">행성</button>
       <button type="button" data-tab="home" class="home"><img src="img/nav_home.png" alt="" aria-hidden="true">로비</button>
-      <button type="button" data-tab="stars"><img src="img/nav_const.png" alt="" aria-hidden="true">별자리</button>
       <button type="button" data-tab="team"><img src="img/nav_team.png" alt="" aria-hidden="true">팀</button>
+      <button type="button" data-tab="planets"><img src="img/nav_planets.png" alt="" aria-hidden="true">행성</button>
+      <button type="button" data-tab="stars"><img src="img/nav_const.png" alt="" aria-hidden="true">별자리</button>
+      <button type="button" data-tab="skills"><img src="img/sk_nova.png" alt="" aria-hidden="true">스킬</button>
+      <button type="button" data-tab="store"><img src="img/nav_store.png" alt="" aria-hidden="true">상점</button>
     </nav>
   </section>
 
