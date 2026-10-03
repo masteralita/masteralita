@@ -301,6 +301,17 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .psk h3{margin:0;font-size:14px}
 .psk h3 small{font-weight:400;color:var(--dim);font-size:11px;margin-left:6px}
 .psk-row{display:grid;grid-template-columns:32px 1fr auto;gap:10px;align-items:center}
+.psk-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.esk-list{max-height:52vh}
+.esk-item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(8,12,30,.7)}
+.esk-item.on{grid-template-columns:auto 1fr auto;border-color:rgba(245,196,81,.45)}
+.esk-item.on.empty{grid-template-columns:auto 1fr;border-style:dashed;opacity:.75}
+.esk-item.pick{border-color:var(--gold)}
+.esk-item b{display:block;font-size:14px}
+.esk-item .cs{font-family:var(--f-disp);font-size:11px;color:var(--gold);margin-left:4px;font-weight:400}
+.esk-item .mini{display:block;line-height:1.45;margin-top:2px}
+.esk-item .gchip.sg{font-family:var(--f-disp);padding:0 6px;margin-right:2px}
+.esk-k{font-size:11px;color:var(--gold);writing-mode:horizontal-tb;white-space:nowrap}
 .psk-row .lbl{font-size:11px;font-weight:400;color:var(--dim);margin-right:2px}
 .psk-row .gchip.sg,.skin-item .gchip.sg{font-family:var(--f-disp);padding:0 6px;margin-right:2px}
 .psk-row.empty p{opacity:.6}

@@ -696,9 +696,9 @@ function renderPlanets() {
       <div class="skin-line"><span class="lbl">${d.orbits === 1 ? '궤도 스킨' : `궤도 ${k + 1} 스킨`}</span><b>${own ? (OSKIN[own.orbitSkins[k]] || OSKIN.dash).name : '-'}</b><button class="ghost sm" data-pact="oskin" data-k="${k}" type="button" ${own ? '' : 'disabled'}>변경</button></div>`).join('')}
     </section>
     <section class="psk">
-      <h3>게이지 스킬 <small>전투에서 기력을 써서 발동해요</small></h3>
-      ${planetSkills(planetSel).map((s, k) => skillRow(s, k ? `장착 ${k}` : '고유', k
-        ? `<button class="ghost sm" data-pact="eskill" data-k="${k - 1}" type="button" ${own ? '' : 'disabled'}>${s ? '변경' : '장착'}</button>` : '')).join('')}
+      <div class="psk-h"><h3>게이지 스킬 <small>전투에서 기력을 써서 발동해요</small></h3>
+        <button class="ghost sm" data-pact="eskill" type="button" ${own ? '' : 'disabled'}>변경</button></div>
+      ${planetSkills(planetSel).map((s, k) => skillRow(s, k ? `장착 ${k}` : '고유')).join('')}
       <p class="fine">고유 스킬은 행성마다 정해져 있고 스킨을 바꿔도 그대로예요. 장착 스킬은 상점 스킬 뽑기로 얻고, 어느 행성에나 장착할 수 있어요.</p>
     </section>`;
 }
@@ -709,36 +709,46 @@ function skillRow(s, label, btn = '') {
   return `<div class="psk-row"><img src="img/sk_${(GSKILL[s.type] || GSKILL.meteor).icon}.png" alt="" aria-hidden="true">
     <div><b><span class="lbl">${label}</span> ${skillChip(s.grade)} ${s.name} <span class="cs">기력 ${s.cost}</span></b><p>${skillDesc(s)}</p></div>${btn}</div>`;
 }
-// 장착 스킬 고르기: any owned skill fits any planet; picking the one in the other slot swaps them
+// 장착 스킬 변경: every owned equip skill, the two equipped on top and the rest below.
+// 장착 fills an empty slot; with both slots full it asks which one to replace. Changes save at once.
 const GRADE_ORDER = ['MR', 'UR', 'SSR', 'SR', 'R'];
-function openSkillEquip(pid, k) {
-  const cur = equipOf(pid), owned = save.skills.filter(id => ESKILL[id])
-    .sort((a, b) => GRADE_ORDER.indexOf(ESKILL[a].grade) - GRADE_ORDER.indexOf(ESKILL[b].grade));
-  let sel = cur[k];
-  const item = id => { const d = ESKILL[id]; return `<button class="skin-item" type="button" role="radio" data-esk="${id}" aria-checked="${id === sel}">
-      <b>${skillChip(d.grade)} ${d.name} <span class="cs">기력 ${d.cost}</span></b><span class="mini">${skillDesc(d)}</span>
-      ${id === cur[k] ? '<em class="eq">장착</em>' : id === cur[1 - k] ? `<em class="own">장착 ${2 - k}</em>` : ''}
-    </button>`; };
-  const btns = () => `<div class="mbtns"><button class="ghost" data-act="${cur[k] ? 'clear' : 'close'}" type="button">${cur[k] ? '비우기' : '취소'}</button>
-    <button class="cta sm" data-act="equip" type="button" ${!sel || sel === cur[k] ? 'disabled' : ''}>${sel && sel === cur[1 - k] ? '자리 바꾸기' : '장착'}</button></div>`;
-  openModal(`<h3>${PLANET[pid].name} · 장착 ${k + 1}</h3>
-    <div class="skin-list" role="radiogroup" aria-label="장착할 스킬">${owned.map(item).join('')}</div>
-    <div id="eskBtns">${btns()}</div>`,
-  act => {
+function openSkillEquip(pid) {
+  let pick = null; // unequipped skill waiting for a slot to replace
+  const body = () => {
+    const cur = equipOf(pid), owned = save.skills.filter(id => ESKILL[id] && !cur.includes(id))
+      .sort((a, b) => GRADE_ORDER.indexOf(ESKILL[a].grade) - GRADE_ORDER.indexOf(ESKILL[b].grade));
+    const info = d => `<div><b>${skillChip(d.grade)} ${d.name} <span class="cs">기력 ${d.cost}</span></b><span class="mini">${skillDesc(d)}</span></div>`;
+    const slot = (id, k) => id
+      ? `<div class="esk-item on"><span class="esk-k">장착 ${k + 1}</span>${info(ESKILL[id])}
+          <button class="${pick ? 'cta' : 'ghost'} sm" data-act="${pick ? 'swap' : 'off'}" data-k="${k}" type="button">${pick ? '교체' : '해제'}</button></div>`
+      : `<div class="esk-item on empty"><span class="esk-k">장착 ${k + 1}</span><div><b>비어 있음</b><span class="mini">아래 목록에서 장착할 스킬을 골라요.</span></div></div>`;
+    return `<h3>${PLANET[pid].name} · 장착 스킬</h3>
+      <div class="skin-list esk-list">
+        <span class="set-h">장착 중</span>${cur.map(slot).join('')}
+        <span class="set-h">미장착 ${owned.length}</span>
+        ${owned.map(id => `<div class="esk-item${pick === id ? ' pick' : ''}">${info(ESKILL[id])}
+          <button class="${pick === id ? 'ghost' : 'cta'} sm" data-act="${pick === id ? 'unpick' : 'on'}" data-id="${id}" type="button">${pick === id ? '취소' : '장착'}</button></div>`).join('')
+          || '<p class="mtxt">미장착 스킬이 없어요. 상점 스킬 뽑기로 더 얻을 수 있어요.</p>'}
+      </div>
+      ${pick ? `<p class="mtxt">${ESKILL[pick].name}(으)로 바꿀 장착 스킬의 <b>교체</b>를 눌러요.</p>` : ''}
+      <div class="mbtns"><button class="cta sm" data-act="close" type="button">완료</button></div>`;
+  };
+  const set = e => { save.equip[pid] = e; persist(); renderPlanets(); };
+  const redraw = () => openModal(body(), onAct);
+  function onAct(act, b) {
+    const cur = equipOf(pid);
     if (act === 'close') { closeModal(); return; }
-    const e = [...cur];
-    if (act === 'clear') e[k] = null;
-    else { if (e[1 - k] === sel) e[1 - k] = e[k]; e[k] = sel; }
-    save.equip[pid] = e; persist(); closeModal();
-    toast(act === 'clear' ? '장착 칸을 비웠어요' : `${ESKILL[sel].name} 장착`);
-    renderPlanets();
-  });
-  $('modalBody').querySelector('.skin-list').addEventListener('click', e => {
-    const b = e.target.closest('[data-esk]'); if (!b) return;
-    sel = b.dataset.esk;
-    $('modalBody').querySelectorAll('[data-esk]').forEach(x => x.setAttribute('aria-checked', x === b));
-    $('eskBtns').innerHTML = btns();
-  });
+    if (act === 'off') { const e = [...cur]; e[+b.dataset.k] = null; set(e); }
+    else if (act === 'on') {
+      const k = cur.indexOf(null);
+      if (k < 0) pick = b.dataset.id;
+      else { const e = [...cur]; e[k] = b.dataset.id; set(e); }
+    }
+    else if (act === 'swap') { const e = [...cur]; e[+b.dataset.k] = pick; pick = null; set(e); }
+    else if (act === 'unpick') pick = null;
+    redraw();
+  }
+  redraw();
 }
 $('pane-planets').addEventListener('click', e => {
   const c = e.target.closest('[data-pid]'); if (c) { planetSel = c.dataset.pid; planetView = 'detail'; renderPlanets(); $('pane-planets').closest('.panes').scrollTop = 0; return; }
@@ -747,7 +757,7 @@ $('pane-planets').addEventListener('click', e => {
   if (act === 'list') { planetView = 'list'; renderPlanets(); return; }
   if (act === 'pskin') { openSkinList('p', 0, planetSel); return; }
   if (act === 'oskin') { openSkinList('o', +a.dataset.k, planetSel); return; }
-  if (act === 'eskill') { openSkillEquip(planetSel, +a.dataset.k); return; }
+  if (act === 'eskill') { openSkillEquip(planetSel); return; }
   if (act === 'unlock') { if (spend('piece', d.unlock)) { save.planets[planetSel] = { lv: 1, skin: 'basic', orbitSkins: [] }; persist(); toast(`${d.name} 해금`); renderPlanets(); } }
   else if (act === 'up') { const o = save.planets[planetSel]; if (spend('dust', planetUpCost(o.lv))) { o.lv += 1; persist(); toast(`${d.name} Lv ${o.lv}`); renderPlanets(); } }
   else if (act === 'main') {
