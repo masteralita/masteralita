@@ -14,6 +14,7 @@ function freshSave() {
     cons: { sgr: newCon(0), leo: newCon(0), vir: newCon(0) },
     team: ['sgr', 'leo', 'vir'], form: [['sgr', 'leo'], ['vir']],
     pSkins: ['basic'], oSkins: ['dash'],
+    skills: [...STARTER_SKILLS], equip: {}, // 장착 스킬: owned ids, and the two slots per planet (unset → the starter pair)
     settings: { glow: true, fps: 60, sfx: true, bgm: true, push: true },
   };
 }
@@ -23,6 +24,9 @@ const equippedSkin = id => { const s = save.cons[id] && save.cons[id].skin; retu
 // The classic skin comes with the constellation; other skins can be owned before it (chest, mail, purchase)
 const ownsSkin = (id, sid) => (sid === id ? !!save.cons[id] : (save.skins || []).includes(sid) || !!(save.cons[id] && (save.cons[id].skins || []).includes(sid)));
 const addSkin = sid => { save.skins = [...new Set([...(save.skins || []), sid])]; };
+// 게이지 스킬: slot 0 = the planet's unique skill (UR), slots 1–2 = equip skills from the store (any planet)
+const equipOf = pid => { const e = save.equip[pid] || STARTER_SKILLS; return [0, 1].map(k => ESKILL[e[k]] && save.skills.includes(e[k]) ? e[k] : null); };
+const planetSkills = pid => [{ ...PLANET[pid].uskill, grade: 'UR' }, ...equipOf(pid).map(id => id ? { ...ESKILL[id], id } : null)];
 const skinStyle = sk => { const d = CON[sk.con]; return `${STYLE_LABEL[sk.style || d.style]} · ${KIND_LABEL[sk.kind || d.kind]}`; };
 let save = (() => {
   try { const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if (v && v.v === 1) return loadSave(v); } catch {}
@@ -80,6 +84,8 @@ function loadSave(v) {
   const o = Object.assign(freshSave(), v);
   if (!v.form) o.form = [v.team || [], []];
   if (o.adsRemoved && !o.adPass) o.adPass = true; // older saves bought the previous ad item
+  o.skills = [...new Set([...STARTER_SKILLS, ...(Array.isArray(o.skills) ? o.skills : [])])];
+  if (!o.equip || typeof o.equip !== 'object') o.equip = {};
   return o;
 }
 // cloud.js: the server copy is newer (or the player switched accounts) → replace this device's progress
@@ -495,6 +501,8 @@ function showProbability() {
     <p class="mtxt">별자리는 ${g.cur === 'piece' ? '뱀주인자리를 포함한 13종' : '12종'} 중 같은 확률로 정해져요.</p>`; }).join('');
   const csum = Object.values(CHEST_ODDS).reduce((a, b) => a + b, 0), cl = { skin: '성운 스킨', dust: 'Star Dust', piece: 'Star Piece', con: '별자리 카드' };
   openModal(`<h3>확률 정보</h3><div class="doc-body prob-body">${gacha}
+    <h4>${SKILL_GACHA.name}</h4><ul class="prob">${DRAW_GRADES.map(g => `<li><span>${g} ${SKILL_GRADES[g].name}</span><b>${skPct(g)}</b></li>`).join('')}</ul>
+    <p class="mtxt">등급 안에서는 스킬마다 같은 확률이에요. UR(고유) 스킬은 뽑기에 나오지 않아요.</p>
     <h4>보물 상자</h4><ul class="prob">${Object.entries(CHEST_ODDS).map(([k, v]) => `<li><span>${cl[k] || k}</span><b>${pct(v, csum)}</b></li>`).join('')}</ul>
     <h4>강화 성공률</h4><ul class="prob">${ENHANCE_RATE.map((v, i) => `<li><span>+${i} → +${i + 1}</span><b>${Math.round(v * 100)}%</b></li>`).join('')}</ul></div>
     <div class="mbtns"><button class="cta sm" data-act="close" type="button">닫기</button></div>`, () => closeModal());
@@ -550,6 +558,28 @@ function conSvg(id, size, opts = {}) {
   return `<img class="csvg cimg${opts.dim ? ' dim' : ''}" src="img/con_${sk.id}.webp" width="${size}" height="${size}" alt="" aria-hidden="true">`;
 }
 
+/* ---------- 스킬 뽑기 ---------- */
+const skSum = () => DRAW_GRADES.reduce((a, g) => a + (SKILL_GACHA.w[g] || 0), 0);
+const skPct = g => `${+((SKILL_GACHA.w[g] || 0) / (skSum() || 1) * 100).toFixed(2)}%`;
+// Grade by weight, then a skill of that grade at equal odds; a skill already owned turns into Star Dust
+function rollSkill() {
+  const w = DRAW_GRADES.map(g => SKILL_GACHA.w[g] || 0), ids = Object.keys(ESKILL);
+  let grade = DRAW_GRADES[rollGrade(w)], pool = ids.filter(id => ESKILL[id].grade === grade);
+  if (!pool.length) { pool = ids; grade = null; }
+  const id = pool[Math.floor(Math.random() * pool.length)];
+  if (save.skills.includes(id)) { const d = SKILL_GACHA.dupe[ESKILL[id].grade] || 0; save.dust += d; return { id, res: 'dup', dust: d }; }
+  save.skills.push(id); return { id, res: 'new' };
+}
+function showSkillResult(list, title) {
+  persist(); renderTopBar();
+  const card = (r, i) => { const d = ESKILL[r.id], col = SKILL_GRADES[d.grade].col; return `<div class="gcard skill" style="--g:${col};animation-delay:${i * 70}ms">
+      <img class="sk-ic" src="img/sk_${(GSKILL[d.type] || GSKILL.meteor).icon}.png" width="48" height="48" alt="" aria-hidden="true">
+      <b>${d.name}</b>${skillChip(d.grade)}${r.res === 'new' ? '<em class="new">NEW</em>' : `<em>Star Dust +${fmt(r.dust)}</em>`}</div>`; };
+  openModal(`<h3>${title}</h3><div class="gres">${list.map(card).join('')}</div>
+    <p class="mtxt">새 스킬은 행성 탭에서 장착할 수 있어요.</p>
+    <div class="mbtns"><button class="cta sm" data-act="ok" type="button">확인</button></div>`, () => { closeModal(); setTab(tab); });
+}
+
 /* ---------- 상점 (Store) ---------- */
 function renderStore() {
   const odds = w => w.map((v, i) => v ? `${GRADES[i].name} ${v}%` : '').filter(Boolean).join(' · ');
@@ -572,6 +602,14 @@ function renderStore() {
           <button class="buy" data-gacha="${k}" data-n="10" type="button"><span>10회</span><b class="${g.cur}">${fmt(g.cost10)}</b></button>
         </section>`; }).join('')}
     </div>
+    <section class="shop-card gacha-skill">
+      <h3>${SKILL_GACHA.name}</h3>
+      <p class="mini">장착 스킬 · ${DRAW_GRADES.map(g => `${g} ${skPct(g)}`).join(' · ')}</p>
+      <div class="grid2">
+        <button class="buy" data-skgacha="1" type="button"><span>1회</span><b class="${SKILL_GACHA.cur}">${fmt(SKILL_GACHA.cost)}</b></button>
+        <button class="buy" data-skgacha="10" type="button"><span>10회</span><b class="${SKILL_GACHA.cur}">${fmt(SKILL_GACHA.cost10)}</b></button>
+      </div>
+    </section>
     <section class="shop-card row-card">
       <div><h3>광고 무제한 패키지</h3><p class="mini">${save.adPass ? '적용 중 · 모든 광고 없이 바로 보상' : '모든 광고 제거 · 로비 보물 상자와 광고 보상을 광고 없이 바로 받아요'}</p></div>
       <button class="buy fit" data-buy="ads" type="button" ${save.adPass ? 'disabled' : ''}>${save.adPass ? '구매 완료' : '₩9,900'}</button>
@@ -583,9 +621,16 @@ function renderStore() {
           <button class="piece-pack" data-buy="piece" data-n="${n}" type="button"><b class="piece">${fmt(n)}</b><span>${p}</span></button>`).join('')}
       </div>
     </section>
-    <p class="fine">확률 안내 · 골드 뽑기: ${odds(GACHA.gold.w)}<br>유료 뽑기: ${odds(GACHA.paid.w)}<br>보물 상자 1개: 성운 스킨 ${pct(CHEST_ODDS.skin)} · Star Dust ${pct(CHEST_ODDS.dust)} · Star Piece ${pct(CHEST_ODDS.piece)} · 별자리 카드 ${pct(CHEST_ODDS.con)} (성운 스킨을 모두 가지면 Star Dust로 바뀌어요)<br>스페셜 스킨은 별자리 탭에서만 구매할 수 있어요.<br>이미 가진 별자리는 더 높은 등급이면 등급이 오르고, 아니면 Star Dust로 바뀌어요.<br>프로토타입이라 실제 결제는 일어나지 않고 바로 지급돼요.</p>`;
+    <p class="fine">확률 안내 · 골드 뽑기: ${odds(GACHA.gold.w)}<br>유료 뽑기: ${odds(GACHA.paid.w)}<br>보물 상자 1개: 성운 스킨 ${pct(CHEST_ODDS.skin)} · Star Dust ${pct(CHEST_ODDS.dust)} · Star Piece ${pct(CHEST_ODDS.piece)} · 별자리 카드 ${pct(CHEST_ODDS.con)} (성운 스킨을 모두 가지면 Star Dust로 바뀌어요)<br>스킬 뽑기: ${DRAW_GRADES.map(g => `${g}(${SKILL_GRADES[g].name}) ${skPct(g)}`).join(' · ')} · 등급 안에서는 같은 확률 · 이미 가진 스킬은 Star Dust로 바뀌어요 (UR 고유 스킬은 행성마다 정해져 있어요)<br>스페셜 스킨은 별자리 탭에서만 구매할 수 있어요.<br>이미 가진 별자리는 더 높은 등급이면 등급이 오르고, 아니면 Star Dust로 바뀌어요.<br>프로토타입이라 실제 결제는 일어나지 않고 바로 지급돼요.</p>`;
 }
 $('pane-store').addEventListener('click', e => {
+  const sg = e.target.closest('[data-skgacha]');
+  if (sg) {
+    const n = +sg.dataset.skgacha;
+    if (!spend(SKILL_GACHA.cur, n === 10 ? SKILL_GACHA.cost10 : SKILL_GACHA.cost)) return;
+    showSkillResult(Array.from({ length: n }, rollSkill), `${SKILL_GACHA.name} ${n}회`); gwEvent('gacha', { kind: 'skill', n });
+    return;
+  }
   const g = e.target.closest('[data-gacha]');
   if (g) {
     const k = g.dataset.gacha, n = +g.dataset.n, def = GACHA[k];
@@ -652,10 +697,48 @@ function renderPlanets() {
     </section>
     <section class="psk">
       <h3>게이지 스킬 <small>전투에서 기력을 써서 발동해요</small></h3>
-      ${(d.skills || []).map(s => `
-        <div class="psk-row"><img src="img/sk_${(GSKILL[s.type] || GSKILL.meteor).icon}.png" alt="" aria-hidden="true">
-          <div><b>${s.name} <span class="cs">기력 ${s.cost}</span></b><p>${skillDesc(s)}</p></div></div>`).join('')}
+      ${planetSkills(planetSel).map((s, k) => skillRow(s, k ? `장착 ${k}` : '고유', k
+        ? `<button class="ghost sm" data-pact="eskill" data-k="${k - 1}" type="button" ${own ? '' : 'disabled'}>${s ? '변경' : '장착'}</button>` : '')).join('')}
+      <p class="fine">고유 스킬은 행성마다 정해져 있고 스킨을 바꿔도 그대로예요. 장착 스킬은 상점 스킬 뽑기로 얻고, 어느 행성에나 장착할 수 있어요.</p>
     </section>`;
+}
+const skillChip = g => `<span class="gchip sg" style="--g:${SKILL_GRADES[g].col}">${g}</span>`;
+function skillRow(s, label, btn = '') {
+  if (!s) return `<div class="psk-row empty"><span class="sk-empty" aria-hidden="true">+</span>
+    <div><b><span class="lbl">${label}</span> 비어 있음</b><p>상점 스킬 뽑기로 얻은 스킬을 장착할 수 있어요.</p></div>${btn}</div>`;
+  return `<div class="psk-row"><img src="img/sk_${(GSKILL[s.type] || GSKILL.meteor).icon}.png" alt="" aria-hidden="true">
+    <div><b><span class="lbl">${label}</span> ${skillChip(s.grade)} ${s.name} <span class="cs">기력 ${s.cost}</span></b><p>${skillDesc(s)}</p></div>${btn}</div>`;
+}
+// 장착 스킬 고르기: any owned skill fits any planet; picking the one in the other slot swaps them
+const GRADE_ORDER = ['MR', 'UR', 'SSR', 'SR', 'R'];
+function openSkillEquip(pid, k) {
+  const cur = equipOf(pid), owned = save.skills.filter(id => ESKILL[id])
+    .sort((a, b) => GRADE_ORDER.indexOf(ESKILL[a].grade) - GRADE_ORDER.indexOf(ESKILL[b].grade));
+  let sel = cur[k];
+  const item = id => { const d = ESKILL[id]; return `<button class="skin-item" type="button" role="radio" data-esk="${id}" aria-checked="${id === sel}">
+      <b>${skillChip(d.grade)} ${d.name} <span class="cs">기력 ${d.cost}</span></b><span class="mini">${skillDesc(d)}</span>
+      ${id === cur[k] ? '<em class="eq">장착</em>' : id === cur[1 - k] ? `<em class="own">장착 ${2 - k}</em>` : ''}
+    </button>`; };
+  const btns = () => `<div class="mbtns"><button class="ghost" data-act="${cur[k] ? 'clear' : 'close'}" type="button">${cur[k] ? '비우기' : '취소'}</button>
+    <button class="cta sm" data-act="equip" type="button" ${!sel || sel === cur[k] ? 'disabled' : ''}>${sel && sel === cur[1 - k] ? '자리 바꾸기' : '장착'}</button></div>`;
+  openModal(`<h3>${PLANET[pid].name} · 장착 ${k + 1}</h3>
+    <div class="skin-list" role="radiogroup" aria-label="장착할 스킬">${owned.map(item).join('')}</div>
+    <div id="eskBtns">${btns()}</div>`,
+  act => {
+    if (act === 'close') { closeModal(); return; }
+    const e = [...cur];
+    if (act === 'clear') e[k] = null;
+    else { if (e[1 - k] === sel) e[1 - k] = e[k]; e[k] = sel; }
+    save.equip[pid] = e; persist(); closeModal();
+    toast(act === 'clear' ? '장착 칸을 비웠어요' : `${ESKILL[sel].name} 장착`);
+    renderPlanets();
+  });
+  $('modalBody').querySelector('.skin-list').addEventListener('click', e => {
+    const b = e.target.closest('[data-esk]'); if (!b) return;
+    sel = b.dataset.esk;
+    $('modalBody').querySelectorAll('[data-esk]').forEach(x => x.setAttribute('aria-checked', x === b));
+    $('eskBtns').innerHTML = btns();
+  });
 }
 $('pane-planets').addEventListener('click', e => {
   const c = e.target.closest('[data-pid]'); if (c) { planetSel = c.dataset.pid; planetView = 'detail'; renderPlanets(); $('pane-planets').closest('.panes').scrollTop = 0; return; }
@@ -664,6 +747,7 @@ $('pane-planets').addEventListener('click', e => {
   if (act === 'list') { planetView = 'list'; renderPlanets(); return; }
   if (act === 'pskin') { openSkinList('p', 0, planetSel); return; }
   if (act === 'oskin') { openSkinList('o', +a.dataset.k, planetSel); return; }
+  if (act === 'eskill') { openSkillEquip(planetSel, +a.dataset.k); return; }
   if (act === 'unlock') { if (spend('piece', d.unlock)) { save.planets[planetSel] = { lv: 1, skin: 'basic', orbitSkins: [] }; persist(); toast(`${d.name} 해금`); renderPlanets(); } }
   else if (act === 'up') { const o = save.planets[planetSel]; if (spend('dust', planetUpCost(o.lv))) { o.lv += 1; persist(); toast(`${d.name} Lv ${o.lv}`); renderPlanets(); } }
   else if (act === 'main') {

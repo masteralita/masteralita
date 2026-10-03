@@ -59,7 +59,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .skill{position:relative;display:grid;gap:2px;justify-items:center;padding:9px 4px 7px;border-radius:12px;border:1px solid var(--line);background:var(--panel);text-align:center;overflow:hidden}
 .skill .ic{font-family:var(--f-disp);font-size:17px;line-height:1}
 .skill .nm{font-size:13px;font-weight:700}
-.skill .cs{font-family:var(--f-disp);font-size:11px;color:var(--gold)}
+.skill .cs{font-family:var(--f-disp);font-size:11px;color:var(--sg,var(--gold))}
 .skill:disabled{opacity:.42;cursor:default}
 .skill.ready{border-color:rgba(245,196,81,.6)}
 .skill .dur{position:absolute;left:0;bottom:0;height:3px;background:var(--gold);width:0}
@@ -300,7 +300,15 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .psk{display:grid;gap:8px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(15,22,52,.6)}
 .psk h3{margin:0;font-size:14px}
 .psk h3 small{font-weight:400;color:var(--dim);font-size:11px;margin-left:6px}
-.psk-row{display:grid;grid-template-columns:32px 1fr;gap:10px;align-items:start}
+.psk-row{display:grid;grid-template-columns:32px 1fr auto;gap:10px;align-items:center}
+.psk-row .lbl{font-size:11px;font-weight:400;color:var(--dim);margin-right:2px}
+.psk-row .gchip.sg,.skin-item .gchip.sg{font-family:var(--f-disp);padding:0 6px;margin-right:2px}
+.psk-row.empty p{opacity:.6}
+.sk-empty{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;border:1px dashed var(--line);color:var(--dim);font-size:18px}
+.skin-item .cs{font-family:var(--f-disp);font-size:11px;color:var(--gold);margin-left:4px;font-weight:400}
+.skin-item .mini{padding-right:44px;line-height:1.45}
+.gcard.skill .sk-ic{image-rendering:pixelated}
+.gacha-skill .mini{font-family:var(--f-disp)}
 .psk-row img{width:32px;height:32px;image-rendering:pixelated}
 .psk-row b{font-size:13px}
 .psk-row .cs{font-family:var(--f-disp);font-size:11px;color:var(--gold);margin-left:4px;font-weight:400}

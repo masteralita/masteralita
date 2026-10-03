@@ -1,21 +1,22 @@
 'use strict';
-/* ---------- Planet gauge skills (게이지 스킬) ----------
-   The three skill buttons come from the main planet (data.js PLANET_SKILLS, editable in admin/),
-   and each costs 기력. Loaded after battle.js: it uses the battle state and damage helpers. */
+/* ---------- Gauge skills (게이지 스킬) ----------
+   The three skill buttons are the main planet's unique skill (UR) and its two equip slots
+   (data.js PLANET_USKILL / ESKILL, editable in admin/); each costs 기력.
+   Loaded after battle.js: it uses the battle state and damage helpers. */
 const SK = { list: [], dur: [0, 0, 0], durT: [1, 1, 1], crit: 0, critV: 0 };
 const skBtns = [0, 1, 2].map(i => $('sk' + i));
 
 // Called at the start of every battle: picks the planet's skills and relabels the buttons
 function setupSkills() {
-  const d = PLANET[save.mainPlanet] || PLANET.earth;
-  SK.list = (d.skills || PLANET.earth.skills).map(s => GSKILL[s.type] ? s : { ...s, type: 'meteor' });
+  SK.list = planetSkills(save.mainPlanet).filter(Boolean).map(s => GSKILL[s.type] ? s : { ...s, type: 'meteor' });
   SK.dur = [0, 0, 0]; SK.durT = [1, 1, 1]; SK.crit = 0;
   G.shieldV = .7; G.novaV = 1;
   skBtns.forEach((b, i) => {
     const s = SK.list[i]; b.hidden = !s; if (!s) return;
     b.querySelector('img').src = `img/sk_${GSKILL[s.type].icon}.png`;
     b.querySelector('.nm').textContent = s.name;
-    b.querySelector('.cs').textContent = `기력 ${s.cost}`;
+    b.querySelector('.cs').textContent = `${s.grade} · 기력 ${s.cost}`;
+    b.style.setProperty('--sg', SKILL_GRADES[s.grade].col);
     b.title = skillDesc(s);
   });
 }

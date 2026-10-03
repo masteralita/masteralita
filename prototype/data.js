@@ -290,7 +290,9 @@ const PLANETS = [
   { id:'sun',     name:'태양',   en:'Sun',     kind:'sun',   hp:1800, orbits:2, unlock:2500, trait:{ rateMul:1.15 },   desc:'공격속도 +15%' },
 ];
 const PLANET = Object.fromEntries(PLANETS.map(p => [p.id, p]));
-/* ---------- Planet gauge skills (게이지 스킬): 3 per planet, paid with 기력 in battle ---------- */
+/* ---------- Gauge skills (게이지 스킬): paid with 기력 in battle ---------- */
+// Each planet has 1 unique skill (UR, 고유: tied to the planet, the same whatever skin it wears)
+// and 2 equip slots for skills drawn in the store (R · SR · SSR · MR), which fit any planet.
 // Each skill: { type, name, cost (기력), v (power, fraction), dur (seconds, for timed types) }. Types are implemented in skills.js.
 // icon: which of the three skill images (img/sk_*.png) the button shows.
 const GSKILL = {
@@ -306,21 +308,56 @@ const GSKILL = {
   stun:    { label:'전체 기절',   icon:'nova',   timed:true,  desc: s => `적 별자리 전체를 ${s.dur}초 동안 기절시켜요.` },
   slow:    { label:'전체 둔화',   icon:'nova',   timed:true,  desc: s => `${s.dur}초 동안 적 별자리 공격속도 -${pct(s.v)}.` },
 };
-const gsk = (type, name, cost, v, dur = 0) => ({ type, name, cost, v, dur });
-const PLANET_SKILLS = {
-  earth:   [gsk('meteor', '유성우', 3, .07),          gsk('shield', '성운 방패', 2, .7, 6),    gsk('haste', '초신성 가속', 4, 1, 6)],
-  moon:    [gsk('heal', '달빛 치유', 3, .2),           gsk('barrier', '조석 보호막', 2, .15),     gsk('stun', '월식', 4, 0, 2)],
-  mercury: [gsk('haste', '쾌속 공전', 3, 1, 6),        gsk('burn', '태양열 반사', 3, .04, 5),     gsk('stun', '수성 섬광', 4, 0, 1.5)],
-  venus:   [gsk('burn', '산성 구름', 3, .05, 5),       gsk('shield', '두꺼운 대기', 2, .75, 7),   gsk('barrier', '온실 장막', 3, .2)],
-  mars:    [gsk('rally', '전쟁의 함성', 3, .5, 6),     gsk('slow', '붉은 모래폭풍', 2, .4, 5),    gsk('meteor', '포보스 낙하', 4, .09)],
-  jupiter: [gsk('slow', '대적점 폭풍', 3, .5, 6),      gsk('barrier', '거대 자기장', 2, .2),      gsk('strike', '중력 붕괴', 5, .1)],
-  saturn:  [gsk('shield', '고리 방패', 2, .7, 7),      gsk('meteor', '고리 파편', 3, .07),        gsk('stun', '타이탄의 안개', 4, 0, 2)],
-  uranus:  [gsk('slow', '극지 냉기', 2, .4, 5),        gsk('stun', '자기 폭풍', 3, 0, 1.5),       gsk('haste', '기울어진 자전', 3, .8, 6)],
-  neptune: [gsk('meteor', '해일', 3, .08),             gsk('rally', '초음속 바람', 3, .5, 6),     gsk('strike', '심해 압력', 5, .1)],
-  pluto:   [gsk('crit', '정밀 조준', 2, .3, 6),        gsk('slow', '얼음 심연', 3, .4, 5),        gsk('strike', '저승의 일격', 4, .07)],
-  sun:     [gsk('burn', '태양 플레어', 3, .05, 5),     gsk('haste', '코로나 폭발', 4, 1, 6),      gsk('meteor', '홍염 낙하', 4, .09)],
+// Skill grades, low → high. UR is the planet's unique skill and is not in the draw (UR 뽑기는 추후 업데이트).
+const SKILL_GRADES = {
+  R:   { name:'희귀',   en:'Rare Rank',            col:'#46a8ff' },
+  SR:  { name:'특급',   en:'Special Rank',         col:'#b26bff' },
+  SSR: { name:'초특급', en:'Super Special Rank',   col:'#ffb020' },
+  UR:  { name:'고유',   en:'Unique Rank',          col:'#ff4d6d' },
+  MR:  { name:'신화',   en:'Mythical Rank',        col:'#7dfff0' },
 };
-for (const p of PLANETS) p.skills = PLANET_SKILLS[p.id];
+const DRAW_GRADES = ['R', 'SR', 'SSR', 'MR'];
+const gsk = (type, name, cost, v, dur = 0) => ({ type, name, cost, v, dur });
+// Unique (UR) skill per planet
+const PLANET_USKILL = {
+  earth:   gsk('meteor', '유성우', 3, .08),
+  moon:    gsk('stun', '월식', 4, 0, 2),
+  mercury: gsk('haste', '쾌속 공전', 3, 1, 6),
+  venus:   gsk('burn', '산성 구름', 3, .05, 5),
+  mars:    gsk('rally', '전쟁의 함성', 3, .5, 6),
+  jupiter: gsk('strike', '중력 붕괴', 5, .1),
+  saturn:  gsk('shield', '고리 방패', 2, .7, 7),
+  uranus:  gsk('stun', '자기 폭풍', 3, 0, 1.5),
+  neptune: gsk('meteor', '해일', 3, .08),
+  pluto:   gsk('strike', '저승의 일격', 4, .07),
+  sun:     gsk('burn', '태양 플레어', 3, .05, 5),
+};
+for (const p of PLANETS) p.uskill = PLANET_USKILL[p.id];
+// Equip skills (장착 스킬), drawn in the store. id → { grade, ...skill }
+const ESKILL = {
+  r_meteor:   { grade:'R',   ...gsk('meteor',  '유성 파편',   3, .05) },
+  r_shield:   { grade:'R',   ...gsk('shield',  '성운 방패',   2, .6, 5) },
+  r_haste:    { grade:'R',   ...gsk('haste',   '초신성 가속', 4, .8, 6) },
+  r_heal:     { grade:'R',   ...gsk('heal',    '별빛 치유',   3, .12) },
+  r_slow:     { grade:'R',   ...gsk('slow',    '냉기 안개',   2, .3, 4) },
+  r_barrier:  { grade:'R',   ...gsk('barrier', '얇은 보호막', 2, .1) },
+  sr_burn:    { grade:'SR',  ...gsk('burn',    '화염 폭풍',   3, .045, 5) },
+  sr_rally:   { grade:'SR',  ...gsk('rally',   '전투 함성',   3, .4, 6) },
+  sr_crit:    { grade:'SR',  ...gsk('crit',    '예리한 시선', 2, .25, 6) },
+  sr_strike:  { grade:'SR',  ...gsk('strike',  '궤도 포격',   4, .06) },
+  sr_stun:    { grade:'SR',  ...gsk('stun',    '섬광탄',      3, 0, 1.2) },
+  ssr_meteor: { grade:'SSR', ...gsk('meteor',  '유성 폭격',   4, .1) },
+  ssr_shield: { grade:'SSR', ...gsk('shield',  '은하 방벽',   3, .8, 7) },
+  ssr_haste:  { grade:'SSR', ...gsk('haste',   '광속 질주',   4, 1.2, 7) },
+  ssr_strike: { grade:'SSR', ...gsk('strike',  '혜성 충돌',   5, .12) },
+  mr_stun:    { grade:'MR',  ...gsk('stun',    '시간 정지',   5, 0, 3) },
+  mr_heal:    { grade:'MR',  ...gsk('heal',    '창세의 빛',   4, .35) },
+  mr_burn:    { grade:'MR',  ...gsk('burn',    '종말의 불꽃', 5, .08, 6) },
+};
+const STARTER_SKILLS = ['r_shield', 'r_haste']; // every player owns these two from the start
+// 스킬 뽑기 (상점): weights per grade, and Star Dust paid back for a skill already owned
+const SKILL_GACHA = { name:'스킬 뽑기', cur:'piece', cost:250, cost10:2250,
+  w:{ R:60, SR:28, SSR:10, MR:2 }, dupe:{ R:200, SR:600, SSR:2000, MR:8000 } };
 const skillDesc = s => (GSKILL[s.type] || GSKILL.meteor).desc(s);
 /* ---------- Orbits (궤도): belong to the planet, carry their own base stats and skin ---------- */
 // A planet with a single orbit gets a stronger orbit to make up for fewer constellations.

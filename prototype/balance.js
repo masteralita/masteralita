@@ -10,7 +10,7 @@
 const BAL_ROOTS = {
   con: CON, skin: SKIN, planet: PLANET, orbit: ORBIT_BASE, pskin: PSKIN, oskin: OSKIN,
   grade: GRADES, gacha: GACHA, tier: SKIN_TIER, chest: CHEST_ODDS, adchest: AD_CHEST,
-  income: INCOME, slot: SLOT, enhance: ENHANCE_RATE, wave: WAVE,
+  income: INCOME, slot: SLOT, enhance: ENHANCE_RATE, wave: WAVE, eskill: ESKILL, skgacha: SKILL_GACHA,
 };
 
 // Param defaults per effect type, taken from the first skin that uses it (for switching an awakening's type)
@@ -54,11 +54,20 @@ const BAL_SECTIONS = [
            { key:'trait/energy', label:'시작 기력', kind:'int', neutral:0 }, { key:'trait/crit', label:'치명타율', kind:'pct', neutral:0 },
            { key:'name', label:'이름', kind:'text' }, { key:'desc', label:'설명', kind:'text' }],
     path: (r, c) => `planet/${r}/${c}` },
-  { id:'pskill', title:'행성 스킬', desc:'행성마다 전투 게이지 스킬 3개 (기력으로 발동). 위력은 종류마다 뜻이 달라요: 피해·회복·보호막은 최대 HP 대비, 버프·둔화는 증가/감소량',
-    rows: PLANETS.flatMap(p => [0, 1, 2].map(k => ({ id:`${p.id}/${k}`, label:`${p.name} ${k + 1}`, sub:k ? '' : p.en }))),
+  { id:'pskill', title:'고유 스킬 (UR)', desc:'행성마다 하나씩 있는 고유 게이지 스킬 (기력으로 발동). 스킨을 바꿔도 그대로예요. 위력은 종류마다 뜻이 달라요: 피해·회복·보호막은 최대 HP 대비, 버프·둔화는 증가/감소량',
+    rows: PLANETS.map(p => ({ id:p.id, label:p.name, sub:p.en })),
     cols: [{ key:'type', label:'종류', kind:'gskill' }, { key:'name', label:'스킬 이름', kind:'text' }, { key:'cost', label:'기력', kind:'int' },
            { key:'v', label:'위력', kind:'pct' }, { key:'dur', label:'지속(초)', kind:'num' }],
-    path: (r, c) => { const [pid, k] = r.split('/'); return `planet/${pid}/skills/${k}/${c}`; } },
+    path: (r, c) => `planet/${r}/uskill/${c}` },
+  { id:'eskill', title:'장착 스킬', desc:'상점 스킬 뽑기로 얻는 스킬 (행성마다 2칸, 어느 행성에나 장착). 등급은 고정이고 종류·이름·수치를 바꿀 수 있어요',
+    rows: Object.entries(ESKILL).map(([id, k]) => ({ id, label:k.name, sub:`${k.grade} · ${SKILL_GRADES[k.grade].name}` })),
+    cols: [{ key:'type', label:'종류', kind:'gskill' }, { key:'name', label:'스킬 이름', kind:'text' }, { key:'cost', label:'기력', kind:'int' },
+           { key:'v', label:'위력', kind:'pct' }, { key:'dur', label:'지속(초)', kind:'num' }],
+    path: (r, c) => `eskill/${r}/${c}` },
+  { id:'skgacha', title:'스킬 뽑기', desc:'등급별 뽑기 가중치 (가중치 합 기준 확률)과 이미 가진 스킬이 나왔을 때 돌려주는 Star Dust',
+    rows: DRAW_GRADES.map(g => ({ id:g, label:g, sub:SKILL_GRADES[g].name })),
+    cols: [{ key:'w', label:'뽑기 가중치', kind:'num' }, { key:'dupe', label:'중복 시 Star Dust', kind:'int' }],
+    path: (r, c) => `skgacha/${c}/${r}` },
   { id:'orbit', title:'궤도', desc:'궤도 기본 능력치 (그 궤도의 별자리에게 적용)',
     rows: [{ id:'single/0', label:'단일 궤도', sub:'궤도 1개 행성' }, { id:'dual/0', label:'안쪽 궤도', sub:'궤도 2개 행성' }, { id:'dual/1', label:'바깥 궤도', sub:'궤도 2개 행성' }],
     cols: [{ key:'name', label:'이름', kind:'text' }, { key:'atk', label:'공격력 +', kind:'pct' }, { key:'rate', label:'공속 +', kind:'pct' }, { key:'hp', label:'HP +', kind:'pct' }],
@@ -82,6 +91,7 @@ const BAL_SECTIONS = [
   { id:'econ', title:'경제·확률', desc:'가격, 확률, 보상량', kv: [
       ['gacha/gold/cost', '골드 뽑기 1회 (Star Dust)', 'int'], ['gacha/gold/cost10', '골드 뽑기 10회 (Star Dust)', 'int'],
       ['gacha/paid/cost', '유료 뽑기 1회 (Star Piece)', 'int'], ['gacha/paid/cost10', '유료 뽑기 10회 (Star Piece)', 'int'],
+      ['skgacha/cost', '스킬 뽑기 1회 (Star Piece)', 'int'], ['skgacha/cost10', '스킬 뽑기 10회 (Star Piece)', 'int'],
       ['tier/supernova/price', '스페셜 스킨 가격 (Star Piece)', 'int'],
       ['chest/skin', '보물 상자 · 성운 스킨 확률', 'pct'], ['chest/dust', '보물 상자 · Star Dust 확률', 'pct'],
       ['chest/piece', '보물 상자 · Star Piece 확률', 'pct'], ['chest/con', '보물 상자 · 별자리 카드 확률', 'pct'],
@@ -123,7 +133,7 @@ function balSet(path, v) {
     ch.type = FX[v.type] ? v.type : ch.type; ch.p = { ...(v.p || FX_DEFAULTS[ch.type] || {}) }; // exactly the given params
     ch.desc = FX[ch.type](ch.p); return;
   }
-  if (seg[0] === 'planet' && seg[2] === 'skills' && seg[4] === 'type' && !GSKILL[v]) return; // unknown skill type: keep the current one
+  if (seg[seg.length - 1] === 'type' && (seg[2] === 'uskill' || seg[0] === 'eskill') && !GSKILL[v]) return; // unknown skill type: keep the current one
   const f = BAL_FIELDS[path], k = seg[seg.length - 1], isNeutral = f && f.neutral !== undefined && v === f.neutral;
   for (let i = 1; i < seg.length - 1; i++) {
     if (o[seg[i]] == null) { if (isNeutral) return; o[seg[i]] = {}; } // don't create containers just to hold a neutral value
