@@ -46,6 +46,7 @@
 |---|---|
 | `rock_0~3.png` | 로비 낙하 운석(app.js `drawHome`), 보스 "고리 파편 낙하" 투사체 |
 | `meteor_fire.png` | 유성우 스킬·유성 소환 투사체 (battle.js, 진행 방향으로 회전) |
+| `ship_scout.png` · `ship_saucer.png` · `ship_crab.png` · `ship_boss.png` | 아케이드 외계 우주선 (정찰선·원반선·돌격선·모선). SpriteCook pixel, 스타일 레퍼런스: Claudia 캐릭터 + 남색/금색 상자. arcade.js `drawArcade()` |
 | `chest_closed.png` | 로비 낙하 보물상자·대기 보물상자 (`drawChest`) |
 | `blackhole.png` | 블랙홀 행성 (`drawHole`) |
 | `sk_meteor/shield/nova.png` | 전투 스킬 버튼 아이콘 |

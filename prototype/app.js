@@ -1273,8 +1273,8 @@ function pauseSkills() {
   return out;
 }
 function renderPause() {
-  const pvp = G.mode === 'pvp', stats = $('pauseStats').getAttribute('aria-pressed') === 'true';
-  $('pauseSecTitle').textContent = stats ? '피해 통계' : '스킬';
+  const pvp = G.mode === 'pvp', stats = $('pauseStats').getAttribute('aria-selected') === 'true';
+  $('pauseTabSkills').setAttribute('aria-selected', String(!stats));
   $('pauseSkills').hidden = stats; $('pauseStatsList').hidden = !stats;
   const list = pauseSkills();
   $('pauseSkills').innerHTML = pvp ? '<p class="pm-empty">대전은 모든 능력치와 각성이 최대로 시작해요</p>'
@@ -1288,20 +1288,32 @@ function renderPause() {
   }).join('') : '<p class="pm-empty">아직 입힌 피해가 없어요</p>';
   $('pauseCoin').hidden = pvp;
   $('pauseDust').textContent = fmt(arcadeDust());
-  $('soundBtn').setAttribute('aria-pressed', String(save.settings.sfx !== false));
 }
-let quitArm = 0;
+// 재시작 and 나가기 both end the run, so each needs a second tap within 2.5 s
+let armed = null, armedAt = 0;
+function disarm() { armed = null; $('quitWarn').hidden = true; ['restartBtn', 'quitBtn'].forEach(id => $(id).classList.remove('armed')); }
+function confirmTap(id, msg) {
+  if (armed === id && performance.now() - armedAt < 2500) { disarm(); return true; }
+  disarm(); armed = id; armedAt = performance.now(); $(id).classList.add('armed');
+  $('quitWarn').textContent = msg; $('quitWarn').hidden = false;
+  return false;
+}
 function setPaused(p) {
   G.paused = p; $('pauseMenu').hidden = !p;
-  quitArm = 0; $('quitBtn').classList.remove('armed'); $('quitWarn').hidden = true;
-  if (p) renderPause();
+  disarm();
+  if (p) { $('pauseStats').setAttribute('aria-selected', 'false'); renderPause(); }
 }
 $('pauseBtn').addEventListener('click', () => setPaused(true));
 $('resumeBtn').addEventListener('click', () => setPaused(false));
-$('pauseStats').addEventListener('click', e => { const b = e.currentTarget; b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); renderPause(); });
-$('soundBtn').addEventListener('click', () => { const on = save.settings.sfx === false; save.settings.sfx = on; save.settings.bgm = on; persist(); renderPause(); });
-$('quitBtn').addEventListener('click', () => { // two taps within 2.5 s: the first only arms it
-  if (performance.now() - quitArm > 2500) { quitArm = performance.now(); $('quitBtn').classList.add('armed'); $('quitWarn').hidden = false; return; }
+$('pauseTabSkills').addEventListener('click', () => { $('pauseStats').setAttribute('aria-selected', 'false'); renderPause(); });
+$('pauseStats').addEventListener('click', () => { $('pauseStats').setAttribute('aria-selected', 'true'); renderPause(); });
+$('restartBtn').addEventListener('click', () => {
+  if (!confirmTap('restartBtn', '한 번 더 누르면 처음부터 다시 시작해요 (보상 없음)')) return;
+  setPaused(false);
+  if (G.state === 'fight' || G.state === 'clear' || G.state === 'intro') startRun(G.mode);
+});
+$('quitBtn').addEventListener('click', () => {
+  if (!confirmTap('quitBtn', '한 번 더 누르면 전투를 끝내고 결과를 봐요')) return;
   setPaused(false);
   if (G.state === 'fight' || G.state === 'clear' || G.state === 'intro') { G.state = 'over'; finishBattle(false); }
 });

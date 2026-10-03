@@ -52,7 +52,7 @@ function makeSystem(side, planet, cons, ringOf) {
   return { side, planet, cons, rings, phase: rnd(0, TAU), speed: TAU / (side === 'me' ? 7 : 8.5), orbits: 0, cx: 0, cy: 0, R: 0, ry: 0, pr: 0 };
 }
 function layout() {
-  const top = 104, bot = 224, band = Math.max(200, H - top - bot);
+  const hb = $('hudBot'), top = 104, bot = (hb && !hb.hidden && hb.offsetHeight ? hb.offsetHeight : 170) + 12, band = Math.max(200, H - top - bot);
   const R = Math.min(W * .41, band * .42), ry = R * ORBIT_TILT;
   const margin = ry + R * .22 * .95; // outer ring plus a constellation's half-height
   for (const [sys, cy] of [[G.foe, top + margin], [G.me, H - bot - margin]]) {
@@ -91,7 +91,6 @@ function startRun(mode) {
   G.T = { armor: 0, marmor: 0, evade: 0, dmgRed: 0, planetRed: P.dmgRed };
   $('myName').textContent = P.name;
   showBattleUi(true); setupSkills();
-  $('hint').innerHTML = mode === 'pvp' ? '적 별자리 탭 <b>집중 공격</b> · 내 별자리 탭 <b>레벨업 (기력 1)</b>' : '적 탭 <b>집중 공격</b> · 내 별자리 탭 <b>레벨업 (기력 1)</b>';
   if (mode === 'pvp') { startPvp(); maxOutPvp(); } else startArcadeWave();
   beginIntro();
 }

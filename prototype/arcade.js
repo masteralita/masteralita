@@ -16,7 +16,7 @@ const MOB = {
   scout:  { hp: () => WAVE.shipHp,        r: [16, 16], xp: 4, name: '정찰선' },
   saucer: { hp: () => WAVE.shipHp * 1.2,  r: [17, 17], xp: 5, name: '원반선' },
   crab:   { hp: () => WAVE.shipHp * 1.7,  r: [17, 17], xp: 6, name: '돌격선' },
-  boss:   { r: [44, 44], xp: 30, name: '모선' },
+  boss:   { r: [48, 48], xp: 30, name: '모선' },
 };
 const SHIP_KINDS = ['scout', 'saucer', 'crab'];         // formation rows cycle through these (shifted by wave)
 const fieldTop = () => 116;                             // below the top HUD
@@ -24,33 +24,16 @@ const fieldBot = () => G.me ? G.me.cy - G.me.ry - G.me.R * .25 : H * .6;
 const isShip = m => m.mob === 'scout' || m.mob === 'saucer' || m.mob === 'crab';
 const onField = m => !m.mob || (m.x > -4 && m.x < W + 4 && m.y > -4 && m.y < H);
 
-/* ---------- Pixel ships ---------- */
-// '.' = empty; b body, s shade, c canopy, d glass, a lights, e engine flame
-const SHIP_ART = {
-  scout: ['..a.....a..', '...a...a...', '..bbbbbbb..', '.bbcbbbcbb.', 'bbbbbdbbbbb', 'b.bsbbbsb.b', 'b..bs.sb..b', '...b...b...', '..e.....e..'],
-  saucer: ['....ccccc....', '...cddddddc..', '..cddddddddc.', '.sbbbbbbbbbs.', 'bbabbabbabbab', '.sbbbbbbbbbs.', '...e..e..e...'],
-  crab: ['b.........b', 'bb..ccc..bb', 'bbbcdddcbbb', '.bbbbbbbbb.', 'sbbsbabsbbs', '..bb.b.bb..', '.bb.....bb.', 'b.e.....e.b'],
-  boss: ['........ccccc........', '......ccdddddcc......', '....ccdddadddddcc....', '...cddddddddddaddc...', '.sbbbbbbbbbbbbbbbbbs.',
-    'bbbabbbabbbabbbabbbab', 'bsbbbbbbbbbbbbbbbbbsb', '.bbsbbbbsbbbsbbbbsbb.', '..bbb..bbb.bbb..bbb..', '...e....e...e....e...', '...e....e...e....e...'],
-};
-const SHIP_PAL = {
-  scout: { b: '#ff5a6e', s: '#a3243a', c: '#ffe08a', d: '#ffffff', a: '#fff1c2', e: '#ffb15a' },
-  saucer: { b: '#9aa3c8', s: '#55597a', c: '#7dffb0', d: '#2ad17a', a: '#ffe08a', e: '#7dffb0' },
-  crab: { b: '#c35bff', s: '#6a1fc2', c: '#ffd36a', d: '#ff7a3a', a: '#ffffff', e: '#ff7ad9' },
-};
-const SHIP_CV = {};
-function shipSprite(kind, pal, white) {
-  const key = kind + (white ? '_w' : '') + (pal.b || '');
-  if (SHIP_CV[key]) return SHIP_CV[key];
-  const rows = SHIP_ART[kind], w = Math.max(...rows.map(r => r.length)), h = rows.length;
-  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-  const g = cv.getContext('2d');
-  rows.forEach((r, y) => [...r].forEach((ch, x) => { if (ch === '.' || !pal[ch]) return; g.fillStyle = white ? '#fff' : pal[ch]; g.fillRect(x, y, 1, 1); }));
-  return (SHIP_CV[key] = cv);
-}
-function bossPal() {
-  const c = (G.arc && G.arc.look && G.arc.look.c) || ['#e0b6ff', '#6a1fc2', '#12032b'];
-  return { b: c[1], s: c[2] === '#000' ? '#2a1a40' : c[2], c: c[0] === '#000' ? '#ffb15a' : c[0], d: '#ff5a6e', a: '#fff1c2', e: '#ffb15a' };
+/* ---------- Pixel ships (SpriteCook, img/ship_*.png) ---------- */
+// rot: turns to face its flight path · up: the art's nose points up, so it is flipped to face the planet
+const SHIP_LOOK = { scout: { rot: true, up: true, w: 2.5 }, saucer: { rot: false, w: 2.6 }, crab: { rot: true, w: 2.5 }, boss: { rot: false, w: 2.5 } };
+['scout', 'saucer', 'crab', 'boss'].forEach(k => pxSprite('ship_' + k));
+const SHIP_WHITE = {};
+function shipWhite(k, im) { // white silhouette for the hit flash
+  if (SHIP_WHITE[k]) return SHIP_WHITE[k];
+  const cv = document.createElement('canvas'); cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+  const g = cv.getContext('2d'); g.drawImage(im, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+  return (SHIP_WHITE[k] = cv);
 }
 
 /* ---------- Wave setup ---------- */
@@ -270,16 +253,19 @@ function drawArcade(t) {
       else { ctx.fillStyle = '#ffb15a'; ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, TAU); ctx.fill(); }
       if (save.settings.glow !== false && Math.random() < .5) G.fx.push({ x: m.x - vx * m.r, y: m.y - vy * m.r, vx: rnd(-15, 15) - vx * 30, vy: rnd(-15, 15) - vy * 30, t: rnd(.2, .4), c: Math.random() < .5 ? '#ffb15a' : '#ff6a2a' });
     } else {
-      const pal = m.mob === 'boss' ? bossPal() : SHIP_PAL[m.mob], cv = shipSprite(m.mob, pal, false);
-      const w = m.r * 2.3, h = w * cv.height / cv.width, a = (m.dir ?? Math.PI / 2) - Math.PI / 2;
+      const L = SHIP_LOOK[m.mob], im = pxSprite('ship_' + m.mob);
+      const w = m.r * L.w, h = im ? w * im.naturalHeight / im.naturalWidth : w;
       ctx.imageSmoothingEnabled = false;
-      ctx.translate(m.x, m.y); if (m.mob !== 'boss') ctx.rotate(a);
+      ctx.translate(m.x, m.y);
+      if (L.rot) ctx.rotate((m.dir ?? Math.PI / 2) - Math.PI / 2 + (L.up ? Math.PI : 0));
       if (m.mob === 'boss' && save.settings.glow !== false) { // menacing red halo behind the mothership
         const g = ctx.createRadialGradient(0, 0, m.r * .3, 0, 0, m.r * 1.4); g.addColorStop(0, 'rgba(255,90,110,.3)'); g.addColorStop(1, 'rgba(255,90,110,0)');
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, m.r * 1.4, 0, TAU); ctx.fill();
       }
-      ctx.drawImage(cv, -w / 2, -h / 2, w, h);
-      if (m.flash > 0) { ctx.globalAlpha *= .75; ctx.drawImage(shipSprite(m.mob, pal, true), -w / 2, -h / 2, w, h); }
+      if (im) {
+        ctx.drawImage(im, -w / 2, -h / 2, w, h);
+        if (m.flash > 0) { ctx.globalAlpha *= .7; ctx.drawImage(shipWhite(m.mob, im), -w / 2, -h / 2, w, h); }
+      } else { ctx.fillStyle = '#6a5acd'; ctx.beginPath(); ctx.arc(0, 0, m.r, 0, TAU); ctx.fill(); }
     }
     ctx.restore();
     if (m.dead) continue;
