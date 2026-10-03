@@ -432,6 +432,22 @@ const ESKILL = {
   mr_regen:     { grade:'MR',  ...gsk('regen', '영원의 샘', 5, 0.056, 7.0) },
 };
 const STARTER_SKILLS = ['r_shield', 'r_haste']; // every player owns these two from the start
+/* ---------- 스킬 레벨: duplicate draws pile up and level an equip skill ----------
+   SKILL_LV[i] is the step from Lv i+1 to Lv i+2: need = copies used, step = that level's 구간 배율.
+   Power at Lv L = base × (1 + up% × (sum of steps up to L)), where up (레벨당 증가 %) is set per skill.
+   Stun has no power number, so its duration grows instead. */
+const SKILL_LV = Array.from({ length: 9 }, (_, i) => ({ need: 2 * (i + 1), step: 1 }));
+const SKILL_UP = { R:10, SR:12, SSR:14, LR:16, MR:18 }; // default 레벨당 증가 % by grade
+for (const k of Object.values(ESKILL)) k.up = SKILL_UP[k.grade];
+const SKILL_CAP = { slow:.9, shield:.9 };
+const skillMaxLv = () => SKILL_LV.length + 1;
+const skillLvMul = (up, lv) => 1 + (up || 0) / 100 * SKILL_LV.slice(0, Math.max(0, lv - 1)).reduce((a, x) => a + (x.step || 0), 0);
+function skillAtLv(s, lv) {
+  const m = skillLvMul(s.up, lv), o = { ...s, lv };
+  if (s.type === 'stun') o.dur = +(s.dur * m).toFixed(1);
+  else o.v = +Math.min(SKILL_CAP[s.type] || 99, s.v * m).toFixed(4);
+  return o;
+}
 // 스킬 뽑기 (상점): free = Star Dust (R~SSR), paid = Star Piece (R~MR); weights per grade, and Star Dust paid back for a skill already owned
 const SKILL_GACHA = {
   free: { name:'무료 스킬 뽑기', cur:'dust',  cost:5000, cost10:45000, w:{ R:75, SR:22, SSR:3, LR:0, MR:0 } },

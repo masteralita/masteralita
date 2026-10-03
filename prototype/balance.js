@@ -10,7 +10,7 @@
 const BAL_ROOTS = {
   con: CON, skin: SKIN, planet: PLANET, orbit: ORBIT_BASE, pskin: PSKIN, oskin: OSKIN,
   grade: GRADES, gacha: GACHA, tier: SKIN_TIER, chest: CHEST_ODDS, adchest: AD_CHEST,
-  income: INCOME, slot: SLOT, enhance: ENHANCE_RATE, wave: WAVE, eskill: ESKILL, skgacha: SKILL_GACHA,
+  income: INCOME, slot: SLOT, enhance: ENHANCE_RATE, wave: WAVE, eskill: ESKILL, skgacha: SKILL_GACHA, sklv: SKILL_LV,
 };
 
 // Param defaults per effect type, taken from the first skin that uses it (for switching an awakening's type)
@@ -62,11 +62,15 @@ const BAL_SECTIONS = [
   { id:'eskill', title:'장착 스킬', desc:'상점 스킬 뽑기로 얻는 스킬 (행성마다 2칸, 어느 행성에나 장착). 등급은 고정이고 종류·이름·수치를 바꿀 수 있어요',
     rows: Object.entries(ESKILL).map(([id, k]) => ({ id, label:k.name, sub:`${k.grade} · ${SKILL_GRADES[k.grade].name}` })),
     cols: [{ key:'type', label:'종류', kind:'gskill' }, { key:'name', label:'스킬 이름', kind:'text' }, { key:'cost', label:'기력', kind:'int' },
-           { key:'v', label:'위력', kind:'pct' }, { key:'dur', label:'지속(초)', kind:'num' }],
+           { key:'v', label:'위력 (Lv 1)', kind:'pct' }, { key:'dur', label:'지속(초)', kind:'num' }, { key:'up', label:'레벨당 증가 (%)', kind:'num' }],
     path: (r, c) => `eskill/${r}/${c}` },
-  { id:'skgacha', title:'스킬 뽑기', desc:'등급별 뽑기 가중치 (가중치 합 기준 확률)과 이미 가진 스킬이 나왔을 때 돌려주는 Star Dust',
+  { id:'sklv', title:'스킬 레벨', desc:'중복으로 뽑은 장착 스킬이 쌓이면 레벨업. 필요 개수 = 그 레벨로 올리는 데 쓰는 같은 스킬 수. 구간 배율 = 그 레벨에서 스킬별 [레벨당 증가 %]를 몇 번 더할지 (1 = 한 번, 2 = 두 번, 0 = 증가 없음). 위력 = Lv 1 위력 × (1 + 레벨당 증가 % × 구간 배율 합). 기절은 지속 시간이 늘어나요',
+    rows: SKILL_LV.map((_, i) => ({ id:String(i), label:`Lv ${i + 1} → ${i + 2}` })),
+    cols: [{ key:'need', label:'필요 개수', kind:'int' }, { key:'step', label:'구간 배율', kind:'num' }],
+    path: (r, c) => `sklv/${r}/${c}` },
+  { id:'skgacha', title:'스킬 뽑기', desc:'등급별 뽑기 가중치 (가중치 합 기준 확률)와 최고 레벨 스킬이 또 나왔을 때 돌려주는 Star Dust',
     rows: DRAW_GRADES.map(g => ({ id:g, label:g, sub:SKILL_GRADES[g].name })),
-    cols: [{ key:'free', label:'무료 뽑기 가중치', kind:'num' }, { key:'paid', label:'유료 뽑기 가중치', kind:'num' }, { key:'dupe', label:'중복 시 Star Dust', kind:'int' }],
+    cols: [{ key:'free', label:'무료 뽑기 가중치', kind:'num' }, { key:'paid', label:'유료 뽑기 가중치', kind:'num' }, { key:'dupe', label:'최고 레벨 중복 시 Star Dust', kind:'int' }],
     path: (r, c) => c === 'dupe' ? `skgacha/dupe/${r}` : `skgacha/${c}/w/${r}` },
   { id:'orbit', title:'궤도', desc:'궤도 기본 능력치 (그 궤도의 별자리에게 적용)',
     rows: [{ id:'single/0', label:'단일 궤도', sub:'궤도 1개 행성' }, { id:'dual/0', label:'안쪽 궤도', sub:'궤도 2개 행성' }, { id:'dual/1', label:'바깥 궤도', sub:'궤도 2개 행성' }],

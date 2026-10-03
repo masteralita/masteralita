@@ -15,6 +15,7 @@ function freshSave() {
     team: ['sgr', 'leo', 'vir'], form: [['sgr', 'leo'], ['vir']],
     pSkins: ['basic'], oSkins: ['dash'],
     skills: [...STARTER_SKILLS], equip: {}, // 장착 스킬: owned ids, and the two slots per planet (unset → the starter pair)
+    skillLv: {}, skillCopies: {}, // per owned skill: level (unset = 1) and duplicate copies toward the next level
     settings: { glow: true, fps: 60, sfx: true, bgm: true, push: true },
   };
 }
@@ -26,7 +27,10 @@ const ownsSkin = (id, sid) => (sid === id ? !!save.cons[id] : (save.skins || [])
 const addSkin = sid => { save.skins = [...new Set([...(save.skins || []), sid])]; };
 // 게이지 스킬: slot 0 = the planet's unique skill (UR), slots 1–2 = equip skills from the store (any planet)
 const equipOf = pid => { const e = save.equip[pid] || STARTER_SKILLS; return [0, 1].map(k => ESKILL[e[k]] && save.skills.includes(e[k]) ? e[k] : null); };
-const planetSkills = pid => [{ ...PLANET[pid].uskill, grade: 'UR' }, ...equipOf(pid).map(id => id ? { ...ESKILL[id], id } : null)];
+const skLv = id => clamp(save.skillLv[id] || 1, 1, skillMaxLv());
+const skNeed = id => skLv(id) >= skillMaxLv() ? 0 : SKILL_LV[skLv(id) - 1].need;
+const skillOf = id => ({ ...skillAtLv(ESKILL[id], skLv(id)), id }); // the skill at the player's level
+const planetSkills = pid => [{ ...PLANET[pid].uskill, grade: 'UR' }, ...equipOf(pid).map(id => id ? skillOf(id) : null)];
 const skinStyle = sk => { const d = CON[sk.con]; return `${STYLE_LABEL[sk.style || d.style]} · ${KIND_LABEL[sk.kind || d.kind]}`; };
 let save = (() => {
   try { const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if (v && v.v === 1) return loadSave(v); } catch {}
@@ -86,6 +90,7 @@ function loadSave(v) {
   if (o.adsRemoved && !o.adPass) o.adPass = true; // older saves bought the previous ad item
   o.skills = [...new Set([...STARTER_SKILLS, ...(Array.isArray(o.skills) ? o.skills : [])])];
   if (!o.equip || typeof o.equip !== 'object') o.equip = {};
+  for (const k of ['skillLv', 'skillCopies']) if (!o[k] || typeof o[k] !== 'object') o[k] = {};
   return o;
 }
 // cloud.js: the server copy is newer (or the player switched accounts) → replace this device's progress
@@ -568,14 +573,18 @@ function rollSkill(k) {
   let grade = DRAW_GRADES[rollGrade(w)], pool = ids.filter(id => ESKILL[id].grade === grade);
   if (!pool.length) { pool = ids; grade = null; }
   const id = pool[Math.floor(Math.random() * pool.length)];
-  if (save.skills.includes(id)) { const d = SKILL_GACHA.dupe[ESKILL[id].grade] || 0; save.dust += d; return { id, res: 'dup', dust: d }; }
-  save.skills.push(id); return { id, res: 'new' };
+  if (!save.skills.includes(id)) { save.skills.push(id); return { id, res: 'new' }; }
+  if (skLv(id) >= skillMaxLv()) { const d = SKILL_GACHA.dupe[ESKILL[id].grade] || 0; save.dust += d; return { id, res: 'dup', dust: d }; } // max level: Star Dust
+  save.skillCopies[id] = (save.skillCopies[id] || 0) + 1;
+  let up = false;
+  while (skLv(id) < skillMaxLv() && save.skillCopies[id] >= skNeed(id)) { save.skillCopies[id] -= skNeed(id); save.skillLv[id] = skLv(id) + 1; up = true; }
+  return { id, res: up ? 'up' : 'copy', lv: skLv(id), copies: save.skillCopies[id], need: skNeed(id) };
 }
 function showSkillResult(list, title) {
   persist(); renderTopBar();
   const card = (r, i) => { const d = ESKILL[r.id], col = SKILL_GRADES[d.grade].col; return `<div class="gcard skill" style="--g:${col};animation-delay:${i * 70}ms">
       <img class="sk-ic" src="img/sk_${(GSKILL[d.type] || GSKILL.meteor).icon}.png" width="48" height="48" alt="" aria-hidden="true">
-      <b>${d.name}</b><span>${skillChip(d.grade)} ${catChip(d)}</span>${r.res === 'new' ? '<em class="new">NEW</em>' : `<em>Star Dust +${fmt(r.dust)}</em>`}</div>`; };
+      <b>${d.name}</b><span>${skillChip(d.grade)} ${catChip(d)}</span>${r.res === 'new' ? '<em class="new">NEW</em>' : r.res === 'up' ? `<em class="up">Lv ${r.lv} 달성</em>` : r.res === 'copy' ? `<em>누적 ${r.copies}/${r.need}</em>` : `<em>MAX · Star Dust +${fmt(r.dust)}</em>`}</div>`; };
   openModal(`<h3>${title}</h3><div class="gres">${list.map(card).join('')}</div>
     <p class="mtxt">새 스킬은 행성 탭에서 장착할 수 있어요.</p>
     <div class="mbtns"><button class="cta sm" data-act="ok" type="button">확인</button></div>`, () => { closeModal(); setTab(tab); });
@@ -624,7 +633,7 @@ function renderStore() {
           <button class="piece-pack" data-buy="piece" data-n="${n}" type="button"><b class="piece">${fmt(n)}</b><span>${p}</span></button>`).join('')}
       </div>
     </section>
-    <p class="fine">확률 안내 · 골드 뽑기: ${odds(GACHA.gold.w)}<br>유료 뽑기: ${odds(GACHA.paid.w)}<br>보물 상자 1개: 성운 스킨 ${pct(CHEST_ODDS.skin)} · Star Dust ${pct(CHEST_ODDS.dust)} · Star Piece ${pct(CHEST_ODDS.piece)} · 별자리 카드 ${pct(CHEST_ODDS.con)} (성운 스킨을 모두 가지면 Star Dust로 바뀌어요)<br>무료 스킬 뽑기: ${skOdds('free', true)}<br>유료 스킬 뽑기: ${skOdds('paid', true)}<br>스킬은 등급 안에서는 같은 확률 · 이미 가진 스킬은 Star Dust로 바뀌어요 (UR 고유 스킬은 행성마다 정해져 있어요)<br>스페셜 스킨은 별자리 탭에서만 구매할 수 있어요.<br>이미 가진 별자리는 더 높은 등급이면 등급이 오르고, 아니면 Star Dust로 바뀌어요.<br>프로토타입이라 실제 결제는 일어나지 않고 바로 지급돼요.</p>`;
+    <p class="fine">확률 안내 · 골드 뽑기: ${odds(GACHA.gold.w)}<br>유료 뽑기: ${odds(GACHA.paid.w)}<br>보물 상자 1개: 성운 스킨 ${pct(CHEST_ODDS.skin)} · Star Dust ${pct(CHEST_ODDS.dust)} · Star Piece ${pct(CHEST_ODDS.piece)} · 별자리 카드 ${pct(CHEST_ODDS.con)} (성운 스킨을 모두 가지면 Star Dust로 바뀌어요)<br>무료 스킬 뽑기: ${skOdds('free', true)}<br>유료 스킬 뽑기: ${skOdds('paid', true)}<br>스킬은 등급 안에서는 같은 확률 · 이미 가진 스킬은 누적돼서 레벨이 올라요 (최고 레벨이면 Star Dust) (UR 고유 스킬은 행성마다 정해져 있어요)<br>스페셜 스킨은 별자리 탭에서만 구매할 수 있어요.<br>이미 가진 별자리는 더 높은 등급이면 등급이 오르고, 아니면 Star Dust로 바뀌어요.<br>프로토타입이라 실제 결제는 일어나지 않고 바로 지급돼요.</p>`;
 }
 $('pane-store').addEventListener('click', e => {
   const sg = e.target.closest('[data-skgacha]');
@@ -711,7 +720,7 @@ function skillRow(s, label, btn = '') {
   if (!s) return `<div class="psk-row empty"><span class="sk-empty" aria-hidden="true">+</span>
     <div><b><span class="lbl">${label}</span> 비어 있음</b><p>상점 스킬 뽑기로 얻은 스킬을 장착할 수 있어요.</p></div>${btn}</div>`;
   return `<div class="psk-row"><img src="img/sk_${(GSKILL[s.type] || GSKILL.meteor).icon}.png" alt="" aria-hidden="true">
-    <div><b><span class="lbl">${label}</span> ${skillChip(s.grade)} ${s.name} ${catChip(s)} <span class="cs">기력 ${s.cost}</span></b><p>${skillDesc(s)}</p></div>${btn}</div>`;
+    <div><b><span class="lbl">${label}</span> ${skillChip(s.grade)} ${s.name}${s.lv ? ` <span class="lvt">Lv ${s.lv}</span>` : ''} ${catChip(s)} <span class="cs">기력 ${s.cost}</span></b><p>${skillDesc(s)}</p></div>${btn}</div>`;
 }
 // 장착 스킬 변경: every owned equip skill, the two equipped on top and the rest below.
 // 장착 fills an empty slot; with both slots full it asks which one to replace. Changes save at once.
@@ -722,9 +731,9 @@ function openSkillEquip(pid) {
   const body = () => {
     const cur = equipOf(pid), owned = save.skills.filter(id => ESKILL[id] && !cur.includes(id) && (cat === 'all' || skCat(ESKILL[id]) === cat))
       .sort((a, b) => GRADE_ORDER.indexOf(ESKILL[a].grade) - GRADE_ORDER.indexOf(ESKILL[b].grade) || CAT_ORDER.indexOf(skCat(ESKILL[a])) - CAT_ORDER.indexOf(skCat(ESKILL[b])));
-    const info = d => `<div><b>${skillChip(d.grade)} ${d.name} ${catChip(d)} <span class="cs">기력 ${d.cost}</span></b><span class="mini">${skillDesc(d)}</span></div>`;
+    const info = d => `<div><b>${skillChip(d.grade)} ${d.name}${d.lv ? ` <span class="lvt">Lv ${d.lv}</span>` : ''} ${catChip(d)} <span class="cs">기력 ${d.cost}</span></b><span class="mini">${skillDesc(d)}</span></div>`;
     const slot = (id, k) => id
-      ? `<div class="esk-item on"><span class="esk-k">장착 ${k + 1}</span>${info(ESKILL[id])}
+      ? `<div class="esk-item on"><span class="esk-k">장착 ${k + 1}</span>${info(skillOf(id))}
           <button class="${pick ? 'cta' : 'ghost'} sm" data-act="${pick ? 'swap' : 'off'}" data-k="${k}" type="button">${pick ? '교체' : '해제'}</button></div>`
       : `<div class="esk-item on empty"><span class="esk-k">장착 ${k + 1}</span><div><b>비어 있음</b><span class="mini">아래 목록에서 장착할 스킬을 골라요.</span></div></div>`;
     return `<h3>${PLANET[pid].name} · 장착 스킬</h3>
@@ -732,7 +741,7 @@ function openSkillEquip(pid) {
         <span class="set-h">장착 중</span>${cur.map(slot).join('')}
         <span class="set-h">미장착 ${owned.length}</span>
         <div class="esk-cats">${[['all', '전체'], ...CAT_ORDER.map(k => [k, SKILL_CATS[k].name])].map(([k, n]) => `<button type="button" data-act="cat" data-cat="${k}" aria-pressed="${k === cat}">${n}</button>`).join('')}</div>
-        ${owned.map(id => `<div class="esk-item${pick === id ? ' pick' : ''}">${info(ESKILL[id])}
+        ${owned.map(id => `<div class="esk-item${pick === id ? ' pick' : ''}">${info(skillOf(id))}
           <button class="${pick === id ? 'ghost' : 'cta'} sm" data-act="${pick === id ? 'unpick' : 'on'}" data-id="${id}" type="button">${pick === id ? '취소' : '장착'}</button></div>`).join('')
           || '<p class="mtxt">미장착 스킬이 없어요. 상점 스킬 뽑기로 더 얻을 수 있어요.</p>'}
       </div>
@@ -763,7 +772,7 @@ const skIcon = s => `img/sk_${(GSKILL[s.type] || GSKILL.meteor).icon}.png`;
 function renderSkills() {
   const where = id => PLANETS.filter(p => save.planets[p.id] && equipOf(p.id).includes(id)).map(p => p.name);
   const uniq = PLANETS.map(p => ({ key: 'u:' + p.id, s: { ...p.uskill, grade: 'UR' }, own: !!save.planets[p.id], sub: p.name }));
-  const eq = Object.entries(ESKILL).map(([id, s]) => ({ key: id, s, own: save.skills.includes(id), sub: where(id).join(' · ') }));
+  const eq = Object.entries(ESKILL).map(([id, s]) => { const own = save.skills.includes(id); return { key: id, s: own ? skillOf(id) : s, own, sub: where(id).join(' · ') }; });
   const list = [...uniq, ...eq].filter(x => (skFilter.g === 'all' || x.s.grade === skFilter.g) && (skFilter.c === 'all' || skCat(x.s) === skFilter.c))
     .sort((a, b) => (b.own - a.own) || GRADE_ORDER.indexOf(a.s.grade) - GRADE_ORDER.indexOf(b.s.grade) || CAT_ORDER.indexOf(skCat(a.s)) - CAT_ORDER.indexOf(skCat(b.s)));
   const ownedN = eq.filter(x => x.own).length;
@@ -777,22 +786,32 @@ function renderSkills() {
         ${x.sub && x.own && x.s.grade !== 'UR' ? '<em class="tm">장착</em>' : ''}
         <img src="${skIcon(x.s)}" alt="" aria-hidden="true"><b>${x.s.name}</b>
         <span>${skillChip(x.s.grade)} ${catChip(x.s)}</span>
+        ${x.own && x.s.lv ? `<small class="lvp">Lv ${x.s.lv}${skNeed(x.key) ? ` · ${save.skillCopies[x.key] || 0}/${skNeed(x.key)}` : ' · MAX'}</small>` : ''}
       </button>`).join('') || '<p class="mtxt">조건에 맞는 스킬이 없어요.</p>'}</div>
     <button class="cta wide" data-skgo="store" type="button">상점에서 스킬 뽑기</button>
     <p class="fine">고유(UR) 스킬은 행성마다 정해져 있어 그 행성을 해금하면 쓸 수 있어요. 장착 스킬은 행성 화면의 게이지 스킬 [변경]에서 장착해요.</p>`;
+}
+// 레벨 정보: current level, copies toward the next one, and what the next level does
+function lvInfo(id, own) {
+  const lv = own ? skLv(id) : 1, max = skillMaxLv(), b = ESKILL[id];
+  const next = lv < max ? skillAtLv(b, lv + 1) : null, pctUp = Math.round((skillLvMul(b.up, lv) - 1) * 100);
+  return `<div class="lv-box"><b>Lv ${lv} / ${max}</b> <small>레벨당 +${b.up}% · 현재 +${pctUp}%</small>
+    ${own && next ? `<div class="bar"><i style="width:${Math.min(100, (save.skillCopies[id] || 0) / skNeed(id) * 100)}%"></i></div>
+      <small>같은 스킬 ${save.skillCopies[id] || 0} / ${skNeed(id)}개 모으면 Lv ${lv + 1}: ${skillDesc(next)}</small>`
+      : own ? '<small>최고 레벨이에요. 더 뽑히면 Star Dust로 바뀌어요.</small>' : `<small>뽑으면 Lv 1. 같은 스킬을 더 뽑으면 레벨이 올라요 (Lv 2까지 ${SKILL_LV[0].need}개).</small>`}</div>`;
 }
 $('pane-skills').addEventListener('click', e => {
   const f = e.target.closest('[data-skf]'); if (f) { skFilter[f.dataset.skf] = f.dataset.v; renderSkills(); return; }
   if (e.target.closest('[data-skgo]')) { setTab('store'); return; }
   const d = e.target.closest('[data-skd]'); if (!d) return;
   const key = d.dataset.skd, isU = key.startsWith('u:'), pid = isU ? key.slice(2) : null;
-  const s = isU ? { ...PLANET[pid].uskill, grade: 'UR' } : ESKILL[key], own = isU ? !!save.planets[pid] : save.skills.includes(key);
+  const own = isU ? !!save.planets[pid] : save.skills.includes(key), s = isU ? { ...PLANET[pid].uskill, grade: 'UR' } : own ? skillOf(key) : ESKILL[key];
   const on = isU ? [] : PLANETS.filter(p => save.planets[p.id] && equipOf(p.id).includes(key)).map(p => p.name);
   const status = isU ? `${PLANET[pid].name} 고유 스킬 · ${own ? '사용 가능' : '행성을 해금하면 사용 가능'}`
     : own ? (on.length ? `장착 중: ${on.join(', ')}` : '보유 · 장착 안 함') : '미보유 · 상점 스킬 뽑기에서 얻을 수 있어요';
   openModal(`<h3>${s.name}</h3><div class="sk-detail"><img src="${skIcon(s)}" alt="" aria-hidden="true">
       <span>${skillChip(s.grade)} ${SKILL_GRADES[s.grade].name} · ${catChip(s)} ${GSKILL[s.type].label} · 기력 ${s.cost}</span>
-      <p class="mtxt">${skillDesc(s)}</p><p class="mtxt">${status}</p></div>
+      <p class="mtxt">${skillDesc(s)}</p><p class="mtxt">${status}</p>${isU ? '' : lvInfo(key, own)}</div>
     <div class="mbtns"><button class="ghost" data-act="close" type="button">닫기</button>
       ${isU ? `<button class="cta sm" data-act="planet" type="button">행성 보기</button>`
         : own ? `<button class="cta sm" data-act="planet" type="button">대표 행성에 장착하기</button>` : `<button class="cta sm" data-act="store" type="button">상점으로</button>`}</div>`,
