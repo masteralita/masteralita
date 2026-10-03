@@ -103,7 +103,7 @@
 /* pixel art everywhere: scale every art image with hard pixel edges */
 .nav button img,.side-icons .gear img,.skill .ic img,.dust::before,.piece::before,.ccell[data-g],.gcard[data-g],.loot-art .box,.banner-card,.shop-card.gacha-gold,.shop-card.gacha-paid{image-rendering:pixelated}
 .skill .ic img{width:26px;height:26px;object-fit:contain;display:block;filter:drop-shadow(0 1px 1px #000)}
-.nav button img{width:34px;height:34px;object-fit:contain;filter:drop-shadow(0 1px 1px #000)}
+.nav button img{width:30px;height:30px;object-fit:contain;filter:drop-shadow(0 1px 1px #000)}
 .nav button.home img{width:38px;height:38px}
 .nav button:not([aria-current="page"]) img{filter:drop-shadow(0 1px 1px #000) saturate(.75) brightness(.85)}
 .side-icons .gear img{width:26px;height:26px;object-fit:contain;filter:drop-shadow(0 1px 1px #000)}
