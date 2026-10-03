@@ -109,10 +109,12 @@ const BAL_SECTIONS = [
       ...ENHANCE_RATE.map((_, i) => [`enhance/${i}`, `강화 성공률 +${i} → +${i + 1}`, 'pct']),
     ] },
   { id:'wave', title:'웨이브', desc:'아케이드 난이도 곡선', kv: [
-      ['wave/planetHp', '적 행성 기본 HP', 'int'], ['wave/planetGrowth', '적 행성 HP 증가 (웨이브마다 ×)', 'num'],
-      ['wave/statGrowth', '적 별자리 능력치 증가 (웨이브마다 ×)', 'num'], ['wave/deepFrom', '외우주 가속 시작 웨이브', 'int'],
-      ['wave/deepGrowth', '외우주 추가 증가 (×)', 'num'], ['wave/midBossHp', '중간 보스 HP 배율', 'num'], ['wave/zoneBossHp', '구역 보스 HP 배율', 'num'],
-      ['wave/conHp', '적 별자리 HP 배율', 'num'], ['wave/conAtk', '적 별자리 공격력 배율', 'num'], ['wave/timer', '웨이브 제한 시간 (초)', 'int'],
+      ['wave/planetHp', '모선(보스) 기본 HP', 'int'], ['wave/planetGrowth', '모선 HP 증가 (웨이브마다 ×)', 'num'],
+      ['wave/statGrowth', '적 능력치 증가 (웨이브마다 ×)', 'num'], ['wave/deepFrom', '외우주 가속 시작 웨이브', 'int'],
+      ['wave/deepGrowth', '외우주 추가 증가 (×)', 'num'], ['wave/midBossHp', '중간 보스(모선) HP 배율', 'num'], ['wave/zoneBossHp', '구역 보스 HP 배율', 'num'],
+      ['wave/conHp', '적 HP 배율 (소행성·운석·우주선)', 'num'], ['wave/conAtk', '적 공격력 배율', 'num'], ['wave/timer', '웨이브 제한 시간 (초)', 'int'],
+      ['wave/rockHp', '소행성 기본 HP', 'int'], ['wave/meteorHp', '운석 기본 HP', 'int'], ['wave/shipHp', '외계 우주선 기본 HP', 'int'],
+      ['wave/shipAtk', '외계 우주선 탄 피해', 'int'], ['wave/rockPct', '소행성 충돌 피해 (행성 최대 HP 비율)', 'pct'], ['wave/meteorPct', '운석 충돌 피해 (행성 최대 HP 비율)', 'pct'],
     ] },
 ];
 // Flatten into fields: path → { kind, neutral, label }

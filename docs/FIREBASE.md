@@ -138,7 +138,7 @@
 ## 6. 이어받기 메모
 
 - 작업 브랜치: `claude/upbeat-carson-fmqclr` (이전 `claude/vibrant-einstein-sc3mji` 작업 포함).
-- 웹 프로토타입: `prototype/` (index.html + data.js, firebase-config.js, balance.js, battle.js, ads.js, app.js, cloud.js, live.js)
+- 웹 프로토타입: `prototype/` (index.html + data.js, firebase-config.js, balance.js, battle.js, arcade.js, skills.js, ads.js, app.js, cloud.js, live.js)
 - 관리자: `admin/` (admin.js = 밸런스·플레이어, ops.js, stats.js, legal.js) · 약관 웹 페이지: `legal/`
   - 수치 레지스트리: `prototype/balance.js` 의 `BAL_SECTIONS` (`path → value`). 관리자 사이트(`admin/admin.js`)가 같은 파일을 불러와 써요.
 - 추가 항목이 배포에서 빠지면 그 스킨을 장착한 플레이어는 기본 스킨으로 돌아가요 (`equippedSkin`, `PSKIN.basic`, `OSKIN.dash` 대체).

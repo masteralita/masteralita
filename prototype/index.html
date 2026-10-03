@@ -46,7 +46,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .bar.me i{background:linear-gradient(90deg,#2fcf8f,#8cf2c6)}
 .bar.xp{height:4px}
 .bar.xp i{background:linear-gradient(90deg,#c35bff,#f5c451)}
-.hud-bot{bottom:0;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));display:grid;gap:9px;background:linear-gradient(0deg,rgba(6,10,26,.95) 60%,rgba(6,10,26,0))}
+.hud-bot{bottom:0;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px));display:grid;gap:6px;background:linear-gradient(0deg,rgba(6,10,26,.95) 60%,rgba(6,10,26,0))}
 .lvrow{display:flex;align-items:center;gap:8px}
 .lvrow .lv{font-family:var(--f-disp);font-weight:700;font-size:12px;color:var(--gold);white-space:nowrap;min-width:36px}
 .lvrow .bar{flex:1}
@@ -56,10 +56,17 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .pips span{flex:1;height:10px;border-radius:2px;background:rgba(245,196,81,.12);border:1px solid rgba(245,196,81,.25)}
 .pips span.on{background:var(--gold);border-color:var(--gold);box-shadow:0 0 8px rgba(245,196,81,.6)}
 .skills{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;pointer-events:auto}
-.skill{position:relative;display:grid;gap:2px;justify-items:center;padding:9px 4px 7px;border-radius:12px;border:1px solid var(--line);background:var(--panel);text-align:center;overflow:hidden}
+.skill{position:relative;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:5px;align-items:center;justify-items:start;padding:4px 6px;border-radius:12px;border:1px solid var(--line);background:var(--panel);text-align:left;overflow:hidden;min-width:0}
+.skill .ic{grid-row:1/3}
+.skill .nm,.skill .cs{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hud-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center}
+.hud-bot .bar-wrap{gap:2px}
+.hud-bot .pips{gap:2px}
+.hud-bot .pips span{height:8px}
+.hud-row .lv,.hud-row .energy .lbl{min-width:0}
 .skill .ic{font-family:var(--f-disp);font-size:17px;line-height:1}
-.skill .nm{font-size:13px;font-weight:700}
-.skill .cs{font-family:var(--f-disp);font-size:11px;color:var(--sg,var(--gold))}
+.skill .nm{font-size:12px;font-weight:700;line-height:1.2}
+.skill .cs{font-family:var(--f-disp);font-size:10px;line-height:1.2;color:var(--sg,var(--gold))}
 .skill:disabled{opacity:.42;cursor:default}
 .skill.ready{border-color:rgba(245,196,81,.6)}
 .skill .dur{position:absolute;left:0;bottom:0;height:3px;background:var(--gold);width:0}
@@ -123,27 +130,39 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .btns{display:grid;gap:10px;width:min(320px,100%)}
 .ghost{padding:14px;border-radius:14px;border:1px solid var(--line);background:var(--panel);font-weight:700}
 
-/* ---------- Level up ---------- */
-.lvup{position:absolute;inset:0;display:grid;align-content:center;gap:16px;padding-inline:16px;padding-block:24px;background:rgba(4,6,18,.82);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
-.lvup header{display:grid;gap:4px;text-align:center}
-.lvup h2{margin:0;font-family:var(--f-disp);font-size:30px;letter-spacing:.08em;color:var(--gold)}
-.lvup p{margin:0;color:var(--dim);font-size:13px}
-.cards{display:grid;gap:10px}
-.card{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;text-align:left;padding:14px;border-radius:14px;border:1px solid var(--line);background:linear-gradient(180deg,#141d45,#0d1433)}
-.card:hover,.card:focus-visible{border-color:var(--gold)}
-.card .badge{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-family:var(--f-disp);font-weight:700;font-size:15px;color:var(--gold);border:1px solid rgba(245,196,81,.5);background:rgba(245,196,81,.08)}
-.card.stat .badge{color:#a9c1ff;border-color:rgba(91,140,255,.5);background:rgba(91,140,255,.08)}
-.card.special .badge{color:#e2b3ff;border-color:rgba(195,91,255,.6);background:rgba(195,91,255,.1)}
-.card .who{font-size:11px;color:var(--dim);display:flex;gap:6px;align-items:center}
-.card .who em{font-style:normal;font-family:var(--f-disp);color:var(--gold);letter-spacing:.06em}
-.card.stat .who em{color:#a9c1ff}
-.card .nm{font-size:16px;font-weight:700;margin-block:2px}
-.card .ds{font-size:12.5px;color:var(--dim);line-height:1.5}
-.card .ds b{color:var(--ok);font-weight:500}
-.card .dots{display:flex;gap:3px;margin-top:6px}
-.card .dots i{width:14px;height:3px;border-radius:2px;background:rgba(255,255,255,.14)}
-.card .dots i.on{background:var(--gold)}
-.card .dots i.next{background:var(--ok)}
+/* ---------- Level up: 새로운 스킬! ---------- */
+.lvup{position:absolute;inset:0;display:grid;align-content:center;gap:22px;padding-inline:12px;padding-block:24px;background:rgba(4,6,18,.78)}
+.lvup header{display:grid;gap:8px;justify-items:center;text-align:center}
+.lvup header p{margin:0;color:var(--dim);font-size:12px}
+.frame-title{position:relative;width:min(340px,86%);padding:14px 10px;background:#4a5070;border:1px solid #b89a4e;box-sizing:border-box}
+.frame-title::before,.frame-title::after{content:"";position:absolute;top:-5px;bottom:-5px;width:8px;border:2px solid #d8b864}
+.frame-title::before{left:-5px;border-right:0}
+.frame-title::after{right:-5px;border-left:0}
+.frame-title h2{margin:0;font-size:20px;font-weight:700;color:#fff;letter-spacing:.02em}
+.ncards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-items:stretch}
+.ncard{--hc:#3aa0ff;--hd:#1f7fe6;position:relative;display:grid;grid-template-rows:auto auto 1fr auto;padding:0 0 10px;border:0;border-radius:6px;background:#f6f9fc;color:#1e2235;text-align:center;box-shadow:0 3px 0 var(--hd),0 8px 18px rgba(0,0,0,.45);overflow:hidden;min-width:0;animation:ncin .32s both}
+.ncard:nth-child(2){animation-delay:.06s}
+.ncard:nth-child(3){animation-delay:.12s}
+@keyframes ncin{from{transform:translateY(18px) scale(.94);opacity:0}to{transform:none;opacity:1}}
+.ncard:hover,.ncard:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.ncard.chain{--hc:#f0a92f;--hd:#c47d0e}
+.ncard.special{--hc:#b05cff;--hd:#7d2fd0}
+.ncard.repair{--hc:#2fc48a;--hd:#1a9265}
+.nc-head{display:block;padding:10px 4px 8px;background:var(--hc);color:#10162e;font-size:14px;font-weight:700;line-height:1.25;word-break:keep-all}
+.nc-art{position:relative;display:grid;place-items:center;padding:12px 0 10px;background:radial-gradient(circle,var(--hc) 28%,transparent 31%) 0 0/9px 9px,linear-gradient(180deg,var(--hc),#f6f9fc 80%)}
+.nc-orb{width:68px;height:68px;border-radius:50%;display:grid;place-items:center;overflow:hidden;background:radial-gradient(circle at 50% 40%,#2a3466,#0b1130);border:3px solid #c9a24a;box-shadow:0 0 0 2px #6b4f17}
+.nc-orb img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated}
+.nc-orb img.pl{width:70%;height:70%}
+.nc-tag{position:absolute;top:6px;left:6px;font-size:9.5px;font-weight:700;padding:1px 5px;border-radius:4px;background:#10162e;color:#fff;font-family:var(--f-disp)}
+.nc-desc{display:grid;place-items:center;margin:4px 8px 8px;padding:10px 6px;min-height:84px;border:2px solid #d5dbe6;border-radius:8px;background:#fff;font-size:12px;line-height:1.45;word-break:keep-all}
+.nc-desc em{font-style:normal;font-weight:700;color:#e2394f}
+.nc-desc b{color:#e2397a;font-weight:700}
+.nc-stars{display:flex;justify-content:center;gap:3px;min-height:20px}
+.nc-stars i{width:20px;height:20px;background:#3a4258;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.nc-stars i.on{background:#f5c451}
+.nc-stars i.next{background:#f5c451;animation:starblink .8s ease-in-out infinite alternate}
+@keyframes starblink{from{opacity:.35}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.ncard,.nc-stars i.next{animation:none}}
 .banner{position:absolute;left:16px;right:16px;top:40%;display:grid;gap:4px;text-align:center;pointer-events:none;opacity:0;transition:opacity .3s}
 .banner.show{opacity:1}
 .banner .b1{font-family:var(--f-disp);font-weight:700;font-size:28px;letter-spacing:.1em;color:var(--gold);text-shadow:0 0 18px rgba(245,196,81,.6)}
@@ -545,9 +564,36 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .rename{display:grid;grid-template-columns:1fr auto;gap:8px}
 .toast{position:absolute;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,10px);max-width:calc(100% - 32px);padding:10px 16px;border-radius:12px;background:rgba(20,28,66,.97);border:1px solid var(--line);font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:30;text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
-.pause-menu{position:absolute;inset:0;display:grid;align-content:center;justify-items:center;gap:12px;padding-inline:16px;background:rgba(3,5,14,.8);z-index:15}
-.pause-menu h2{margin:0 0 6px;font-family:var(--f-disp);letter-spacing:.2em;font-size:24px}
-.pause-menu .btns{width:min(300px,100%)}
+.pause-menu{position:absolute;inset:0;display:grid;place-items:center;padding-inline:16px;padding-block:calc(24px + env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-bottom,0px));background:rgba(3,5,14,.8);z-index:15;box-sizing:border-box}
+.pm-panel{display:grid;gap:12px;width:min(380px,100%);max-height:100%;min-height:0;grid-template-rows:auto auto minmax(0,1fr) auto auto auto;padding:0 14px 16px;border-radius:14px;box-sizing:border-box}
+.pm-head{margin:0 -14px;padding:12px 16px;text-align:center;font-size:18px;font-weight:700;color:#fff;border-radius:12px 12px 0 0}
+.pm-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pm-tabs button{padding:7px 4px;border:1px solid var(--line);border-radius:8px;background:rgba(15,22,52,.7);color:var(--dim);font-size:13px;font-weight:700}
+.pm-tabs button[aria-selected="true"]{color:#fff}
+.pm-body{overflow-y:auto;min-height:120px;max-height:46vh;padding:4px 2px}
+.pm-skills{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:12px 6px}
+.pm-skill{display:grid;justify-items:center}
+.pm-skill .pm-orb{position:relative;width:58px;height:58px;overflow:hidden;border-radius:8px;box-sizing:border-box}
+.pm-skill .pm-orb img{width:100%;height:100%;object-fit:cover;image-rendering:pixelated}
+.pm-skill .pm-orb img.pl{width:70%;height:70%;margin:15%}
+.pm-skill b{margin-top:4px;font-size:11px;font-weight:700;line-height:1.3;text-align:center;word-break:keep-all}
+.pm-skill small{font-size:10px;color:var(--dim);margin-top:1px;text-align:center}
+.pm-empty{grid-column:1/-1;text-align:center;font-size:13px;color:var(--dim);line-height:1.6;margin:18px 0}
+.pm-stats-list{display:grid;gap:8px}
+.pm-row{display:grid;grid-template-columns:34px 1fr;gap:8px;align-items:center;font-size:12px}
+.pm-row img{width:34px;height:34px;border-radius:6px;background:#0b1130;image-rendering:pixelated}
+.pm-row span{display:grid;gap:3px}
+.pm-row .top{display:flex;justify-content:space-between;gap:8px}
+.pm-row em{font-style:normal;font-family:var(--f-disp);font-variant-numeric:tabular-nums}
+.pm-row .bar{height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}
+.pm-row .bar i{display:block;height:100%;background:var(--gold)}
+.pm-coin{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 14px;border-radius:10px;box-sizing:border-box}
+.pm-coin img{width:28px;height:28px;image-rendering:pixelated}
+.pm-coin b{font-family:var(--f-disp);font-size:22px}
+.pm-coin small{font-size:11px;color:#ffe08a}
+.pm-warn{margin:-4px 0;font-size:12px;color:#ff9a9a;text-align:center}
+.pm-btns{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:8px}
+.pm-btns button{padding:12px 4px;font-size:15px}
 .rewards{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
 .rewards span{font-family:var(--f-disp);font-size:13px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel)}
 .rewards .lvup-tag{border-color:var(--gold);color:var(--gold)}
@@ -563,7 +609,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
       <div class="wave"><small>WAVE</small><span id="waveNo">1</span><span class="zone" id="zoneChip">내행성계</span></div>
       <div class="row" style="gap:8px">
         <div class="timer" id="timer">40.0</div>
-        <button class="pause" id="pauseBtn" type="button">일시정지</button>
+        <button class="pause" id="pauseBtn" type="button" aria-label="일시정지"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="9.5" y="2" width="3.5" height="12" rx="1" fill="currentColor"/></svg></button>
       </div>
     </div>
     <div class="bar-wrap">
@@ -576,31 +622,44 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
       <div class="bar-label"><b id="myName">지구</b><span class="num" id="myHpTxt">0</span></div>
       <div class="bar me"><i id="myHp"></i></div>
     </div>
-    <div class="lvrow"><span class="lv" id="lvTxt">Lv 1</span><div class="bar xp"><i id="xpBar"></i></div></div>
-    <div class="energy"><span class="lbl">기력</span><div class="pips" id="pips"></div></div>
+    <div class="hud-row">
+      <div class="lvrow"><span class="lv" id="lvTxt">Lv 1</span><div class="bar xp"><i id="xpBar"></i></div></div>
+      <div class="energy"><span class="lbl">기력</span><div class="pips" id="pips"></div></div>
+    </div>
     <div class="skills">
       <button class="skill" id="sk0" type="button"><span class="ic"><img src="img/sk_meteor.png" alt="" aria-hidden="true"></span><span class="nm">유성우</span><span class="cs">기력 3</span><i class="dur"></i></button>
       <button class="skill" id="sk1" type="button"><span class="ic"><img src="img/sk_shield.png" alt="" aria-hidden="true"></span><span class="nm">성운 방패</span><span class="cs">기력 2</span><i class="dur"></i></button>
       <button class="skill" id="sk2" type="button"><span class="ic"><img src="img/sk_nova.png" alt="" aria-hidden="true"></span><span class="nm">초신성 가속</span><span class="cs">기력 4</span><i class="dur"></i></button>
     </div>
-    <div class="hint">적 별자리 탭 <b>집중 공격</b> · 내 별자리 탭 <b>레벨업 (기력 1)</b></div>
   </div>
   <div class="banner" id="banner"><div class="b1" id="b1"></div><div class="b2" id="b2"></div></div>
 
   <section class="lvup" id="lvup" hidden aria-labelledby="lvupTitle">
     <header>
-      <span class="eyebrow">LEVEL UP</span>
-      <h2 id="lvupTitle">Lv 2</h2>
-      <p>편성한 별자리의 능력 중 하나를 고르세요</p>
+      <div class="frame-title"><h2 id="lvupTitle">새로운 스킬!</h2></div>
+      <p id="lvupSub">전투 Lv 2 · 하나를 골라요</p>
     </header>
-    <div class="cards" id="cards"></div>
+    <div class="ncards" id="cards"></div>
   </section>
 
-  <section class="pause-menu" id="pauseMenu" hidden>
-    <h2>PAUSE</h2>
-    <div class="btns">
-      <button class="cta" id="resumeBtn" type="button">계속하기</button>
-      <button class="ghost" id="quitBtn" type="button">포기하고 결과 보기</button>
+  <section class="pause-menu" id="pauseMenu" hidden aria-labelledby="pauseTitle">
+    <div class="pm-panel">
+      <h2 class="pm-head" id="pauseTitle">일시정지</h2>
+      <div class="pm-tabs" role="tablist">
+        <button type="button" role="tab" id="pauseTabSkills" aria-selected="true">습득 스킬</button>
+        <button type="button" role="tab" id="pauseStats" aria-selected="false">피해 통계</button>
+      </div>
+      <div class="pm-body">
+        <div class="pm-skills" id="pauseSkills"></div>
+        <div class="pm-stats-list" id="pauseStatsList" hidden></div>
+      </div>
+      <div class="pm-coin" id="pauseCoin"><img src="img/cur_dust.png" alt="" aria-hidden="true"><b id="pauseDust">0</b><small>획득 예정 Star Dust</small></div>
+      <p class="pm-warn" id="quitWarn" hidden></p>
+      <div class="pm-btns">
+        <button class="ghost" id="restartBtn" type="button">재시작</button>
+        <button class="cta" id="resumeBtn" type="button">이어하기</button>
+        <button class="ghost danger-btn" id="quitBtn" type="button">나가기</button>
+      </div>
     </div>
   </section>
 
@@ -710,6 +769,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 <script src="balance.js"></script>
 <script src="pixel.js"></script>
 <script src="battle.js"></script>
+<script src="arcade.js"></script>
 <script src="skills.js"></script>
 <script src="ads.js"></script>
 <script src="app.js"></script>

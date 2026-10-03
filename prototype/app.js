@@ -1237,7 +1237,7 @@ function openSettings() {
 function finishBattle(win) {
   const arcade = G.mode === 'arcade';
   let dust, chest, xp;
-  if (arcade) { dust = 120 * G.wave + 20 * G.kills; chest = G.wave >= 5 ? 3 : 1; xp = 12 * G.wave; save.best = Math.max(save.best, G.wave); }
+  if (arcade) { dust = arcadeDust(); chest = G.wave >= 5 ? 3 : 1; xp = 12 * G.wave; save.best = Math.max(save.best, G.wave); }
   else { dust = win ? 600 : 180; chest = win ? 3 : 1; xp = win ? 40 : 15; win ? save.wins++ : save.losses++; }
   save.dust += dust; save.chest = Math.min(CHEST_MAX, save.chest + chest);
   const up = gainAccXp(xp);
@@ -1258,10 +1258,62 @@ $('retryBtn').addEventListener('click', () => { $('resultScr').hidden = true; st
 $('lobbyBtn').addEventListener('click', () => { $('resultScr').hidden = true; enterHome(); });
 
 /* ---------- Pause menu ---------- */
-function setPaused(p) { G.paused = p; $('pauseMenu').hidden = !p; }
+// 일시정지: the skills picked up this run (one orb per stat card / awakening, with its level),
+// a damage-by-constellation view (top-right button), Star Dust earned so far, and sound · resume · home.
+const arcadeDust = () => 120 * G.wave + 20 * G.kills;
+function pauseSkills() {
+  const out = [];
+  for (const id of new Set(G.me.cons.map(c => c.def.id))) {
+    const c = G.me.cons.find(x => x.def.id === id), img = `img/con_${c.skin.id}.webp`;
+    for (const [k, name] of c.skin.stats) if (c.stacks[k]) out.push({ img, name, sub: `Lv${c.stacks[k]} · ${c.skin.name}` });
+    if (c.chain) out.push({ img, name: c.skin.chain[c.chain - 1].name, sub: `각성 ${ROMAN[c.chain]} · ${c.skin.name}`, cls: 'chain' });
+  }
+  const fix = G.taken.filter(t => t === '행성 수리').length;
+  if (fix) out.push({ img: pxPlanetUrl(save.mainPlanet), name: '행성 수리', sub: `×${fix} · ${G.me.planet.name}`, cls: 'repair', pl: true });
+  return out;
+}
+function renderPause() {
+  const pvp = G.mode === 'pvp', stats = $('pauseStats').getAttribute('aria-selected') === 'true';
+  $('pauseTabSkills').setAttribute('aria-selected', String(!stats));
+  $('pauseSkills').hidden = stats; $('pauseStatsList').hidden = !stats;
+  const list = pauseSkills();
+  $('pauseSkills').innerHTML = pvp ? '<p class="pm-empty">대전은 모든 능력치와 각성이 최대로 시작해요</p>'
+    : list.length ? list.map(o => `<div class="pm-skill ${o.cls || ''}"><span class="pm-orb"><img ${o.pl ? 'class="pl" ' : ''}src="${o.img}" alt="" aria-hidden="true"></span><b>${o.name}</b><small>${o.sub}</small></div>`).join('')
+    : '<p class="pm-empty">아직 습득한 스킬이 없어요.<br>적을 부숴 레벨업하면 새 스킬을 골라요.</p>';
+  const by = G.dmgBy || {}, rows = Object.entries(by).sort((a, b) => b[1] - a[1]), top = rows.length ? rows[0][1] : 1;
+  $('pauseStatsList').innerHTML = rows.length ? rows.map(([id, v]) => {
+    const c = G.me.cons.find(x => x.def.id === id);
+    const img = c ? `img/con_${c.skin.id}.webp` : 'img/sk_meteor.png', name = c ? c.skin.name : '게이지 스킬 · 기타';
+    return `<div class="pm-row"><img src="${img}" alt="" aria-hidden="true"><span><span class="top"><b>${name}</b><em>${fmt(Math.round(v))}</em></span><span class="bar"><i style="width:${(v / top * 100).toFixed(1)}%"></i></span></span></div>`;
+  }).join('') : '<p class="pm-empty">아직 입힌 피해가 없어요</p>';
+  $('pauseCoin').hidden = pvp;
+  $('pauseDust').textContent = fmt(arcadeDust());
+}
+// 재시작 and 나가기 both end the run, so each needs a second tap within 2.5 s
+let armed = null, armedAt = 0;
+function disarm() { armed = null; $('quitWarn').hidden = true; ['restartBtn', 'quitBtn'].forEach(id => $(id).classList.remove('armed')); }
+function confirmTap(id, msg) {
+  if (armed === id && performance.now() - armedAt < 2500) { disarm(); return true; }
+  disarm(); armed = id; armedAt = performance.now(); $(id).classList.add('armed');
+  $('quitWarn').textContent = msg; $('quitWarn').hidden = false;
+  return false;
+}
+function setPaused(p) {
+  G.paused = p; $('pauseMenu').hidden = !p;
+  disarm();
+  if (p) { $('pauseStats').setAttribute('aria-selected', 'false'); renderPause(); }
+}
 $('pauseBtn').addEventListener('click', () => setPaused(true));
 $('resumeBtn').addEventListener('click', () => setPaused(false));
+$('pauseTabSkills').addEventListener('click', () => { $('pauseStats').setAttribute('aria-selected', 'false'); renderPause(); });
+$('pauseStats').addEventListener('click', () => { $('pauseStats').setAttribute('aria-selected', 'true'); renderPause(); });
+$('restartBtn').addEventListener('click', () => {
+  if (!confirmTap('restartBtn', '한 번 더 누르면 처음부터 다시 시작해요 (보상 없음)')) return;
+  setPaused(false);
+  if (G.state === 'fight' || G.state === 'clear' || G.state === 'intro') startRun(G.mode);
+});
 $('quitBtn').addEventListener('click', () => {
+  if (!confirmTap('quitBtn', '한 번 더 누르면 전투를 끝내고 결과를 봐요')) return;
   setPaused(false);
   if (G.state === 'fight' || G.state === 'clear' || G.state === 'intro') { G.state = 'over'; finishBattle(false); }
 });

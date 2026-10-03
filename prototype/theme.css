@@ -131,3 +131,19 @@
 .loot-art{margin-bottom:22px}
 .loot-art .box{width:120px;height:120px;border-radius:0;background:url(img/icon_chest.png) center/contain no-repeat;box-shadow:none;filter:drop-shadow(0 0 18px rgba(255,200,80,.5))}
 .loot-art .box::before,.loot-art .box::after{content:none}
+
+/* ---------- Pause (일시정지): silver framed panel, grey title bar, gold coin gauge, teal/steel/red buttons ---------- */
+.pm-panel{border:2px solid transparent;background:var(--inner) padding-box,var(--metal) border-box;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 8px 24px rgba(0,0,0,.6)}
+.pm-head{background:linear-gradient(180deg,#3a4458,#1c2230);border-bottom:2px solid #8f9bb0;text-shadow:var(--stroke)}
+.pm-tabs button{border:0;border-image:url(img/btn_steel.png) 24 fill / 10px stretch;text-shadow:var(--stroke)}
+.pm-tabs button[aria-selected="true"]{border-image-source:url(img/btn_teal.png)}
+.pm-skill .pm-orb{border:2px solid transparent;background:var(--inner) padding-box,var(--metal) border-box}
+.pm-skill.chain .pm-orb{background:var(--inner) padding-box,var(--goldf) border-box;box-shadow:0 0 10px rgba(255,190,70,.4)}
+.pm-skill.repair .pm-orb{background:var(--inner) padding-box,linear-gradient(160deg,#d8ffff,#3fd0da 35%,#0b5b66 60%,#7ff0f4 100%) border-box}
+.pm-skill b{text-shadow:var(--stroke)}
+.pm-coin{border:2px solid transparent;background:linear-gradient(180deg,#2a1d08,#120c03) padding-box,var(--goldf) border-box;box-shadow:0 0 12px rgba(255,190,70,.3)}
+.pm-coin b{text-shadow:var(--stroke)}
+.pm-btns .danger-btn{border-image-source:url(img/btn_red.png)}
+.pm-btns .armed{filter:brightness(1.35) saturate(1.3);animation:armed .5s ease-in-out infinite alternate}
+@keyframes armed{to{transform:scale(1.04)}}
+@media (prefers-reduced-motion:reduce){.pm-btns .armed{animation:none}}
