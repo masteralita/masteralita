@@ -87,11 +87,12 @@ function startRun(mode) {
   G.me = buildMySystem();
   const P = G.me.planet;
   Object.assign(G, { mode, wave: 1, kills: 0, energy: 2 + P.energy, shield: 0, nova: 0, roar: 0, pShield: 0, proj: [], beams: [], fx: [], texts: [],
-    lv: 1, xp: 0, pendingLv: 0, taken: [], zone: ZONES[0], choosing: false, paused: false });
+    lv: 1, xp: 0, pendingLv: 0, taken: [], zone: ZONES[0], choosing: false, paused: false, dmgBy: {}, arc: null });
   G.T = { armor: 0, marmor: 0, evade: 0, dmgRed: 0, planetRed: P.dmgRed };
   $('myName').textContent = P.name;
   showBattleUi(true); setupSkills();
-  if (mode === 'pvp') { startPvp(); maxOutPvp(); } else startWave();
+  $('hint').innerHTML = mode === 'pvp' ? '적 별자리 탭 <b>집중 공격</b> · 내 별자리 탭 <b>레벨업 (기력 1)</b>' : '적 탭 <b>집중 공격</b> · 내 별자리 탭 <b>레벨업 (기력 1)</b>';
+  if (mode === 'pvp') { startPvp(); maxOutPvp(); } else startArcadeWave();
   beginIntro();
 }
 // Battle opening: both systems slide in (foe from the top, me from the bottom), then 3·2·1 and the fight starts.
@@ -142,34 +143,10 @@ function startPvp() {
   layout();
   banner('SPEC BATTLE', `${name} (Lv ${G.ghost.lv}) 의 행성계`, 1.6);
 }
-function startWave() {
-  const n = G.wave, z = zoneOf(n);
-  const bossTier = n % 10 === 0 ? 2 : n % 5 === 0 ? 1 : 0;
-  const deep = Math.max(0, n - WAVE.deepFrom);
-  const m = Math.pow(WAVE.statGrowth, n - 1) * Math.pow(WAVE.deepGrowth, deep);
-  const look = bossTier === 2 ? z.boss : bossTier === 1 ? z.mid : z.foes[Math.floor(Math.random() * z.foes.length)];
-  const base = z === ZONES[0] ? 2 : z === ZONES[1] ? 3 : 4;
-  const count = bossTier ? base + 1 : Math.min(base + Math.floor(((n - 1) % 10) / 4), base + 2);
-  const pool = Array.from({ length: count }, () => ZODIAC[Math.floor(Math.random() * ZODIAC.length)]);
-  const pHp = Math.round(WAVE.planetHp * Math.pow(WAVE.planetGrowth, n - 1) * Math.pow(WAVE.deepGrowth, deep) * (bossTier === 2 ? WAVE.zoneBossHp : bossTier === 1 ? WAVE.midBossHp : 1));
-  G.foe = makeSystem('foe', { isPlanet: true, look, kind: look.kind, bossTier, ability: bossTier ? (look.ability || 'stun') : null,
-    name: look.name, hp: pHp, maxHp: pHp, dArmor: 15 + n * 2, mArmor: 15 + n * 2, flash: 0, dot: null, shred: 0, side: 'foe' },
-    pool.map(d => makeCon(d, 'foe', { hp: WAVE.conHp * m, atk: WAVE.conAtk * m })));
-  for (const c of G.me.cons) { c.dead = false; c.hp = c.maxHp; c.alpha = 1; c.stun = 0; c.dot = null; c.revived = false; c.molted = false; c.invuln = 0; }
-  const P = G.me.planet; if (n > 1) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * .15);
-  resetHole();
-  G.timer = WAVE.timer; G.enraged = false; G.bossCd = 5; G.bossCd2 = 8; G.focus = null; G.proj = []; G.beams = [];
-  G.state = 'fight';
-  const newZone = z !== G.zone || n === 1; G.zone = z;
-  $('foeName').textContent = (bossTier === 2 ? '구역 보스 · ' : bossTier === 1 ? 'BOSS · ' : '') + look.name;
-  $('waveNo').textContent = n; $('zoneChip').textContent = z.name;
-  layout();
-  if (newZone) banner(z.en, `${z.name} 진입 · WAVE ${n}`, 2);
-  else banner(bossTier ? `BOSS WAVE ${n}` : `WAVE ${n}`, look.name, 1.3);
-}
+// 아케이드 waves (asteroids, meteors, alien ships): arcade.js startArcadeWave()
 
 /* ---------- Black hole ---------- */
-// 30 s into a fight (each PvP battle / each arcade wave) a black hole opens between the two systems
+// 30 s into a PvP battle a black hole opens between the two systems
 // and drains both planets by a flat 50 HP per second, ignoring armor, shields and evasion.
 const HOLE = { at: 30, dmg: 50, every: 1 };
 function resetHole() { G.holeT = 0; G.holeCd = 0; G.holeOn = false; G.holePulse = 0; G.holeDust = []; if (G.me) G.me.quake = 0; if (G.foe) G.foe.quake = 0; }
@@ -289,6 +266,7 @@ function conAtk(c) {
   return a;
 }
 function pickTarget(c, exclude) {
+  if (G.mode === 'arcade' && c.side === 'me') return arcadeTarget(c, exclude);
   const enemy = other(c.side);
   if (c.def.special) return enemy.planet;
   if (c.side === 'me' && G.focus && !G.focus.isPlanet && alive(G.focus) && G.focus !== exclude) return G.focus;
@@ -299,7 +277,7 @@ function pickTarget(c, exclude) {
   return best;
 }
 function randomOtherEnemy(c, t) {
-  const live = other(c.side).cons.filter(x => !x.dead && x !== t);
+  const live = other(c.side).cons.filter(x => !x.dead && x !== t && onField(x));
   return live.length ? live[Math.floor(Math.random() * live.length)] : null;
 }
 
@@ -337,6 +315,7 @@ function applyDamage(t, dmg, kind, { src = null, tier = 0, color = null, silent 
   let d = dmg * 100 / (100 + armor);
   if (t.isPlanet && t.side === 'me' && G.pShield > 0) { const a = Math.min(G.pShield, d); G.pShield -= a; d -= a; }
   t.hp -= d; t.flash = .12;
+  if (t.side === 'foe' && d > 0 && G.dmgBy) { const k = src && src.side === 'me' && src.def ? src.def.id : 'skill'; G.dmgBy[k] = (G.dmgBy[k] || 0) + Math.min(d, d + t.hp); }
   if (t.side === 'me' && t.isPlanet && d > 0 && !REDUCED_MOTION) G.shake = Math.min(SHAKE_MAX, G.shake + 1 + 40 * d / t.maxHp);
   if (!silent) {
     const big = tier >= 1;
@@ -368,7 +347,8 @@ function killCon(t, src) {
   if (G.focus === t) G.focus = null;
   if (t.side === 'foe') {
     G.kills += 1;
-    gainXp(6 + G.wave);
+    gainXp(t.xp ?? 6 + G.wave);
+    if (t.mob) arcadeKilled(t);
     if ((e = E(src, 'energyKill'))) { G.energy = Math.min(G.maxEnergy, G.energy + e.v); say(x, y - 26, '기력 +' + e.v, '#f5c451', 1); }
     if (t.dot && G.me.cons.some(s => E(s, 'poisonSpread'))) {
       const live = G.foe.cons.filter(x => !x.dead && x !== t), n = live[Math.floor(Math.random() * live.length)];
@@ -467,24 +447,28 @@ function perkOptions() {
   while (picked.length < 3) picked.push({ type: 'repair', id: null, name: '행성 수리', desc: '행성 HP를 <b>30%</b> 회복해요.' });
   return picked;
 }
+// 새로운 스킬! popup (Soul Hunter style): three tall cards side by side — coloured header with the
+// skill name, the constellation's art in a round frame, the description, and stars for its level.
+function perkCard(o, i) {
+  const c = o.id ? G.me.cons.find(x => x.def.id === o.id) : null, d = o.id ? CON[o.id] : null;
+  const kind = o.type === 'stat' ? 'stat' : o.type === 'chain' ? (d && d.special ? 'special' : 'chain') : 'repair';
+  const total = o.type === 'stat' ? STAT_MAX : o.type === 'chain' ? 3 : 0;
+  const stars = Array.from({ length: total }, (_, j) => `<i class="${j < o.lvl - 1 ? 'on' : j === o.lvl - 1 ? 'next' : ''}"></i>`).join('');
+  const tag = o.type === 'stat' ? '능력치' : o.type === 'chain' ? `각성 ${ROMAN[o.lvl]}` : '보급';
+  const who = c ? `<em style="--pc:rgb(${c.skin.pal.line})">${c.skin.name}</em>의 ` : '';
+  const art = c ? `<img src="img/con_${c.skin.id}.webp" alt="" aria-hidden="true">` : `<img class="pl" src="${pxPlanetUrl(save.mainPlanet)}" alt="" aria-hidden="true">`;
+  return `<button class="ncard ${kind}" type="button" data-i="${i}">
+    <span class="nc-head">${o.name}</span>
+    <span class="nc-art"><span class="nc-tag">${tag}</span><span class="nc-orb">${art}</span></span>
+    <span class="nc-desc"><span>${who}${o.desc}</span></span>
+    <span class="nc-stars">${stars}</span>
+  </button>`;
+}
 function openLevelUp() {
   G.choosing = true; G.pendingLv -= 1;
   const opts = perkOptions();
-  $('lvupTitle').textContent = `Lv ${G.lv - G.pendingLv}`;
-  $('cards').innerHTML = opts.map((o, i) => {
-    const d = o.id ? CON[o.id] : null;
-    const cls = o.type === 'stat' ? 'stat' : d && d.special ? 'special' : '';
-    const badge = o.type === 'stat' ? `+${o.lvl}` : o.type === 'chain' ? ROMAN[o.lvl] : '+';
-    const tag = o.type === 'stat' ? `능력치 ${o.lvl}/${STAT_MAX}` : o.type === 'chain' ? `각성 ${ROMAN[o.lvl]}` : '보급';
-    const total = o.type === 'stat' ? STAT_MAX : 3;
-    const dots = o.id ? Array.from({ length: total }, (_, j) => `<i class="${j < o.lvl - 1 ? 'on' : j === o.lvl - 1 ? 'next' : ''}"></i>`).join('') : '';
-    return `<button class="card ${cls}" type="button" data-i="${i}">
-      <span class="badge">${badge}</span>
-      <span><span class="who">${d ? d.name + '자리' : '행성'}<em>${tag}</em></span>
-      <span class="nm" style="display:block">${o.name}</span><span class="ds" style="display:block">${o.desc}</span>
-      ${dots ? `<span class="dots">${dots}</span>` : ''}</span>
-    </button>`;
-  }).join('');
+  $('lvupSub').textContent = `전투 Lv ${G.lv - G.pendingLv} · 하나를 골라요`;
+  $('cards').innerHTML = opts.map(perkCard).join('');
   $('cards').onclick = e => {
     const b = e.target.closest('[data-i]'); if (!b) return;
     applyPerk(opts[+b.dataset.i]);
@@ -682,8 +666,9 @@ cv.addEventListener('pointerdown', e => {
     say(mine.x, mine.y - 24, 'Lv ' + mine.lv, '#f5c451', 1); burst(mine.x, mine.y, 14, '#f5c451');
     return;
   }
-  const foe = hitCon(G.foe);
+  const foe = G.mode === 'arcade' ? arcadeHit(x, y) : hitCon(G.foe);
   if (foe) { G.focus = foe; return; }
+  if (G.mode === 'arcade') return;
   if (Math.hypot(G.foe.cx - x, G.foe.cy - y) < G.foe.pr * 1.4) {
     G.focus = G.foe.planet;
     if (G.foe.cons.some(c => !c.dead)) say(G.foe.cx, G.foe.cy - G.foe.pr - 10, '별자리를 먼저 부숴야 해요', '#8d96c4', 1.2);
@@ -748,41 +733,13 @@ function updateSystem(sys, dt) {
   }
 }
 
-function bossAct(dt) {
-  const B = G.foe.planet;
-  if (!B.bossTier) return;
-  G.bossCd -= dt;
-  if (G.bossCd <= 0) {
-    G.bossCd = B.bossTier === 2 ? 5 : 6;
-    const live = G.me.cons.filter(c => !c.dead);
-    if (live.length) {
-      const c = live[Math.floor(Math.random() * live.length)];
-      const hasSco = G.me.cons.some(x => x.def.id === 'sco' && !x.dead);
-      c.stun = hasSco ? 1.3 : 2.6;
-      G.beams.push({ x1: G.foe.cx, y1: G.foe.cy, x2: c.x, y2: c.y, t: .4, c: '#c35bff', w: 3, zig: true });
-      say(c.x, c.y - 24, '기절', '#d58bff', 1);
-    }
-  }
-  if (B.bossTier === 2) {
-    G.bossCd2 -= dt;
-    if (G.bossCd2 <= 0) {
-      G.bossCd2 = 8;
-      const P = G.me.planet;
-      if (B.ability === 'burn') { P.dot = { dps: P.maxHp * .012, t: 5 }; banner('태양 플레어', '행성이 불타요', .9); }
-      else if (B.ability === 'meteor') {
-        for (let i = 0; i < 4; i++) G.proj.push({ x: G.me.cx + rnd(-80, 80), y: -30 - i * 50, t: P, src: G.foe.cons.find(c => !c.dead) || null, sp: 520, dmg: P.maxHp * .04, kind: 'phys', col: '#e0b6ff', w: 4, len: 22, debris: Math.floor(Math.random() * 4) });
-        banner('고리 파편 낙하', '', .9);
-      } else if (B.ability === 'drain') { if (G.energy > 0) { G.energy -= 1; say(G.me.cx, G.me.cy - G.me.pr - 12, '기력 -1', '#c35bff', 1); } }
-    }
-  }
-}
-
 function update(dt) {
   G.shake = Math.max(0, G.shake - dt * 16);
   if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) $('banner').classList.remove('show'); }
   if (!G.me) return;
   if (G.state === 'fight' && G.pendingLv > 0 && !G.choosing) { openLevelUp(); return; }
-  updateSystem(G.me, dt); updateSystem(G.foe, dt);
+  const arc = G.mode === 'arcade';
+  updateSystem(G.me, dt); if (arc) updateArcade(dt); else updateSystem(G.foe, dt);
   if (G.state === 'intro') updateIntro(dt);
   if (G.goT > 0) G.goT -= dt;
 
@@ -799,11 +756,10 @@ function update(dt) {
     if (G.nova > 0) G.nova -= dt;
     if (G.roar > 0) G.roar -= dt;
     skillTick(dt);
-    bossAct(dt);
-    if (G.state === 'fight') updateHole(dt);
+    if (!arc && G.state === 'fight') updateHole(dt);
   } else if (G.state === 'clear') {
     G.clearT -= dt;
-    if (G.clearT <= 0 && G.pendingLv === 0) { G.wave += 1; startWave(); }
+    if (G.clearT <= 0 && G.pendingLv === 0) { G.wave += 1; startArcadeWave(); }
     else if (G.clearT <= 0 && !G.choosing) openLevelUp();
   }
 
@@ -1148,7 +1104,7 @@ function drawSystem(sys, t) {
 function drawReticle(t) {
   if (!G.focus || !alive(G.focus) || G.state !== 'fight') return;
   const [x, y] = posOf(G.focus);
-  const r = (G.focus.isPlanet ? G.foe.pr * 1.3 : conSize(G.foe) * G.focus.s * 1.3) + 2 * Math.sin(t * 6);
+  const r = (G.focus.isPlanet ? G.foe.pr * 1.3 : G.focus.mob ? G.focus.r * 1.3 + 4 : conSize(G.foe) * G.focus.s * 1.3) + 2 * Math.sin(t * 6);
   ctx.strokeStyle = '#f5c451'; ctx.lineWidth = 1.8;
   for (let i = 0; i < 4; i++) { const a = i * TAU / 4 + t; ctx.beginPath(); ctx.arc(x, y, r, a, a + .7); ctx.stroke(); }
 }
@@ -1161,11 +1117,12 @@ function draw(t) {
 function drawScene(t) {
   drawBg(t);
   if (!G.me) return;
-  for (const sys of [G.foe, G.me]) {
+  const arc = G.mode === 'arcade';
+  for (const sys of arc ? [G.me] : [G.foe, G.me]) {
     const oy = introOffset(sys);
     if (oy) { ctx.save(); ctx.translate(0, oy); drawSystem(sys, t); ctx.restore(); } else drawSystem(sys, t);
   }
-  drawBlackHole(t);
+  if (arc) drawArcade(t); else drawBlackHole(t);
   drawReticle(t);
   for (const b of G.beams) {
     const al = clamp(b.t * 6, 0, 1);
@@ -1223,9 +1180,10 @@ for (let i = 0; i < 10; i++) { const s = document.createElement('span'); $('pips
 function hud() {
   if (!G.me || $('hudTop').hidden) return;
   const fp = G.foe.planet, mp = G.me.planet;
-  $('foeHp').style.transform = `scaleX(${clamp(fp.hp / fp.maxHp, 0, 1)})`;
+  if (G.mode === 'arcade') arcadeHud();
+  else $('foeHp').style.transform = `scaleX(${clamp(fp.hp / fp.maxHp, 0, 1)})`;
   $('myHp').style.transform = `scaleX(${clamp(mp.hp / mp.maxHp, 0, 1)})`;
-  $('foeHpTxt').textContent = `${Math.ceil(fp.hp).toLocaleString()} / ${fp.maxHp.toLocaleString()}`;
+  if (G.mode !== 'arcade') $('foeHpTxt').textContent = `${Math.ceil(fp.hp).toLocaleString()} / ${fp.maxHp.toLocaleString()}`;
   $('myHpTxt').textContent = `${Math.ceil(mp.hp).toLocaleString()} / ${mp.maxHp.toLocaleString()}` + (G.pShield > 1 ? ` (+${Math.round(G.pShield)})` : '');
   const pvp = G.mode === 'pvp';
   $('xpBar').style.transform = `scaleX(${pvp ? 1 : clamp(G.xp / xpNeed(G.lv), 0, 1)})`;

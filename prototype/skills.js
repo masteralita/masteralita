@@ -25,7 +25,7 @@ function castSkill(i) {
   const s = SK.list[i];
   if (!s || G.state !== 'fight' || G.paused || G.choosing || G.energy < s.cost) return;
   G.energy -= s.cost;
-  const foes = G.foe.cons.filter(c => !c.dead), P = G.me.planet;
+  const foes = G.foe.cons.filter(c => !c.dead && onField(c)), P = G.me.planet;
   const timed = d => { SK.dur[i] = SK.durT[i] = Math.max(.01, d); };
   switch (s.type) {
     case 'meteor': {
@@ -33,10 +33,12 @@ function castSkill(i) {
       for (let k = 0; k < 5; k++) G.proj.push({ x: tx + rnd(-60, 60) - 90, y: -20 - k * 40, t, src: null, sp: 700, dmg: 40 + t.maxHp * s.v + G.wave * 6, kind: 'phys', col: '#ffe9a8', w: 4, len: 26, meteor: true });
       break;
     }
-    case 'strike': {
-      const F = G.foe.planet;
-      G.beams.push({ x1: G.me.cx, y1: G.me.cy, x2: G.foe.cx, y2: G.foe.cy, t: .5, c: '#ffe9a8', w: 6 });
-      applyDamage(F, F.maxHp * s.v * (100 + F.dArmor) / 100, 'phys', { color: '#ffe9a8' }); // armor-adjusted so it lands ≈ v of max HP
+    case 'strike': { // PvP: the enemy planet · arcade: the toughest mob (boss first), hit 3× harder unless it is the boss
+      const arc = G.mode === 'arcade', F = arc ? foes.slice().sort((a, b) => b.maxHp - a.maxHp)[0] : G.foe.planet;
+      if (!F) break;
+      const [fx, fy] = posOf(F);
+      G.beams.push({ x1: G.me.cx, y1: G.me.cy, x2: fx, y2: fy, t: .5, c: '#ffe9a8', w: 6 });
+      applyDamage(F, F.maxHp * s.v * (arc && F.mob !== 'boss' ? 3 : 1) * (100 + F.dArmor) / 100, 'phys', { color: '#ffe9a8' }); // armor-adjusted so it lands ≈ v of max HP
       break;
     }
     case 'volley': {
@@ -63,6 +65,7 @@ function castSkill(i) {
         applyDamage(c, c.maxHp * v, 'magic', { color: '#9fd8ff' }); x = c.x; y = c.y; v *= .85;
       }
       const F = G.foe.planet;
+      if (G.mode === 'arcade') break;
       G.beams.push({ x1: x, y1: y, x2: G.foe.cx, y2: G.foe.cy, t: .35, c: '#9fd8ff', w: 3 });
       applyDamage(F, F.maxHp * v * .3, 'magic', { color: '#9fd8ff' });
       break;
