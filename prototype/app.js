@@ -574,7 +574,7 @@ function showSkillResult(list, title) {
   persist(); renderTopBar();
   const card = (r, i) => { const d = ESKILL[r.id], col = SKILL_GRADES[d.grade].col; return `<div class="gcard skill" style="--g:${col};animation-delay:${i * 70}ms">
       <img class="sk-ic" src="img/sk_${(GSKILL[d.type] || GSKILL.meteor).icon}.png" width="48" height="48" alt="" aria-hidden="true">
-      <b>${d.name}</b>${skillChip(d.grade)}${r.res === 'new' ? '<em class="new">NEW</em>' : `<em>Star Dust +${fmt(r.dust)}</em>`}</div>`; };
+      <b>${d.name}</b><span>${skillChip(d.grade)} ${catChip(d)}</span>${r.res === 'new' ? '<em class="new">NEW</em>' : `<em>Star Dust +${fmt(r.dust)}</em>`}</div>`; };
   openModal(`<h3>${title}</h3><div class="gres">${list.map(card).join('')}</div>
     <p class="mtxt">새 스킬은 행성 탭에서 장착할 수 있어요.</p>
     <div class="mbtns"><button class="cta sm" data-act="ok" type="button">확인</button></div>`, () => { closeModal(); setTab(tab); });
@@ -703,21 +703,23 @@ function renderPlanets() {
     </section>`;
 }
 const skillChip = g => `<span class="gchip sg" style="--g:${SKILL_GRADES[g].col}">${g}</span>`;
+const catChip = s => { const c = SKILL_CATS[(GSKILL[s.type] || GSKILL.meteor).cat]; return `<span class="cat" style="--c:${c.col}">${c.name}</span>`; };
 function skillRow(s, label, btn = '') {
   if (!s) return `<div class="psk-row empty"><span class="sk-empty" aria-hidden="true">+</span>
     <div><b><span class="lbl">${label}</span> 비어 있음</b><p>상점 스킬 뽑기로 얻은 스킬을 장착할 수 있어요.</p></div>${btn}</div>`;
   return `<div class="psk-row"><img src="img/sk_${(GSKILL[s.type] || GSKILL.meteor).icon}.png" alt="" aria-hidden="true">
-    <div><b><span class="lbl">${label}</span> ${skillChip(s.grade)} ${s.name} <span class="cs">기력 ${s.cost}</span></b><p>${skillDesc(s)}</p></div>${btn}</div>`;
+    <div><b><span class="lbl">${label}</span> ${skillChip(s.grade)} ${s.name} ${catChip(s)} <span class="cs">기력 ${s.cost}</span></b><p>${skillDesc(s)}</p></div>${btn}</div>`;
 }
 // 장착 스킬 변경: every owned equip skill, the two equipped on top and the rest below.
 // 장착 fills an empty slot; with both slots full it asks which one to replace. Changes save at once.
-const GRADE_ORDER = ['MR', 'UR', 'SSR', 'SR', 'R'];
+const GRADE_ORDER = ['MR', 'LR', 'UR', 'SSR', 'SR', 'R'], CAT_ORDER = ['atk', 'mag', 'buf', 'heal'];
+const skCat = s => (GSKILL[s.type] || GSKILL.meteor).cat;
 function openSkillEquip(pid) {
-  let pick = null; // unequipped skill waiting for a slot to replace
+  let pick = null, cat = 'all'; // pick: unequipped skill waiting for a slot to replace; cat: list filter
   const body = () => {
-    const cur = equipOf(pid), owned = save.skills.filter(id => ESKILL[id] && !cur.includes(id))
-      .sort((a, b) => GRADE_ORDER.indexOf(ESKILL[a].grade) - GRADE_ORDER.indexOf(ESKILL[b].grade));
-    const info = d => `<div><b>${skillChip(d.grade)} ${d.name} <span class="cs">기력 ${d.cost}</span></b><span class="mini">${skillDesc(d)}</span></div>`;
+    const cur = equipOf(pid), owned = save.skills.filter(id => ESKILL[id] && !cur.includes(id) && (cat === 'all' || skCat(ESKILL[id]) === cat))
+      .sort((a, b) => GRADE_ORDER.indexOf(ESKILL[a].grade) - GRADE_ORDER.indexOf(ESKILL[b].grade) || CAT_ORDER.indexOf(skCat(ESKILL[a])) - CAT_ORDER.indexOf(skCat(ESKILL[b])));
+    const info = d => `<div><b>${skillChip(d.grade)} ${d.name} ${catChip(d)} <span class="cs">기력 ${d.cost}</span></b><span class="mini">${skillDesc(d)}</span></div>`;
     const slot = (id, k) => id
       ? `<div class="esk-item on"><span class="esk-k">장착 ${k + 1}</span>${info(ESKILL[id])}
           <button class="${pick ? 'cta' : 'ghost'} sm" data-act="${pick ? 'swap' : 'off'}" data-k="${k}" type="button">${pick ? '교체' : '해제'}</button></div>`
@@ -726,6 +728,7 @@ function openSkillEquip(pid) {
       <div class="skin-list esk-list">
         <span class="set-h">장착 중</span>${cur.map(slot).join('')}
         <span class="set-h">미장착 ${owned.length}</span>
+        <div class="esk-cats">${[['all', '전체'], ...CAT_ORDER.map(k => [k, SKILL_CATS[k].name])].map(([k, n]) => `<button type="button" data-act="cat" data-cat="${k}" aria-pressed="${k === cat}">${n}</button>`).join('')}</div>
         ${owned.map(id => `<div class="esk-item${pick === id ? ' pick' : ''}">${info(ESKILL[id])}
           <button class="${pick === id ? 'ghost' : 'cta'} sm" data-act="${pick === id ? 'unpick' : 'on'}" data-id="${id}" type="button">${pick === id ? '취소' : '장착'}</button></div>`).join('')
           || '<p class="mtxt">미장착 스킬이 없어요. 상점 스킬 뽑기로 더 얻을 수 있어요.</p>'}
@@ -746,6 +749,7 @@ function openSkillEquip(pid) {
     }
     else if (act === 'swap') { const e = [...cur]; e[+b.dataset.k] = pick; pick = null; set(e); }
     else if (act === 'unpick') pick = null;
+    else if (act === 'cat') cat = b.dataset.cat;
     redraw();
   }
   redraw();

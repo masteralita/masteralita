@@ -87,7 +87,7 @@ function cellHtml(path, kind) {
   if (kind === 'gskill') {
     const base = path.replace(/\/type$/, ''), sk = { type: v, ...Object.fromEntries(['cost', 'v', 'dur'].map(k => [k, curVal(`${base}/${k}`)])) };
     return `<td class="ce${cls}" title="${esc(title)}"><div class="chain-ed">
-      <select data-path="${path}">${Object.keys(GSKILL).map(t => `<option value="${t}"${t === v ? ' selected' : ''}>${GSKILL[t].label}</option>`).join('')}</select>
+      <select data-path="${path}">${Object.keys(GSKILL).map(t => `<option value="${t}"${t === v ? ' selected' : ''}>[${SKILL_CATS[GSKILL[t].cat].name}] ${GSKILL[t].label}</option>`).join('')}</select>
       <span class="fx-desc">${esc(skillDesc(sk))}</span></div></td>`;
   }
   if (kind === 'orbits') return `<td class="${cls}" title="${esc(title)}"><select data-path="${path}"><option value="1"${v === 1 ? ' selected' : ''}>1</option><option value="2"${v === 2 ? ' selected' : ''}>2</option></select></td>`;

@@ -274,7 +274,7 @@ function alive(t) { return !!t && (t.isPlanet ? t.hp > 0 : !t.dead); }
 function say(x, y, v, c, t = .9, size) { G.texts.push({ x, y, v, c, t, size }); }
 
 function critRate(c) { return .05 + c.m.crit + (c.side === 'me' ? G.me.planet.crit + skillCrit() + Math.max(0, G.T.evade - .75) * 2 : 0); }
-function critDmg(c) { const e = E(c, 'critDmg'); return 1.5 + c.m.critDmg + (e ? e.v : 0); }
+function critDmg(c) { const e = E(c, 'critDmg'); return 1.5 + c.m.critDmg + (e ? e.v : 0) + (c.side === 'me' ? skillCritDmg() : 0); }
 function evadeRate() { return Math.min(.75, G.T.evade); }
 function conAtk(c) {
   let a = c.atkBase * (1 + .3 * (c.lv - 1)) * (1 + c.m.atk);
@@ -332,7 +332,7 @@ function applyDamage(t, dmg, kind, { src = null, tier = 0, color = null, silent 
     if (G.enraged) dmg *= 1.5;
     dmg *= 1 - G.T.dmgRed;
     if (t.isPlanet) dmg *= 1 - G.T.planetRed;
-  }
+  } else dmg *= 1 + skillExpose();
   const armor = Math.max(0, (kind === 'magic' ? t.mArmor - (t.shred || 0) : t.dArmor) + (t.side === 'me' && !t.isPlanet ? (kind === 'magic' ? G.T.marmor : G.T.armor) : 0));
   let d = dmg * 100 / (100 + armor);
   if (t.isPlanet && t.side === 'me' && G.pShield > 0) { const a = Math.min(G.pShield, d); G.pShield -= a; d -= a; }
