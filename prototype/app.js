@@ -9,7 +9,7 @@ const SAVE_KEY = 'gw.save.v1';
 function freshSave() {
   return {
     v: 1, name: '', title: 'Star Wanderer', lv: 1, xp: 0, dust: 30000, piece: 1500, birthday: null,
-    skins: [], lastCollect: Date.now(), chest: 0, best: 0, wins: 0, losses: 0, adPass: false,
+    skins: [], lastCollect: Date.now(), chest: 0, stamina: { n: STAMINA.max, t: Date.now() }, best: 0, wins: 0, losses: 0, adPass: false,
     planets: { earth: { lv: 1 } }, mainPlanet: 'earth',
     cons: { sgr: newCon(0), leo: newCon(0), vir: newCon(0) },
     team: ['sgr', 'leo', 'vir'], form: [['sgr', 'leo'], ['vir']],
@@ -91,6 +91,7 @@ function loadSave(v) {
   o.skills = [...new Set([...STARTER_SKILLS, ...(Array.isArray(o.skills) ? o.skills : [])])];
   if (!o.equip || typeof o.equip !== 'object') o.equip = {};
   for (const k of ['skillLv', 'skillCopies']) if (!o[k] || typeof o[k] !== 'object') o[k] = {};
+  if (!o.stamina || typeof o.stamina.n !== 'number') o.stamina = { n: STAMINA.max, t: Date.now() }; // older saves start full
   return o;
 }
 // cloud.js: the server copy is newer (or the player switched accounts) → replace this device's progress
@@ -113,10 +114,63 @@ function spend(cur, n) {
   save[cur] -= n; persist(); renderTopBar(); return true;
 }
 function gain(cur, n) { save[cur] += n; persist(); renderTopBar(); }
+// 계정 레벨업 보상 (ACCOUNT in data.js): 에너지 가득 충전 + Star Dust (dust × 새 레벨) + Star Piece; 방치 수입도 레벨마다 늘어요
 function gainAccXp(v) {
-  save.xp += v; let up = 0;
-  while (save.xp >= accNeed(save.lv)) { save.xp -= accNeed(save.lv); save.lv += 1; up += 1; }
-  persist(); return up;
+  save.xp += v; const out = { up: 0, dust: 0, piece: 0 };
+  while (save.xp >= accNeed(save.lv)) {
+    save.xp -= accNeed(save.lv); save.lv += 1; out.up += 1;
+    out.dust += ACCOUNT.dust * save.lv; out.piece += ACCOUNT.piece;
+  }
+  if (out.up) { save.dust += out.dust; save.piece += out.piece; const st = staminaNow(); st.n = Math.max(st.n, STAMINA.max); st.t = Date.now(); }
+  persist(); return out;
+}
+
+/* ---------- 에너지 (STAMINA in data.js): 한 판에 cost, regenMin분마다 1칸, 최대 max ----------
+   save.stamina = { n, t }: t is when the current regen period started, so the count catches up
+   from the clock alone, even after days offline. */
+const regenMs = () => Math.max(1, STAMINA.regenMin) * 60000;
+function staminaNow() {
+  const st = save.stamina, now = Date.now();
+  if (st.n >= STAMINA.max) { st.t = now; return st; }
+  if (st.t > now) st.t = now; // clock moved backwards
+  const k = Math.floor((now - st.t) / regenMs());
+  if (k > 0) { st.n = Math.min(STAMINA.max, st.n + k); st.t = st.n >= STAMINA.max ? now : st.t + k * regenMs(); }
+  return st;
+}
+const staminaNext = () => { const st = staminaNow(); return st.n >= STAMINA.max ? 0 : regenMs() - (Date.now() - st.t); };
+const clock = ms => { const t = Math.ceil(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), x = t % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
+function useStamina() {
+  const st = staminaNow();
+  if (st.n < STAMINA.cost) {
+    if (G.state === 'home') openStaminaInfo(); else toast(`에너지가 부족해요 · ${clock(staminaNext())} 후 1칸 충전돼요`);
+    return false;
+  }
+  st.n -= STAMINA.cost; persist(); return true;
+}
+// Every battle start (로비 · 다시 출항 · 재시작) goes through here: team check, then one energy
+function tryStart(mode) {
+  if (!checkTeam() || !useStamina()) return false;
+  startRun(mode); return true;
+}
+function openStaminaInfo() {
+  const st = staminaNow(), next = staminaNext();
+  openModal(`<h3>에너지 ${st.n} / ${STAMINA.max}</h3>
+    <p class="mtxt">대전과 아케이드는 한 판에 에너지 <b>${STAMINA.cost}</b>칸을 써요. 에너지는 <b>${STAMINA.regenMin}분</b>마다 1칸씩, 게임을 꺼 두어도 차올라요 (최대 ${STAMINA.max}칸).</p>
+    <p class="mtxt">${next ? `다음 충전까지 <b>${clock(next)}</b> · 가득 차기까지 ${clock(next + (STAMINA.max - st.n - 1) * regenMs())}` : '지금 가득 차 있어요.'}</p>
+    <p class="mtxt">계정 레벨이 오르면 에너지가 가득 채워져요.</p>
+    <div class="mbtns"><button class="cta sm" data-act="ok" type="button">확인</button></div>`, () => closeModal());
+}
+// 계정 레벨: what earns XP and what a level-up gives
+function openAccountInfo() {
+  const need = accNeed(save.lv);
+  openModal(`<h3>계정 Lv ${save.lv}</h3>
+    <div class="gauge"><i style="transform:scaleX(${clamp(save.xp / need, 0, 1)})"></i></div>
+    <p class="mtxt">경험치 <b>${fmt(save.xp)} / ${fmt(need)}</b> · 다음 레벨까지 ${fmt(need - save.xp)}</p>
+    <h4 class="set-h">경험치 얻는 법</h4>
+    <p class="mtxt">아케이드: 도달한 웨이브 × ${ACCOUNT.arcadeXp}<br>대전: 승리 ${ACCOUNT.winXp} · 패배 ${ACCOUNT.loseXp}<br>레벨 L에서 L+1로 가려면 ${ACCOUNT.need} × L 이 필요해요.</p>
+    <h4 class="set-h">레벨업 보상</h4>
+    <p class="mtxt">에너지 가득 충전<br>Star Dust ${fmt(ACCOUNT.dust)} × 새 레벨 (Lv ${save.lv + 1} → ${fmt(ACCOUNT.dust * (save.lv + 1))})<br>Star Piece ${fmt(ACCOUNT.piece)}<br>방치 수입 시간당 Star Dust +${INCOME.dustPerLv}</p>
+    <div class="mbtns"><button class="cta sm" data-act="ok" type="button">확인</button></div>`, () => closeModal());
 }
 
 /* ---------- Account-side bonuses used by battle.js ---------- */
@@ -266,9 +320,14 @@ function renderHome() {
   const chests = Math.floor(save.chest / CHEST_STEP);
   $('chestFill').style.transform = `scaleX(${(save.chest % CHEST_STEP) / CHEST_STEP})`;
   $('chestTxt').textContent = `${save.chest % CHEST_STEP} / ${CHEST_STEP}`;
-  $('chestBtn').textContent = chests ? `상자 열기 ×${chests}` : '상자 없음';
+  $('chestOpen').textContent = chests ? `열기 ×${chests}` : `${save.chest % CHEST_STEP} / ${CHEST_STEP}`;
   $('chestBtn').disabled = chests === 0;
-  $('homeBest').textContent = save.best ? `최고 WAVE ${save.best} · ${zoneOf(save.best).name}` : '기록 없음';
+  const st = staminaNow(), next = staminaNext();
+  $('energyN').textContent = st.n; $('energyMax').textContent = STAMINA.max;
+  $('energyNext').textContent = next ? clock(next) : '가득';
+  $('energyBtn').classList.toggle('low', st.n < STAMINA.cost);
+  document.querySelectorAll('.mode .en').forEach(e => { e.textContent = `⚡${STAMINA.cost}`; });
+  $('homeBest').textContent = save.best ? `최고 WAVE ${save.best}` : '기록 없음';
   $('homePvp').textContent = `${save.wins}승 ${save.losses}패`;
   $('homePower').textContent = fmt(teamPower());
 }
@@ -294,8 +353,10 @@ $('chestBtn').addEventListener('click', () => {
   save.dust += dust; save.piece += piece; persist(); renderTopBar(); renderHome();
   showGachaResult(got, `상자 ${n}개`, [dust && `Star Dust +${fmt(dust)}`, piece && `Star Piece +${fmt(piece)}`].filter(Boolean));
 });
-$('arcadeBtn').addEventListener('click', () => { if (checkTeam()) startRun('arcade'); });
-$('pvpBtn').addEventListener('click', () => { if (checkTeam()) startRun('pvp'); });
+$('arcadeBtn').addEventListener('click', () => tryStart('arcade'));
+$('pvpBtn').addEventListener('click', () => tryStart('pvp'));
+$('energyBtn').addEventListener('click', openStaminaInfo);
+document.querySelector('.lvbadge').addEventListener('click', openAccountInfo);
 function checkTeam() { normalizeForm(); if (save.team.length < TEAM_MIN) { toast('팀 탭에서 별자리를 1개 이상 편성해 주세요'); setTab('team'); return false; } return true; }
 
 function updateHome(dt) {
@@ -925,7 +986,7 @@ function perkList(sk) {
   return `<h3>${sk.name} <small>${SKIN_TIER[sk.tier].name} 스킨 · ${skinStyle(sk)}</small></h3>
     <div class="sig">${sk.sig}${mods ? ` <b class="mods">${mods}</b>` : ''} 아케이드 레벨업 때 아래 능력이 카드로 나와요.</div>
     <ul class="chain">
-      ${sk.stats.map(([k, n]) => `<li><span class="tier stat">×3</span><div><b>${n}</b><span>${STAT[k].txt(STAT[k].v)} · 최대 3번 중첩</span></div></li>`).join('')}
+      ${sk.stats.map(([k, n]) => `<li><span class="tier stat">×3</span><div><b>${n}</b><span>${STAT[k].txt(STAT[k].v)} 최대 3번까지 중첩돼요.</span></div></li>`).join('')}
       ${sk.chain.map((ch, i) => `<li><span class="tier">${ROMAN[i + 1]}</span><div><b>각성 ${ROMAN[i + 1]} · ${ch.name}</b><span>${ch.desc}</span></div></li>`).join('')}
     </ul>`;
 }
@@ -1237,8 +1298,8 @@ function openSettings() {
 function finishBattle(win) {
   const arcade = G.mode === 'arcade';
   let dust, chest, xp;
-  if (arcade) { dust = arcadeDust(); chest = G.wave >= 5 ? 3 : 1; xp = 12 * G.wave; save.best = Math.max(save.best, G.wave); }
-  else { dust = win ? 600 : 180; chest = win ? 3 : 1; xp = win ? 40 : 15; win ? save.wins++ : save.losses++; }
+  if (arcade) { dust = arcadeDust(); chest = G.wave >= 5 ? 3 : 1; xp = ACCOUNT.arcadeXp * G.wave; save.best = Math.max(save.best, G.wave); }
+  else { dust = win ? 600 : 180; chest = win ? 3 : 1; xp = win ? ACCOUNT.winXp : ACCOUNT.loseXp; win ? save.wins++ : save.losses++; }
   save.dust += dust; save.chest = Math.min(CHEST_MAX, save.chest + chest);
   const up = gainAccXp(xp);
   persist();
@@ -1249,12 +1310,13 @@ function finishBattle(win) {
   $('resTxt').textContent = arcade
     ? `${G.me.planet.name} 행성계가 ${G.zone.name} ${G.wave}웨이브에서 무너졌어요. 전투 Lv ${G.lv}까지 성장했어요. 최고 기록 WAVE ${save.best}.`
     : `${G.ghost.name}의 ${G.ghost.planet} 행성계와 싸웠어요. 전적 ${save.wins}승 ${save.losses}패.`;
-  $('resRewards').innerHTML = [`<span class="dust">+${fmt(dust)}</span>`, `<span>상자 게이지 +${chest}</span>`, `<span>계정 경험치 +${xp}</span>`, up ? `<span class="lvup-tag">계정 Lv ${save.lv}</span>` : ''].join('');
+  $('resRewards').innerHTML = [`<span class="dust">+${fmt(dust)}</span>`, `<span>상자 게이지 +${chest}</span>`, `<span>계정 경험치 +${xp}</span>`,
+    up.up ? `<span class="lvup-tag">계정 Lv ${save.lv} 달성 · 에너지 가득 · Star Dust +${fmt(up.dust)} · Star Piece +${fmt(up.piece)}</span>` : ''].join('');
   $('resPerks').innerHTML = arcade ? G.taken.map(t => `<span>${t}</span>`).join('') : '';
   $('retryBtn').textContent = arcade ? '다시 출항' : '다른 상대와 대전';
   $('hudTop').hidden = true; $('hudBot').hidden = true; $('lvup').hidden = true; $('resultScr').hidden = false;
 }
-$('retryBtn').addEventListener('click', () => { $('resultScr').hidden = true; startRun(G.mode); });
+$('retryBtn').addEventListener('click', () => { if (tryStart(G.mode)) $('resultScr').hidden = true; });
 $('lobbyBtn').addEventListener('click', () => { $('resultScr').hidden = true; enterHome(); });
 
 /* ---------- Pause menu ---------- */
@@ -1308,9 +1370,10 @@ $('resumeBtn').addEventListener('click', () => setPaused(false));
 $('pauseTabSkills').addEventListener('click', () => { $('pauseStats').setAttribute('aria-selected', 'false'); renderPause(); });
 $('pauseStats').addEventListener('click', () => { $('pauseStats').setAttribute('aria-selected', 'true'); renderPause(); });
 $('restartBtn').addEventListener('click', () => {
-  if (!confirmTap('restartBtn', '한 번 더 누르면 처음부터 다시 시작해요 (보상 없음)')) return;
-  setPaused(false);
-  if (G.state === 'fight' || G.state === 'clear' || G.state === 'intro') startRun(G.mode);
+  if (!confirmTap('restartBtn', `한 번 더 누르면 처음부터 다시 시작해요 (보상 없음 · 에너지 ${STAMINA.cost} 소모)`)) return;
+  if (!(G.state === 'fight' || G.state === 'clear' || G.state === 'intro')) return;
+  if (!useStamina()) return;
+  setPaused(false); startRun(G.mode);
 });
 $('quitBtn').addEventListener('click', () => {
   if (!confirmTap('quitBtn', '한 번 더 누르면 전투를 끝내고 결과를 봐요')) return;

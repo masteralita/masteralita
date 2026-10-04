@@ -55,17 +55,17 @@ const CON = Object.fromEntries(ALL_CONS.map(c => [c.id, c]));
 
 /* ---------- Perks: stackable stats + sequential awakenings (벤치마킹: 스킬 목록 Lv5→Lv10→…) ---------- */
 const STAT = {
-  atk:     { v:.15, txt:v => `공격력 <b>+${v*100}%</b>` },
-  rate:    { v:.12, txt:v => `공격속도 <b>+${v*100}%</b>` },
-  crit:    { v:.12, txt:v => `치명타율 <b>+${Math.round(v*100)}%</b>` },
-  critDmg: { v:.35, txt:v => `치명타 피해 <b>+${Math.round(v*100)}%</b>` },
-  hp:      { v:.25, txt:v => `최대 HP <b>+${v*100}%</b>` },
-  heal:    { v:.3,  txt:v => `회복량 <b>+${v*100}%</b>` },
-  poison:  { v:.3,  txt:v => `독 피해 <b>+${v*100}%</b>` },
-  tArmor:  { v:10,  txt:v => `모든 별자리 물리 방어 <b>+${v}</b>` },
-  tMArmor: { v:10,  txt:v => `모든 별자리 마법 방어 <b>+${v}</b>` },
-  tEvade:  { v:.08, txt:v => `아군 전체 회피율 <b>+${Math.round(v*100)}%</b>` },
-  pHp:     { v:.1,  txt:v => `행성 최대 HP <b>+${v*100}%</b>` },
+  atk:     { v:.15, txt:v => `공격력이 <b>${v*100}%</b> 올라요.` },
+  rate:    { v:.12, txt:v => `공격속도가 <b>${v*100}%</b> 빨라져요.` },
+  crit:    { v:.12, txt:v => `치명타율이 <b>${Math.round(v*100)}%</b> 올라요.` },
+  critDmg: { v:.35, txt:v => `치명타 피해가 <b>${Math.round(v*100)}%</b> 늘어나요.` },
+  hp:      { v:.25, txt:v => `최대 HP가 <b>${v*100}%</b> 늘어나요.` },
+  heal:    { v:.3,  txt:v => `회복량이 <b>${v*100}%</b> 늘어나요.` },
+  poison:  { v:.3,  txt:v => `독 피해가 <b>${v*100}%</b> 늘어나요.` },
+  tArmor:  { v:10,  txt:v => `모든 아군 별자리의 물리 방어가 <b>${v}</b> 올라요.` },
+  tMArmor: { v:10,  txt:v => `모든 아군 별자리의 마법 방어가 <b>${v}</b> 올라요.` },
+  tEvade:  { v:.08, txt:v => `아군 전체의 회피율이 <b>${Math.round(v*100)}%</b> 올라요.` },
+  pHp:     { v:.1,  txt:v => `행성 최대 HP가 <b>${v*100}%</b> 늘어나요.` },
 };
 /* ---------- Skins: each skin swaps a constellation's look, attack style and whole skill set ---------- */
 // Awakening effects are shared building blocks; a skin picks three of them with its own numbers.
@@ -297,29 +297,29 @@ const PLANET = Object.fromEntries(PLANETS.map(p => [p.id, p]));
 // icon: which of the three skill images (img/sk_*.png) the button shows.
 const GSKILL = {
   // 공격계: physical damage (물리 방어로 줄어요)
-  meteor:    { cat:'atk',  label:'유성 낙하',   icon:'meteor', desc: s => `집중 대상에 유성 5개를 떨어뜨려요. 하나당 대상 최대 HP ${pct(s.v)} + 기본 물리 피해.` },
-  strike:    { cat:'atk',  label:'행성 포격',   icon:'meteor', desc: s => `적 행성에 최대 HP ${pct(s.v)} 물리 피해를 바로 줘요. 별자리가 살아 있어도 맞아요.` },
-  volley:    { cat:'atk',  label:'연속 사격',   icon:'meteor', desc: s => `행성에서 탄 8발을 무작위 적 별자리에게 쏴요. 한 발당 대상 최대 HP ${pct(s.v)} 물리 피해.` },
-  execute:   { cat:'atk',  label:'처형',        icon:'meteor', desc: s => `HP가 가장 낮은 적 별자리에게 최대 HP ${pct(s.v)} 물리 피해. 대상 HP가 30% 이하면 2배.` },
+  meteor:    { cat:'atk',  label:'유성 낙하',   icon:'meteor', desc: s => `조준한 적에게 유성 5개를 떨어뜨려요. 유성 하나가 대상 최대 HP의 ${pct(s.v)}에 기본 물리 피해를 더해 입혀요.` },
+  strike:    { cat:'atk',  label:'행성 포격',   icon:'meteor', desc: s => `적 행성에 최대 HP의 ${pct(s.v)}만큼 물리 피해를 바로 입혀요. 적 별자리가 살아 있어도 맞아요.` },
+  volley:    { cat:'atk',  label:'연속 사격',   icon:'meteor', desc: s => `행성에서 탄 8발을 무작위 적에게 쏴요. 한 발마다 대상 최대 HP의 ${pct(s.v)}만큼 물리 피해를 입혀요.` },
+  execute:   { cat:'atk',  label:'처형',        icon:'meteor', desc: s => `HP 비율이 가장 낮은 적에게 최대 HP의 ${pct(s.v)}만큼 물리 피해를 입혀요. 대상 HP가 30% 이하이면 피해가 2배가 돼요.` },
   // 마법계: magic damage and control (마법 방어로 줄어요)
-  blast:     { cat:'mag',  label:'마력 폭발',   icon:'nova',   desc: s => `적 별자리 전체에 최대 HP ${pct(s.v)} 마법 피해를 줘요.` },
-  burn:      { cat:'mag',  label:'지속 피해',   icon:'meteor', desc: s => `적 별자리 전체가 ${s.dur}초 동안 초당 최대 HP ${pct(s.v)} 피해를 입어요.` },
-  chain:     { cat:'mag',  label:'연쇄 번개',   icon:'nova',   desc: s => `번개가 적 별자리를 차례로 튀며 최대 HP ${pct(s.v)} 마법 피해 (튈 때마다 -15%). 끝에 적 행성도 맞아요.` },
-  stun:      { cat:'mag',  label:'전체 기절',   icon:'nova',   desc: s => `적 별자리 전체를 ${s.dur}초 동안 기절시켜요.` },
-  slow:      { cat:'mag',  label:'전체 둔화',   icon:'nova',   desc: s => `${s.dur}초 동안 적 별자리 공격속도 -${pct(s.v)}.` },
-  expose:    { cat:'mag',  label:'약화 표식',   icon:'nova',   desc: s => `${s.dur}초 동안 적 별자리와 행성이 받는 피해 +${pct(s.v)}.` },
+  blast:     { cat:'mag',  label:'마력 폭발',   icon:'nova',   desc: s => `모든 적에게 최대 HP의 ${pct(s.v)}만큼 마법 피해를 입혀요.` },
+  burn:      { cat:'mag',  label:'지속 피해',   icon:'meteor', desc: s => `모든 적이 ${s.dur}초 동안 매초 최대 HP의 ${pct(s.v)}만큼 피해를 입어요.` },
+  chain:     { cat:'mag',  label:'연쇄 번개',   icon:'nova',   desc: s => `번개가 적을 차례로 튀며 최대 HP의 ${pct(s.v)}만큼 마법 피해를 입혀요. 튈 때마다 피해가 15%씩 줄고, 대전에서는 마지막에 적 행성도 맞아요.` },
+  stun:      { cat:'mag',  label:'전체 기절',   icon:'nova',   desc: s => `모든 적을 ${s.dur}초 동안 기절시켜요.` },
+  slow:      { cat:'mag',  label:'전체 둔화',   icon:'nova',   desc: s => `${s.dur}초 동안 모든 적의 공격속도를 ${pct(s.v)} 낮춰요.` },
+  expose:    { cat:'mag',  label:'약화 표식',   icon:'nova',   desc: s => `${s.dur}초 동안 적이 받는 피해가 ${pct(s.v)} 늘어나요.` },
   // 버프계: my side gets stronger for a while
-  haste:     { cat:'buf',  label:'공속 증가',   icon:'nova',   desc: s => `${s.dur}초 동안 내 별자리 공격속도 +${pct(s.v)}.` },
-  rally:     { cat:'buf',  label:'공격력 증가', icon:'nova',   desc: s => `${s.dur}초 동안 내 별자리 공격력 +${pct(s.v)}.` },
-  crit:      { cat:'buf',  label:'치명타 증가', icon:'nova',   desc: s => `${s.dur}초 동안 내 별자리 치명타율 +${pct(s.v)}.` },
-  critdmg:   { cat:'buf',  label:'치명 피해',   icon:'nova',   desc: s => `${s.dur}초 동안 내 별자리 치명타 피해 +${pct(s.v)}.` },
-  shield:    { cat:'buf',  label:'피해 감소',   icon:'shield', desc: s => `${s.dur}초 동안 내 행성과 별자리가 받는 피해 -${pct(s.v)}.` },
-  overdrive: { cat:'buf',  label:'총공격',      icon:'nova',   desc: s => `${s.dur}초 동안 내 별자리 공격력과 공격속도 +${pct(s.v)}.` },
+  haste:     { cat:'buf',  label:'공속 증가',   icon:'nova',   desc: s => `${s.dur}초 동안 내 별자리의 공격속도를 ${pct(s.v)} 올려요.` },
+  rally:     { cat:'buf',  label:'공격력 증가', icon:'nova',   desc: s => `${s.dur}초 동안 내 별자리의 공격력을 ${pct(s.v)} 올려요.` },
+  crit:      { cat:'buf',  label:'치명타 증가', icon:'nova',   desc: s => `${s.dur}초 동안 내 별자리의 치명타율을 ${pct(s.v)} 올려요.` },
+  critdmg:   { cat:'buf',  label:'치명 피해',   icon:'nova',   desc: s => `${s.dur}초 동안 내 별자리의 치명타 피해를 ${pct(s.v)} 올려요.` },
+  shield:    { cat:'buf',  label:'피해 감소',   icon:'shield', desc: s => `${s.dur}초 동안 내 행성과 별자리가 받는 피해를 ${pct(s.v)} 줄여요.` },
+  overdrive: { cat:'buf',  label:'총공격',      icon:'nova',   desc: s => `${s.dur}초 동안 내 별자리의 공격력과 공격속도를 ${pct(s.v)} 올려요.` },
   // 치유계: HP back
-  heal:      { cat:'heal', label:'회복',        icon:'shield', desc: s => `행성과 내 별자리 HP를 최대 HP ${pct(s.v)}만큼 회복해요.` },
-  barrier:   { cat:'heal', label:'행성 보호막', icon:'shield', desc: s => `행성에 최대 HP ${pct(s.v)}만큼 보호막을 씌워요.` },
-  regen:     { cat:'heal', label:'지속 회복',   icon:'shield', desc: s => `${s.dur}초 동안 행성과 내 별자리가 초당 최대 HP ${pct(s.v)}씩 회복해요.` },
-  revive:    { cat:'heal', label:'부활',        icon:'shield', desc: s => `쓰러진 내 별자리를 모두 최대 HP ${pct(s.v)}로 되살려요. 쓰러진 별자리가 없으면 그만큼 회복해요.` },
+  heal:      { cat:'heal', label:'회복',        icon:'shield', desc: s => `내 행성과 별자리의 HP를 최대 HP의 ${pct(s.v)}만큼 회복해요.` },
+  barrier:   { cat:'heal', label:'행성 보호막', icon:'shield', desc: s => `내 행성에 최대 HP의 ${pct(s.v)}만큼 보호막을 씌워요.` },
+  regen:     { cat:'heal', label:'지속 회복',   icon:'shield', desc: s => `${s.dur}초 동안 내 행성과 별자리가 매초 최대 HP의 ${pct(s.v)}씩 회복해요.` },
+  revive:    { cat:'heal', label:'부활',        icon:'shield', desc: s => `쓰러진 내 별자리를 모두 최대 HP의 ${pct(s.v)}로 되살려요. 쓰러진 별자리가 없으면 그만큼 회복해요.` },
 };
 const SKILL_CATS = { atk:{ name:'공격', col:'#ff7a59' }, mag:{ name:'마법', col:'#8f7bff' }, buf:{ name:'버프', col:'#f5c451' }, heal:{ name:'치유', col:'#5fe0a0' } };
 // Skill grades, low → high. UR is the planet's unique skill and is not in the draw (UR 뽑기는 추후 업데이트).
@@ -526,11 +526,19 @@ const INCOME = { dustBase:90, dustPerLv:10, pieceRate:1, capHours:12,
 const WAVE = { planetHp:900, planetGrowth:1.2, statGrowth:1.13, deepFrom:20, deepGrowth:1.03,
   midBossHp:1.8, zoneBossHp:2.6, conHp:.9, conAtk:.8, timer:40,
   // 아케이드 몹: base HP (× statGrowth per wave × conHp), ship shot damage (× conAtk), crash damage as a share of my planet's max HP
-  rockHp:100, meteorHp:35, shipHp:55, shipAtk:16, rockPct:.06, meteorPct:.035 };
+  rockHp:100, meteorHp:35, shipHp:48, shipAtk:16, rockPct:.06, meteorPct:.035, shipMax:30 };
+// 대전 블랙홀: 30초에 열려 매초 양쪽 행성(dmg)과 모든 별자리(conDmg)에 방어를 무시하는 고정 피해
+const HOLE = { at:30, dmg:50, conDmg:20, every:1 };
+/* ---------- 에너지: 대전·아케이드 한 판마다 cost 소모, regenMin분마다 1 충전 (접속하지 않아도 시간으로 계산) ---------- */
+const STAMINA = { max:10, regenMin:60, cost:1 };
+/* ---------- 계정 레벨: 판이 끝나면 경험치를 받고, 필요 경험치 = need × 현재 레벨 ----------
+   경험치: 아케이드 arcadeXp × 도달 웨이브 · 대전 승리 winXp / 패배 loseXp
+   레벨업 보상: 에너지 가득 충전 · Star Dust dust × 새 레벨 · Star Piece piece, 방치 수입은 레벨마다 INCOME.dustPerLv 증가 */
+const ACCOUNT = { need:100, arcadeXp:12, winXp:40, loseXp:15, dust:300, piece:30 };
 const CHEST_STEP = 10, CHEST_MAX = 1000;
 // per chest: 성운 스킨 → Star Dust → Star Piece → 별자리 카드 (cumulative bands)
 const CHEST_ODDS = { skin:.12, dust:.5, piece:.23, con:.15 };
-const accNeed = lv => 100 * lv;
+const accNeed = lv => ACCOUNT.need * lv;
 const ZODIAC_DATES = [ // 생일 → 별자리 (별자리 시트 조건 열)
   ['cap', 1, 19], ['aqr', 2, 18], ['psc', 3, 20], ['ari', 4, 19], ['tau', 5, 20], ['gem', 6, 20],
   ['cnc', 7, 22], ['leo', 8, 22], ['vir', 9, 22], ['lib', 10, 22], ['sco', 11, 21], ['sgr', 12, 21], ['cap', 12, 31],

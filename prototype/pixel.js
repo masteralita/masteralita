@@ -147,7 +147,7 @@ function pxPlanetUrl(pid, tint = null) {
 const PX_SPR = {};
 function pxSprite(name) {
   let im = PX_SPR[name];
-  if (!im) { im = PX_SPR[name] = new Image(); im.src = `img/${name}.png`; }
+  if (!im) { im = PX_SPR[name] = new Image(); im.src = imgUrl(name + '.png'); } // admin-replaced art (balance.js IMG_OVR) or the bundled file
   return im.complete && im.naturalWidth ? im : null;
 }
 ['rock_0', 'rock_1', 'rock_2', 'rock_3', 'meteor_fire', 'chest_closed', 'blackhole'].forEach(pxSprite);

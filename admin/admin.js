@@ -20,7 +20,8 @@ const db = getFirestore(app, FIREBASE_DB);
 
 const ADM = {
   phase: 'loading', // loading | signin | denied | ready
-  user: null, area: 'balance', sec: BAL_SECTIONS[0].id, // area: balance | ops | players | stats | legal
+  user: null, area: 'balance', sec: BAL_SECTIONS[0].id, // area: balance | assets | ops | players | stats | legal
+  rs: { kind: 'all', cat: 'all', q: '' }, assetData: {},  // 이미지·글 tab: filters, and loaded image data by asset id
   draft: {}, saved: {}, savedAt: null, savedBy: null, // saved = config/balance
   content: {}, savedContent: {}, open: null,          // added items (balance.js applyContent), open = card being edited
   meta: null, releases: [], unsubs: [], busy: false,
@@ -39,7 +40,7 @@ const live = () => liveRel().values || {};
 const curVal = p => (p in ADM.draft ? ADM.draft[p] : BAL_DEFAULTS[p]);
 const diff = (a, b) => [...new Set([...Object.keys(a), ...Object.keys(b)])].filter(p => !sameVal(a[p], b[p]));
 const CT_KINDS = ['skins', 'pskins', 'oskins'];
-const ctDiff = (a = {}, b = {}) => CT_KINDS.reduce((n, k) => n + diff(a[k] || {}, b[k] || {}).length, 0);
+const ctDiff = (a = {}, b = {}) => [...CT_KINDS, 'images'].reduce((n, k) => n + diff(a[k] || {}, b[k] || {}).length, 0); // images: 이미지·글 tab
 const unsavedCount = () => diff(ADM.draft, ADM.saved).length + ctDiff(ADM.content, ADM.savedContent);
 const pendingCount = () => diff(ADM.saved, live()).length + ctDiff(ADM.savedContent, liveRel().content);
 const isDirty = () => unsavedCount() > 0;
@@ -120,7 +121,7 @@ function statusChips() {
     : `<span class="ad-chip">게임 적용 중: ${ADM.meta && ADM.meta.version ? `v${ADM.meta.version}` : '내장 기본값'}</span>`);
   return out.join('');
 }
-const AREAS = [['balance', '밸런스'], ['ops', '운영'], ['players', '플레이어'], ['stats', '통계'], ['legal', '약관·정책']];
+const AREAS = [['balance', '밸런스'], ['assets', '이미지·글'], ['ops', '운영'], ['players', '플레이어'], ['stats', '통계'], ['legal', '약관·정책']];
 function render() {
   if (ADM.phase !== 'ready') { root.innerHTML = gateHtml(); return; }
   const body = root.querySelector('.ad-body'), scroll = body ? body.scrollTop : 0, a = ADM.area;
@@ -137,7 +138,8 @@ function render() {
       <div class="ad-scroll">${sectionHtml(s)}</div>` : ADM.sec === 'content' ? contentHtml() : `
       <div class="ad-desc"><h2>배포 기록</h2><p>[배포]를 누를 때마다 버전이 하나씩 쌓여요. 예전 버전을 초안으로 불러와 다시 배포하면 되돌릴 수 있어요.</p></div>
       <div class="ad-scroll">${releasesHtml()}</div>`;
-  } else if (a === 'ops') { tabs = OPS.tabsHtml(); main = OPS.html(); }
+  } else if (a === 'assets') { tabs = rsTabsHtml(); main = rsHtml(); }
+  else if (a === 'ops') { tabs = OPS.tabsHtml(); main = OPS.html(); }
   else if (a === 'players') main = playersHtml();
   else if (a === 'stats') main = STATS.html();
   else main = LEGAL.html();
@@ -145,7 +147,7 @@ function render() {
   root.innerHTML = `
     <header class="ad-top">
       <div class="ad-title"><span class="eyebrow">GALAXY WAR · ADMIN</span><h1>갤럭시워 관리자</h1></div>
-      ${a === 'balance' ? `<div class="ad-actions">
+      ${a === 'balance' || a === 'assets' ? `<div class="ad-actions">
         <button class="ghost sm" data-ad="export" type="button">엑셀 내보내기</button>
         <label class="ghost sm file">엑셀 가져오기<input type="file" id="adImport" accept=".xlsx"></label>
         <button class="ghost sm" data-ad="defaults" type="button">전체 기본값</button>
@@ -153,9 +155,9 @@ function render() {
         <button class="ghost sm" data-ad="save" type="button"${isDirty() && !ADM.busy ? '' : ' disabled'}>초안 저장</button>
         <button class="cta sm" data-ad="publish" type="button"${pending && !ADM.busy ? '' : ' disabled'}>배포</button>
       </div>` : '<div></div>'}
-      <div class="ad-status">${a === 'balance' ? statusChips() : ''}<span class="who">${esc(ADM.user.email || ADM.user.uid)} · <a href="../play/" target="_blank" rel="noopener">게임 열기</a> · <button class="link" data-ad="signout" type="button">로그아웃</button></span></div>
+      <div class="ad-status">${a === 'balance' || a === 'assets' ? statusChips() : ''}<span class="who">${esc(ADM.user.email || ADM.user.uid)} · <a href="../play/" target="_blank" rel="noopener">게임 열기</a> · <button class="link" data-ad="signout" type="button">로그아웃</button></span></div>
     </header>
-    <nav class="ad-areas" aria-label="관리 영역">${AREAS.map(([id, label]) => `<button type="button" data-area="${id}" aria-current="${id === a ? 'page' : 'false'}">${label}${id === 'balance' && isDirty() ? '<em>•</em>' : ''}</button>`).join('')}</nav>
+    <nav class="ad-areas" aria-label="관리 영역">${AREAS.map(([id, label]) => `<button type="button" data-area="${id}" aria-current="${id === a ? 'page' : 'false'}">${label}${(id === 'balance' || id === 'assets') && isDirty() ? '<em>•</em>' : ''}</button>`).join('')}</nav>
     ${tabs}
     <div class="ad-body">${main}</div>`;
   root.querySelector('.ad-body').scrollTop = scroll;
@@ -285,6 +287,88 @@ function contentChange(el) {
   ADM.content = { ...ADM.content, [k]: { ...ADM.content[k], [id]: d } };
   render();
 }
+
+/* ---------- 이미지·글: every image and every text of the game in one list, filtered by kind / category / search ----------
+   Texts are the balance registry's text fields (same draft → save → publish as the 밸런스 tab).
+   Images: an upload is stored right away as site/{assetId} ({ kind:'asset', file, data }), and the draft maps
+   file → assetId in content.images; the game swaps the art in once that is published (balance.js applyImages). */
+const RS_TEXT_CAT = { con: 'con', skin: 'con', skintext: 'con', planet: 'planet', pskin: 'planet', pskill: 'skill', eskill: 'skill', orbit: 'orbit', oskin: 'orbit' };
+const RS_MAX = 700 * 1024; // keeps the data URL under Firestore's 1 MiB document limit
+const rsImages = () => imgCatalog({ ...SKIN, ...Object.fromEntries(Object.values(ADM.content.skins || {}).map(d => [d.id, d])) });
+const rsTexts = () => Object.entries(BAL_FIELDS).filter(([, f]) => f.kind === 'text').map(([path, f]) => ({ path, cat: RS_TEXT_CAT[f.sec] || 'ui', label: f.label }));
+function rsItems() {
+  const { kind, cat, q } = ADM.rs, needle = q.trim().toLowerCase();
+  const hit = (...xs) => !needle || xs.some(x => String(x || '').toLowerCase().includes(needle));
+  const imgs = kind === 'text' ? [] : rsImages().filter(i => (cat === 'all' || i.cat === cat) && hit(i.label, i.file));
+  const texts = kind === 'image' ? [] : rsTexts().filter(t => (cat === 'all' || t.cat === cat) && hit(t.label, t.path, curVal(t.path)));
+  return { imgs, texts };
+}
+function rsTabsHtml() {
+  const chip = (attr, v, label, cur) => `<button type="button" ${attr}="${v}" aria-current="${v === cur ? 'page' : 'false'}">${label}</button>`;
+  const changed = Object.keys(ADM.content.images || {}).length;
+  return `<nav class="ad-tabs" aria-label="종류">${chip('data-rskind', 'all', '전체', ADM.rs.kind)}${chip('data-rskind', 'image', `이미지${changed ? `<em>${changed}</em>` : ''}`, ADM.rs.kind)}${chip('data-rskind', 'text', '글', ADM.rs.kind)}
+    <span class="rs-sep"></span>${chip('data-rscat', 'all', '모든 분류', ADM.rs.cat)}${Object.entries(IMG_CATS).map(([k, l]) => chip('data-rscat', k, l, ADM.rs.cat)).join('')}</nav>`;
+}
+function rsThumb(file) {
+  const id = (ADM.content.images || {})[file];
+  if (!id) return `../play/img/${file}`;
+  if (ADM.assetData[id] === undefined) {
+    ADM.assetData[id] = null;
+    getDoc(doc(db, 'site', id)).then(d => { ADM.assetData[id] = d.exists() ? d.data().data : ''; render(); }).catch(() => { ADM.assetData[id] = ''; render(); });
+  }
+  return ADM.assetData[id] || '';
+}
+function rsImgCard(i) {
+  const cur = (ADM.content.images || {})[i.file], saved = (ADM.savedContent.images || {})[i.file], live = ((liveRel().content || {}).images || {})[i.file];
+  const tag = cur !== saved ? '<span class="ad-chip gold">저장 전</span>' : cur !== live ? '<span class="ad-chip warn">배포 대기</span>'
+    : cur ? '<span class="ad-chip ok">교체됨</span>' : i.base ? '<span class="ad-chip">기본</span>' : '<span class="ad-chip warn">이미지 없음</span>';
+  const src = rsThumb(i.file);
+  return `<article class="rs-img"><span class="rs-thumb">${src ? `<img src="${esc(src)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : ''}</span>
+    <div class="rs-meta"><b>${esc(i.label)}</b><small>${esc(i.file)} · ${IMG_CATS[i.cat]}</small>${tag}</div>
+    <div class="rs-acts"><label class="ghost sm file">이미지 교체<input type="file" accept="image/png,image/webp,image/jpeg,image/gif" data-rsup="${esc(i.file)}"></label>
+      ${cur ? `<button class="ghost sm" type="button" data-rsreset="${esc(i.file)}">기본으로</button>` : ''}</div></article>`;
+}
+function rsHtml() {
+  const { imgs, texts } = rsItems();
+  return `<div class="ad-desc"><h2>이미지·글</h2><p>게임에 나오는 모든 이미지와 글을 한곳에서 바꿔요. 위에서 종류와 분류를 고르고, 이름이나 파일명으로 찾아요.
+      이미지는 PNG·WebP·JPG ${Math.round(RS_MAX / 1024)}KB 이하로 올리면 바로 서버에 저장되고, 글과 함께 [초안 저장] → [배포]해야 게임에 나와요. 도트 이미지는 원본과 같은 비율로 올려 주세요.</p></div>
+    <form class="pl-search" data-rssearch><input type="search" name="q" id="rsQ" placeholder="이름·파일명·글 내용으로 찾기" value="${esc(ADM.rs.q)}"><span class="ct-desc">이미지 ${imgs.length}개 · 글 ${texts.length}개</span></form>
+    ${imgs.length ? `<h3 class="rs-h">이미지</h3><div class="rs-grid">${imgs.map(rsImgCard).join('')}</div>` : ''}
+    ${texts.length ? `<h3 class="rs-h">글</h3><div class="ad-scroll"><table class="ad-t kv rs-t"><thead><tr><th>항목</th><th>분류</th><th>글</th><th>기본값</th></tr></thead><tbody>
+      ${texts.map(t => `<tr><th scope="row">${esc(t.label)}</th><td class="def">${IMG_CATS[t.cat] || ''}</td>${cellHtml(t.path, 'text')}<td class="def">${esc(BAL_DEFAULTS[t.path] ?? '')}</td></tr>`).join('')}
+      </tbody></table></div>` : ''}
+    ${!imgs.length && !texts.length ? '<p class="empty">찾는 항목이 없어요.</p>' : ''}`;
+}
+async function rsUpload(file, f) {
+  if (!f) return;
+  if (!/^image\/(png|webp|jpeg|gif)$/.test(f.type)) { toast('PNG·WebP·JPG·GIF 이미지만 올릴 수 있어요'); return; }
+  if (f.size > RS_MAX) { toast(`${Math.round(f.size / 1024)}KB예요 · ${Math.round(RS_MAX / 1024)}KB 이하로 줄여 주세요`); return; }
+  const data = await new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = fail; r.readAsDataURL(f); }).catch(() => null);
+  if (!data) { toast('이미지를 읽지 못했어요'); return; }
+  const id = `asset_${file.replace(/\W+/g, '_')}_${Date.now().toString(36)}`;
+  ADM.busy = true; render();
+  try {
+    await setDoc(doc(db, 'site', id), { kind: 'asset', file, data, name: f.name, at: new Date().toISOString(), by: ADM.user.email || ADM.user.uid });
+    ADM.assetData[id] = data;
+    ADM.content = { ...ADM.content, images: { ...(ADM.content.images || {}), [file]: id } };
+    toast('이미지를 올렸어요 · [초안 저장] → [배포]하면 게임에 나와요');
+  } catch (err) { toast(`올리지 못했어요 (${err.code || err.message})`); }
+  ADM.busy = false; render();
+}
+root.addEventListener('click', e => {
+  if (ADM.area !== 'assets') return;
+  const k = e.target.closest('[data-rskind]'), c = e.target.closest('[data-rscat]'), r = e.target.closest('[data-rsreset]');
+  if (k) { ADM.rs = { ...ADM.rs, kind: k.dataset.rskind }; render(); }
+  else if (c) { ADM.rs = { ...ADM.rs, cat: c.dataset.rscat }; render(); }
+  else if (r) { const im = { ...(ADM.content.images || {}) }; delete im[r.dataset.rsreset]; ADM.content = { ...ADM.content, images: im }; render(); }
+});
+root.addEventListener('submit', e => { if (e.target.matches('[data-rssearch]')) e.preventDefault(); });
+root.addEventListener('input', e => {
+  if (e.target.id !== 'rsQ') return;
+  ADM.rs = { ...ADM.rs, q: e.target.value }; const at = e.target.selectionStart;
+  render();
+  const q = document.getElementById('rsQ'); if (q) { q.focus(); q.setSelectionRange(at, at); }
+});
 
 /* ---------- 플레이어 (players/{uid}, read-only) ---------- */
 async function loadPlayers() {
@@ -434,6 +518,7 @@ root.addEventListener('click', async e => {
 root.addEventListener('change', e => {
   const el = e.target;
   if (el.id === 'adImport') { adminImport(el.files[0]); el.value = ''; return; }
+  if (el.dataset.rsup) { rsUpload(el.dataset.rsup, el.files[0]); el.value = ''; return; }
   if (el.dataset.ct) { contentChange(el); return; }
   const path = el.dataset.path; if (!path) return;
   const f = BAL_FIELDS[path];

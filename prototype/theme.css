@@ -22,7 +22,7 @@
 .shell.see-through{background:transparent}
 
 /* ---------- Frames: bevelled silver panel (padding-box inner + border-box metal) ---------- */
-.hcard,.pcell,.prow,.team-planet,.orbit-card,.slot-panel,.star-stage,.lv-row,.mail-row,.notice-row,.set-group,.planet-hero,
+.hcard,.hpill,.pcell,.prow,.team-planet,.orbit-card,.slot-panel,.star-stage,.lv-row,.mail-row,.notice-row,.set-group,.planet-hero,
 .skin-item,.con-pick,.oslot,.tslot,.lv-me,.doc-body,.sk-preview,.ccell.locked,.skin-card{
   border:2px solid transparent!important;
   background:var(--inner) padding-box,var(--metal) border-box!important;
@@ -56,8 +56,9 @@
 .skill.ready{border-image-source:url(img/btn_teal.png)}
 .skill .cs{color:#ffe08a!important;text-shadow:var(--stroke)}
 .buy b,.cta b,.hbtn b{text-shadow:var(--stroke)}
-.mode{min-height:64px}
-.mode b{font-size:20px;text-shadow:var(--stroke)}
+.mode{min-height:50px;padding:6px 12px!important;gap:0!important;align-content:center}
+.mode b{font-size:17px;line-height:1.2;text-shadow:var(--stroke)}
+.mode > span{font-size:11px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mode span{color:#e9fbff!important;text-shadow:var(--stroke)}
 
 /* ---------- Titles: slanted teal ribbon ---------- */
@@ -81,7 +82,7 @@
 /* ---------- Bottom nav: framed square tiles ---------- */
 .nav{gap:4px!important;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px))!important;background:linear-gradient(180deg,#141a2b,#05070e)!important;border-top:2px solid #6f7b90!important}
 .nav button{border:2px solid transparent!important;border-radius:8px!important;background:linear-gradient(180deg,#1d2a4d,#0a1024) padding-box,var(--metal-dim) border-box!important;
-  color:#fff!important;font-size:13px!important;font-weight:700;letter-spacing:0!important;text-shadow:var(--stroke);padding:6px 0 4px!important;min-height:58px}
+  color:#fff!important;font-size:12px!important;font-weight:700;letter-spacing:0!important;text-shadow:var(--stroke);padding:4px 0 3px!important;min-height:48px;gap:1px!important}
 .nav button svg{width:26px!important;height:26px!important;stroke:#dfe9ff;filter:drop-shadow(0 1px 1px #000)}
 .nav button[aria-current="page"]{background:radial-gradient(80% 70% at 50% 40%,rgba(80,200,230,.45),transparent 70%) padding-box,linear-gradient(180deg,#22406e,#0c1838) padding-box,
   linear-gradient(160deg,#e9ffff,#59d4dd 35%,#11606b 60%,#9af3f6 100%) border-box!important;box-shadow:0 0 10px rgba(89,212,221,.5)}
@@ -103,8 +104,8 @@
 /* pixel art everywhere: scale every art image with hard pixel edges */
 .nav button img,.side-icons .gear img,.skill .ic img,.dust::before,.piece::before,.ccell[data-g],.gcard[data-g],.loot-art .box,.banner-card,.shop-card.gacha-gold,.shop-card.gacha-paid{image-rendering:pixelated}
 .skill .ic img{width:26px;height:26px;object-fit:contain;display:block;filter:drop-shadow(0 1px 1px #000)}
-.nav button img{width:30px;height:30px;object-fit:contain;filter:drop-shadow(0 1px 1px #000)}
-.nav button.home img{width:38px;height:38px}
+.nav button img{width:26px;height:26px;object-fit:contain;filter:drop-shadow(0 1px 1px #000)}
+.nav button.home img{width:30px;height:30px}
 .nav button:not([aria-current="page"]) img{filter:drop-shadow(0 1px 1px #000) saturate(.75) brightness(.85)}
 .side-icons .gear img{width:26px;height:26px;object-fit:contain;filter:drop-shadow(0 1px 1px #000)}
 .dust::before,.piece::before{width:16px;height:16px;margin-right:3px;vertical-align:-3px;border-radius:0;transform:none;clip-path:none;background:center/contain no-repeat}

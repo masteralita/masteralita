@@ -11,6 +11,7 @@ const BAL_ROOTS = {
   con: CON, skin: SKIN, planet: PLANET, orbit: ORBIT_BASE, pskin: PSKIN, oskin: OSKIN,
   grade: GRADES, gacha: GACHA, tier: SKIN_TIER, chest: CHEST_ODDS, adchest: AD_CHEST,
   income: INCOME, slot: SLOT, enhance: ENHANCE_RATE, wave: WAVE, eskill: ESKILL, skgacha: SKILL_GACHA, sklv: SKILL_LV,
+  stamina: STAMINA, account: ACCOUNT, hole: HOLE,
 };
 
 // Param defaults per effect type, taken from the first skin that uses it (for switching an awakening's type)
@@ -108,13 +109,20 @@ const BAL_SECTIONS = [
       ['slot/act/cost', '액티브 슬롯 열기 (Star Dust)', 'int'], ['slot/pas/cost', '패시브 슬롯 열기 (Star Dust)', 'int'], ['slot/lim/cost', '한정 슬롯 열기 (Star Piece)', 'int'],
       ...ENHANCE_RATE.map((_, i) => [`enhance/${i}`, `강화 성공률 +${i} → +${i + 1}`, 'pct']),
     ] },
+  { id:'account', title:'에너지·계정', desc:'판마다 쓰는 에너지와 계정 레벨 (필요 경험치 = 기준 × 현재 레벨) · 대전 블랙홀', kv: [
+      ['stamina/max', '에너지 최대', 'int'], ['stamina/regenMin', '에너지 1칸 충전 시간 (분)', 'int'], ['stamina/cost', '한 판에 쓰는 에너지', 'int'],
+      ['account/need', '레벨업 필요 경험치 기준 (× 현재 레벨)', 'int'], ['account/arcadeXp', '아케이드 경험치 (× 도달 웨이브)', 'int'],
+      ['account/winXp', '대전 승리 경험치', 'int'], ['account/loseXp', '대전 패배 경험치', 'int'],
+      ['account/dust', '레벨업 보상 Star Dust (× 새 레벨)', 'int'], ['account/piece', '레벨업 보상 Star Piece', 'int'],
+      ['hole/at', '블랙홀 등장 (초)', 'int'], ['hole/dmg', '블랙홀 행성 피해 (매초)', 'int'], ['hole/conDmg', '블랙홀 별자리 피해 (매초)', 'int'],
+    ] },
   { id:'wave', title:'웨이브', desc:'아케이드 난이도 곡선', kv: [
       ['wave/planetHp', '모선(보스) 기본 HP', 'int'], ['wave/planetGrowth', '모선 HP 증가 (웨이브마다 ×)', 'num'],
       ['wave/statGrowth', '적 능력치 증가 (웨이브마다 ×)', 'num'], ['wave/deepFrom', '외우주 가속 시작 웨이브', 'int'],
       ['wave/deepGrowth', '외우주 추가 증가 (×)', 'num'], ['wave/midBossHp', '중간 보스(모선) HP 배율', 'num'], ['wave/zoneBossHp', '구역 보스 HP 배율', 'num'],
       ['wave/conHp', '적 HP 배율 (소행성·운석·우주선)', 'num'], ['wave/conAtk', '적 공격력 배율', 'num'], ['wave/timer', '웨이브 제한 시간 (초)', 'int'],
       ['wave/rockHp', '소행성 기본 HP', 'int'], ['wave/meteorHp', '운석 기본 HP', 'int'], ['wave/shipHp', '외계 우주선 기본 HP', 'int'],
-      ['wave/shipAtk', '외계 우주선 탄 피해', 'int'], ['wave/rockPct', '소행성 충돌 피해 (행성 최대 HP 비율)', 'pct'], ['wave/meteorPct', '운석 충돌 피해 (행성 최대 HP 비율)', 'pct'],
+      ['wave/shipMax', '웨이브당 외계 우주선 최대 수', 'int'], ['wave/shipAtk', '외계 우주선 탄 피해', 'int'], ['wave/rockPct', '소행성 충돌 피해 (행성 최대 HP 비율)', 'pct'], ['wave/meteorPct', '운석 충돌 피해 (행성 최대 HP 비율)', 'pct'],
     ] },
 ];
 // Flatten into fields: path → { kind, neutral, label }
@@ -206,6 +214,88 @@ function applyContent(content) {
   for (const os of items('oskins')) { os.bonus = os.bonus || {}; os.flavor = os.flavor || ''; ORBIT_SKINS.push(os); OSKIN[os.id] = os; ADDED.oskins.push(os.id); }
 }
 
+/* ---------- Images (관리자 [이미지·글] 탭) ----------
+   Every art file the game shows, grouped for the admin filter. A replaced image is uploaded by the admin
+   site to site/{assetId} ({ file, data: data URL }) and the release maps file → assetId in content.images.
+   The game swaps it in everywhere: canvas sprites (pxSprite, conImg), <img> tags and CSS url()s. */
+const IMG_CATS = { con:'별자리·스킨', planet:'행성', skill:'스킬', orbit:'궤도', enemy:'적·전투', ui:'UI·메뉴', item:'재화·상자' };
+const IMG_FIXED = [
+  ['ship_scout.png', 'enemy', '정찰선'], ['ship_saucer.png', 'enemy', '원반선'], ['ship_crab.png', 'enemy', '돌격선'], ['ship_boss.png', 'enemy', '모선'],
+  ['rock_0.png', 'enemy', '소행성 1'], ['rock_1.png', 'enemy', '소행성 2'], ['rock_2.png', 'enemy', '소행성 3'], ['rock_3.png', 'enemy', '소행성 4'],
+  ['meteor_fire.png', 'enemy', '운석 (불꽃)'], ['blackhole.png', 'enemy', '블랙홀'],
+  ['sk_meteor.png', 'skill', '스킬 아이콘 · 공격'], ['sk_nova.png', 'skill', '스킬 아이콘 · 마법·버프 (스킬 탭 메뉴)'], ['sk_shield.png', 'skill', '스킬 아이콘 · 방어·치유'],
+  ['nav_home.png', 'ui', '메뉴 · 로비'], ['nav_team.png', 'ui', '메뉴 · 팀'], ['nav_planets.png', 'ui', '메뉴 · 행성'], ['nav_const.png', 'ui', '메뉴 · 별자리'], ['nav_store.png', 'ui', '메뉴 · 상점'],
+  ['icon_mail.png', 'ui', '우편함 아이콘'], ['icon_rank.png', 'ui', '랭킹 아이콘'],
+  ['btn_teal.png', 'ui', '버튼 · 청록'], ['btn_steel.png', 'ui', '버튼 · 강철'], ['btn_red.png', 'ui', '버튼 · 빨강'],
+  ['banner_ophiuchus.png', 'ui', '상점 배너 · 뱀주인'], ['banner_gold.png', 'ui', '상점 배너 · 골드 뽑기'], ['banner_premium.png', 'ui', '상점 배너 · 유료 뽑기'],
+  ['card_common.png', 'ui', '카드 틀 · 커먼'], ['card_magic.png', 'ui', '카드 틀 · 매직'], ['card_rare.png', 'ui', '카드 틀 · 레어'],
+  ['card_unique.png', 'ui', '카드 틀 · 유니크'], ['card_epic.png', 'ui', '카드 틀 · 에픽'], ['card_legend.png', 'ui', '카드 틀 · 레전드'],
+  ['cur_dust.png', 'item', 'Star Dust'], ['cur_piece.png', 'item', 'Star Piece'], ['chest_closed.png', 'item', '보물 상자 (로비 낙하)'], ['icon_chest.png', 'item', '보물 상자 아이콘'],
+];
+// skins: { id: { con, name, tier } } — the admin passes its added skins too, so they can get art
+function imgCatalog(skins = SKIN) {
+  const cons = Object.values(skins).map(sk => ({ file: `con_${sk.id}.webp`, cat: 'con', label: `${(CON[sk.con] || {}).name || ''}자리 · ${sk.name || sk.id}`, base: SKIN_BASE_IDS.has(sk.id) }));
+  return [...cons, ...IMG_FIXED.map(([file, cat, label]) => ({ file, cat, label, base: true }))];
+}
+const SKIN_BASE_IDS = new Set(Object.keys(SKIN));
+const IMG_OVR = {};                                   // file → data URL in use
+const imgUrl = f => IMG_OVR[f] || 'img/' + f;
+const IMG_RE = /(^|\/)img\/([^/?#)'"]+)/;
+function swapImg(el) {
+  let src = el.getAttribute('src') || '';
+  if (src.startsWith('data:') && el.dataset.osrc) src = el.dataset.osrc; // already swapped: judge by the original
+  const m = src.match(IMG_RE);
+  if (!m) return;
+  if (IMG_OVR[m[2]]) { el.dataset.osrc = src; if (el.getAttribute('src') !== IMG_OVR[m[2]]) el.setAttribute('src', IMG_OVR[m[2]]); }
+  else if (el.getAttribute('src') !== src) { el.setAttribute('src', src); delete el.dataset.osrc; }
+}
+function swapCss() {
+  for (const sh of document.styleSheets) {
+    let rules; try { rules = sh.cssRules; } catch { continue; }
+    for (const r of rules) {
+      if (!r.style) continue;
+      r.__img = r.__img || {};
+      for (const prop of [...r.style].concat(Object.keys(r.__img))) {
+        const orig = r.__img[prop] || r.style.getPropertyValue(prop);
+        if (!orig || !orig.includes('img/')) continue;
+        r.__img[prop] = orig;
+        const v = orig.replace(/url\((['"]?)([^)'"]*img\/([^)'"]+))\1\)/g, (all, q, u, f) => IMG_OVR[f] ? `url("${IMG_OVR[f]}")` : all);
+        if (v !== r.style.getPropertyValue(prop)) r.style.setProperty(prop, v, r.style.getPropertyPriority(prop));
+      }
+    }
+  }
+}
+let imgObserver = null;
+function refreshImages(changed) {
+  if (typeof PX_SPR !== 'undefined') for (const k of Object.keys(PX_SPR)) if (changed.has(k + '.png')) delete PX_SPR[k];
+  if (typeof CON_IMG !== 'undefined') for (const k of Object.keys(CON_IMG)) if (changed.has(`con_${k}.webp`)) delete CON_IMG[k];
+  if (typeof SHIP_WHITE !== 'undefined') for (const k of Object.keys(SHIP_WHITE)) if (changed.has(`ship_${k}.png`)) delete SHIP_WHITE[k];
+  document.querySelectorAll('img').forEach(swapImg);
+  swapCss();
+  if (!imgObserver && Object.keys(IMG_OVR).length) { // pages render later (innerHTML): swap new <img> as they appear
+    imgObserver = new MutationObserver(ms => { for (const m of ms) {
+      if (m.type === 'attributes') { swapImg(m.target); continue; }
+      for (const n of m.addedNodes) if (n.nodeType === 1) { if (n.tagName === 'IMG') swapImg(n); else n.querySelectorAll('img').forEach(swapImg); }
+    } });
+    imgObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+  }
+}
+async function applyImages(map = {}) {
+  const changed = new Set();
+  for (const f of Object.keys(IMG_OVR)) if (!map[f]) { delete IMG_OVR[f]; changed.add(f); }
+  await Promise.all(Object.entries(map).map(async ([f, id]) => {
+    if (typeof id !== 'string' || !/^[\w-]+$/.test(id)) return;
+    let data = null;
+    try { data = localStorage.getItem('gw-img-' + id); } catch {}
+    if (!data) {
+      try { const d = await fsGet(`site/${id}`); data = d && typeof d.data === 'string' && d.data.startsWith('data:image/') ? d.data : null; } catch {}
+      if (data) try { localStorage.setItem('gw-img-' + id, data); } catch {}
+    }
+    if (data && IMG_OVR[f] !== data) { IMG_OVR[f] = data; changed.add(f); }
+  }));
+  if (changed.size) refreshImages(changed);
+}
+
 /* ---------- Released balance from Firebase (docs/FIREBASE.md) ---------- */
 // The admin site publishes releases/{version} and bumps meta/current; both are public to read.
 // The game checks meta/current on launch and downloads the release only when the version changed.
@@ -217,6 +307,7 @@ function useBalance(rel, source) {
   BAL.values = rel.values || {}; BAL.version = rel.version || 0; BAL.publishedAt = rel.publishedAt || null; BAL.source = source;
   applyContent(rel.content);
   applyBalance(BAL.values);
+  if (!window.GW_ADMIN) applyImages((rel.content || {}).images);
 }
 const fsPlain = f => 'mapValue' in f ? Object.fromEntries(Object.entries(f.mapValue.fields || {}).map(([k, x]) => [k, fsPlain(x)]))
   : 'arrayValue' in f ? (f.arrayValue.values || []).map(fsPlain)

@@ -214,6 +214,20 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 /* ---------- Lobby pane ---------- */
 #pane-home{min-height:100%;align-content:end;box-sizing:border-box}
 .home-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+/* 로비 하단: one slim row of pills (자원 수령 · 보물 상자 · 에너지) above the two mode buttons */
+#pane-home{gap:8px;padding-bottom:10px}
+.home-strip{display:grid;grid-template-columns:1.25fr 1fr .85fr;gap:6px}
+.hpill{display:grid;gap:3px;align-content:center;min-width:0;min-height:46px;padding:6px 9px;border-radius:12px;border:1px solid var(--line);background:rgba(12,18,44,.88);color:var(--ink);text-align:left;font:inherit}
+.hpill small{display:flex;justify-content:space-between;gap:4px;font-size:10.5px;color:var(--dim);white-space:nowrap}
+.hpill small em{font-style:normal;color:var(--gold);font-weight:700}
+.hpill .big{display:flex;gap:8px;align-items:baseline;font-family:var(--f-disp);font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
+.hpill .gauge{height:6px}
+.hpill:disabled{opacity:.6}
+.hpill.energy .big b{font-size:16px;color:#ffe27a}
+.hpill.energy .big span{font-size:11px;color:var(--dim)}
+.hpill.energy.low .big b{color:#ff8a9a}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.mode .en{font-style:normal;font-weight:700}
 .hcard{display:grid;gap:6px;padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,44,.88);min-width:0}
 .hcard h3{margin:0;font-size:12px;color:var(--dim);font-weight:500;display:flex;justify-content:space-between;gap:6px}
 .hcard .big{font-family:var(--f-disp);font-size:15px;font-variant-numeric:tabular-nums;display:flex;gap:10px;flex-wrap:wrap}
@@ -713,23 +727,21 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
           <button class="gear" type="button" data-live="ranking" aria-label="랭킹" title="랭킹"><img src="img/icon_rank.png" alt="" aria-hidden="true"></button>
         </div>
         <div class="power">전투력 <b id="homePower">0</b></div>
-        <div class="home-cards">
-          <section class="hcard">
-            <h3>보관 중인 자원</h3>
-            <div class="big"><span class="dust" id="incDust">+0</span><span class="piece" id="incPiece">+0</span></div>
-            <span class="mini" id="incRate"></span>
-            <button class="hbtn" id="collectBtn" type="button">수령</button>
-          </section>
-          <section class="hcard">
-            <h3>보물 상자 <span id="chestTxt">0 / 10</span></h3>
-            <div class="gauge"><i id="chestFill"></i></div>
-            <span class="mini">승리 +3칸 · 패배 +1칸 · 성운 스킨 12%</span>
-            <button class="hbtn" id="chestBtn" type="button">상자 없음</button>
-          </section>
+        <div class="home-strip">
+          <button class="hpill" id="collectBtn" type="button" title="보관 중인 자원 수령">
+            <small>보관 자원 <em>수령</em></small><span class="big"><span class="dust" id="incDust">+0</span><span class="piece" id="incPiece">+0</span></span>
+            <span class="sr" id="incRate"></span>
+          </button>
+          <button class="hpill" id="chestBtn" type="button" title="보물 상자 · 승리 +3칸 · 패배 +1칸 · 성운 스킨 12%">
+            <small>보물 상자 <em id="chestOpen">0 / 10</em></small><span class="gauge"><i id="chestFill"></i></span><span class="sr" id="chestTxt"></span>
+          </button>
+          <button class="hpill energy" id="energyBtn" type="button" title="에너지">
+            <small>에너지 <em id="energyNext">가득</em></small><span class="big"><b id="energyN">10</b><span>/ <span id="energyMax">10</span></span></span>
+          </button>
         </div>
         <div class="modes">
-          <button class="mode pvp" id="pvpBtn" type="button"><b>배틀</b><span>비동기 대전 · <span id="homePvp">0승 0패</span></span></button>
-          <button class="mode" id="arcadeBtn" type="button"><b>아케이드</b><span id="homeBest">기록 없음</span></button>
+          <button class="mode pvp" id="pvpBtn" type="button"><b>배틀</b><span><span id="homePvp">0승 0패</span> · <i class="en">⚡1</i></span></button>
+          <button class="mode" id="arcadeBtn" type="button"><b>아케이드</b><span><span id="homeBest">기록 없음</span> · <i class="en">⚡1</i></span></button>
         </div>
       </div>
       <div class="pane" id="pane-store" hidden></div>
