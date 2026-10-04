@@ -5,7 +5,9 @@
    - 소행성 / 운석 appear at the edges or warp in mid-field, then rush the planet from every direction.
      Reaching the planet costs a share of its max HP (at least WAVE.rockPct / meteorPct) and they break.
    - 외계 우주선 fly in Galaga-style along a swooping path, line up in a formation at the top,
-     sway together and shoot at the planet; from wave 3 one now and then dives down to strafe it.
+     sway together and shoot at the planet; from wave 2 one now and then dives down to strafe it.
+     Ships are the main force; asteroids and meteors are a lighter side hazard.
+   - My projectiles that touch an enemy shot cancel out with it (cancelShots).
    - Every 5th wave a mothership (모선) leads; every 10th it is the zone boss with its zone ability.
    Mobs live in G.foe.cons so targeting, damage, DoTs and skills keep working on them.
    Loaded after battle.js. */
@@ -43,21 +45,23 @@ function startArcadeWave() {
   const look = bossTier === 2 ? z.boss : bossTier === 1 ? z.mid : null;
   // a dummy enemy "system": holds the mobs in .cons; its planet is never alive, so planet-only effects skip it
   G.foe = makeSystem('foe', { isPlanet: true, side: 'foe', hp: 0, maxHp: 1, dArmor: 0, mArmor: 0, flash: 0, dot: null, shred: 0, name: '' }, []);
-  const ships = Math.min(18, (bossTier ? 3 : 5) + Math.floor(n * (bossTier ? .4 : .8)));
-  const rocks = (bossTier ? 2 : 3) + Math.floor(n * .7);
-  const meteors = Math.floor(n * .5) + (n >= 3 ? 1 : 0);
+  // Alien ships are the main force: many of them, arriving in quick squadrons (up to 5 formation rows of 6).
+  // Asteroids and meteors are only a side hazard now: a few per wave.
+  const ships = Math.min(WAVE.shipMax, (bossTier ? 5 : 8) + Math.floor(n * (bossTier ? .6 : 1.2)));
+  const rocks = 1 + Math.floor(n * .3);
+  const meteors = Math.floor(n * .25);
   const cols = Math.min(6, ships), q = [];
   const groups = Math.ceil(ships / cols);
   for (let g = 0; g < groups; g++) {
-    const side = g % 2 ? 1 : -1, fromTop = g === 2;
+    const side = g % 2 ? 1 : -1, fromTop = g % 3 === 2;
     for (let i = 0; i < cols && g * cols + i < ships; i++)
-      q.push({ at: (bossTier ? 3.5 : 1) + g * 4.2 + i * .22, kind: SHIP_KINDS[(g + n - 1) % 3], row: g, col: i, cols, side, fromTop });
+      q.push({ at: (bossTier ? 3 : .8) + g * 2.6 + i * .2, kind: SHIP_KINDS[(g + n - 1) % 3], row: g, col: i, cols, side, fromTop });
   }
-  for (let i = 0; i < rocks; i++) q.push({ at: rnd(2.5, 26), kind: 'rock' });
-  for (let i = 0; i < meteors; i++) q.push({ at: rnd(6, 28), kind: 'meteor' });
+  for (let i = 0; i < rocks; i++) q.push({ at: rnd(4, 24), kind: 'rock' });
+  for (let i = 0; i < meteors; i++) q.push({ at: rnd(8, 26), kind: 'meteor' });
   if (bossTier) q.push({ at: .3, kind: 'boss', tier: bossTier });
   q.sort((a, b) => a.at - b.at);
-  G.arc = { q, t: 0, total: q.length, killed: 0, boss: null, bossTier, look, m: arcScale(n), diveCd: 7, bossCd: 4, bossCd2: 6, bossCd3: 8 };
+  G.arc = { q, t: 0, total: q.length, killed: 0, boss: null, bossTier, look, m: arcScale(n), diveCd: 5, bossCd: 4, bossCd2: 6, bossCd3: 8 };
   for (const c of G.me.cons) { c.dead = false; c.hp = c.maxHp; c.alpha = 1; c.stun = 0; c.dot = null; c.revived = false; c.molted = false; c.invuln = 0; }
   const P = G.me.planet; if (n > 1) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * .15);
   resetHole();
@@ -102,7 +106,8 @@ function spawnMob(s) {
 /* ---------- Update ---------- */
 function slotPos(m) {
   const gx = Math.min(48, (W - 48) / Math.max(1, m.cols - 1 || 1)), sway = Math.sin(G.arc.t * .7) * W * .05;
-  return [W / 2 + (m.col - (m.cols - 1) / 2) * gx + sway, fieldTop() + 26 + m.row * 38 + (G.arc.boss ? 70 : 0)];
+  const top = fieldTop() + 26 + (G.arc.boss ? 70 : 0), gy = clamp((fieldBot() - top - 70) / 5, 24, 38); // up to 5 rows above the planet
+  return [W / 2 + (m.col - (m.cols - 1) / 2) * gx + sway, top + m.row * gy];
 }
 const bez = (a, b, c, d, u) => { const v = 1 - u; return v * v * v * a + 3 * v * v * u * b + 3 * v * u * u * c + u * u * u * d; };
 function enemyShot(m, opt = {}) {
@@ -138,8 +143,8 @@ function updateArcade(dt) {
   }
   if (A.bossTier && A.boss && !A.boss.dead) bossSkills(dt);
   // a formed ship breaks off and dives at the planet (Galaga style)
-  if (G.wave >= 3 && (A.diveCd -= dt) <= 0) {
-    A.diveCd = rnd(4, 7) / Math.min(2, 1 + G.wave * .03);
+  if (G.wave >= 2 && (A.diveCd -= dt) <= 0) {
+    A.diveCd = rnd(2.5, 4.5) / Math.min(2, 1 + G.wave * .03);
     const formed = F.cons.filter(m => !m.dead && isShip(m) && m.st === 'form');
     if (formed.length) { const m = formed[Math.floor(Math.random() * formed.length)]; m.st = 'dive'; m.t0 = A.t; m.fired = false; m.ddir = m.x < W / 2 ? 1 : -1; }
   }
@@ -175,7 +180,7 @@ function shipUpdate(m, dt) {
   }
   m.x = sx; m.y = sy + Math.sin(A.t * 2 + m.col) * 2; m.dir = Math.PI / 2;
   m.cd -= dt * (G.enraged ? 1.4 : 1);
-  if (m.cd <= 0) { m.cd = rnd(2.6, 4.4); enemyShot(m); }
+  if (m.cd <= 0) { m.cd = rnd(2.2, 3.8); enemyShot(m); }
 }
 function bossUpdate(m, dt) {
   const A = G.arc, by = fieldTop() + 40;
@@ -216,6 +221,29 @@ function arcadeKilled(m) {
   G.arc.killed += 1;
   if (m.mob === 'boss') { burst(m.x, m.y, 60, '#ffe9a8'); burst(m.x, m.y, 40, '#ff7a3c'); if (!REDUCED_MOTION) G.shake = SHAKE_MAX; }
   else if (m.mob === 'rock') { burst(m.x, m.y, 14, '#c9a27a'); }
+}
+
+/* ---------- Shots cancel out ---------- */
+// One of my projectiles (constellation shots and skill projectiles) that touches an enemy shot destroys it and is used up.
+// Checked against both positions of the step so fast shots can't slip through each other.
+function cancelShots() {
+  const foes = G.proj.filter(p => p.foeShot);
+  if (!foes.length) return;
+  const mine = G.proj.filter(p => !p.foeShot && !p.meteor && (!p.src || p.src.side === 'me'));
+  const gone = new Set();
+  for (const e of foes) {
+    const ex = e.rx ?? e.x, ey = e.ry ?? e.y;
+    for (const p of mine) {
+      if (gone.has(p)) continue;
+      const px = p.rx ?? p.x, py = p.ry ?? p.y, r = 9 + (p.w || 2) + (e.w || 3);
+      if (Math.hypot(px - ex, py - ey) > r && Math.hypot((p.px ?? px) - ex, (p.py ?? py) - ey) > r) continue;
+      gone.add(p); gone.add(e);
+      burst(ex, ey, 6, '#fff1c4'); burst(ex, ey, 4, e.col);
+      G.rings = (G.rings || []).concat({ x: ex, y: ey, r: 3, t: .2, c: '#fff1c4' });
+      break;
+    }
+  }
+  if (gone.size) G.proj = G.proj.filter(p => !gone.has(p));
 }
 
 /* ---------- Targeting / tap ---------- */

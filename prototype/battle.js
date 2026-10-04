@@ -145,9 +145,9 @@ function startPvp() {
 // 아케이드 waves (asteroids, meteors, alien ships): arcade.js startArcadeWave()
 
 /* ---------- Black hole ---------- */
-// 30 s into a PvP battle a black hole opens between the two systems
-// and drains both planets by a flat 50 HP per second, ignoring armor, shields and evasion.
-const HOLE = { at: 30, dmg: 50, every: 1 };
+// 30 s into a PvP battle a black hole opens between the two systems and drains both planets
+// (HOLE.dmg) and every constellation (HOLE.conDmg) by a flat amount per second, ignoring armor, shields and evasion.
+// HOLE lives in data.js so the admin site can tune it.
 function resetHole() { G.holeT = 0; G.holeCd = 0; G.holeOn = false; G.holePulse = 0; G.holeDust = []; if (G.me) G.me.quake = 0; if (G.foe) G.foe.quake = 0; }
 function holePos() { return [W / 2, (G.foe.cy + G.me.cy) / 2]; }
 function holeR() { return Math.min(G.me.pr, G.foe.pr) * .55; }
@@ -172,7 +172,7 @@ function updateHole(dt) {
   }
   if (!G.holeOn) {
     if (G.holeT < HOLE.at) return;
-    G.holeOn = true; G.holeCd = HOLE.every; G.holePulse = .9; banner('블랙홀 출현', `양쪽 행성 매초 -${HOLE.dmg}`, 1.4);
+    G.holeOn = true; G.holeCd = HOLE.every; G.holePulse = .9; banner('블랙홀 출현', `행성 매초 -${HOLE.dmg} · 별자리 매초 -${HOLE.conDmg}`, 1.4);
     if (!REDUCED_MOTION) G.shake = Math.min(SHAKE_MAX, G.shake + 6);
     return;
   }
@@ -189,6 +189,15 @@ function updateHole(dt) {
     burst(s.cx, s.cy, 12, '#c79bff');
     return { s, before };
   });
+  // constellations are pulled in too: a flat hit on every living one, both sides (부활·탈피 still apply via killCon)
+  for (const s of [G.me, G.foe]) for (const c of s.cons) {
+    if (c.dead || !HOLE.conDmg) continue;
+    if (c.side === 'me' && c.invuln > 0) continue;
+    c.hp -= HOLE.conDmg; c.flash = .12;
+    G.beams.push({ x1: hx, y1: hy, x2: c.x, y2: c.y, c: 'rgba(170,110,255,.5)', w: 1.5, t: .22 });
+    say(c.x + rnd(-6, 6), c.y - 12, HOLE.conDmg, '#c79bff', .7, 12);
+    if (c.hp <= 0) { c.hp = 0; killCon(c, null); }
+  }
   const dead = hits.filter(h => h.s.planet.hp <= 0);
   if (dead.length === 2) { // both drained at once: whoever had more HP left hangs on at 1
     const keep = dead[0].before / dead[0].s.planet.maxHp >= dead[1].before / dead[1].s.planet.maxHp ? dead[0] : dead[1];
@@ -454,7 +463,8 @@ function perkCard(o, i) {
   const total = o.type === 'stat' ? STAT_MAX : o.type === 'chain' ? 3 : 0;
   const stars = Array.from({ length: total }, (_, j) => `<i class="${j < o.lvl - 1 ? 'on' : j === o.lvl - 1 ? 'next' : ''}"></i>`).join('');
   const tag = o.type === 'stat' ? '능력치' : o.type === 'chain' ? `각성 ${ROMAN[o.lvl]}` : '보급';
-  const who = c ? `<em style="--pc:rgb(${c.skin.pal.line})">${c.skin.name}</em>의 ` : '';
+  const own = o.type === 'stat' && !['tArmor', 'tMArmor', 'tEvade', 'pHp'].includes(o.k); // "궁수의 공격력이 …" reads naturally only for its own stats
+  const who = c ? `<em style="--pc:rgb(${c.skin.pal.line})">${c.skin.name}</em>${own ? '의 ' : ' · '}` : '';
   const art = c ? `<img src="img/con_${c.skin.id}.webp" alt="" aria-hidden="true">` : `<img class="pl" src="${pxPlanetUrl(save.mainPlanet)}" alt="" aria-hidden="true">`;
   return `<button class="ncard ${kind}" type="button" data-i="${i}">
     <span class="nc-head">${o.name}</span>
@@ -785,9 +795,11 @@ function update(dt) {
       da = Math.atan2(Math.sin(da), Math.cos(da));
       const a = cur + clamp(da, -turn, turn); p.vx = Math.cos(a); p.vy = Math.sin(a);
     } else { p.vx = dx / d; p.vy = dy / d; }
+    p.px = p.rx ?? p.x; p.py = p.ry ?? p.y; // where it was drawn last step (cancelShots checks the whole step)
     p.x += p.vx * step; p.y += p.vy * step;
     projVisual(p, d);
   }
+  if (arc && G.state === 'fight') cancelShots();
   for (let i = G.beams.length - 1; i >= 0; i--) { G.beams[i].t -= dt; if (G.beams[i].t <= 0) G.beams.splice(i, 1); }
   if (G.rings) for (let i = G.rings.length - 1; i >= 0; i--) { const r = G.rings[i]; r.t -= dt; r.r += 110 * dt; if (r.t <= 0) G.rings.splice(i, 1); }
   for (let i = G.fx.length - 1; i >= 0; i--) { const f = G.fx[i]; f.t -= dt; f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= .96; f.vy *= .96; if (f.t <= 0) G.fx.splice(i, 1); }
@@ -983,7 +995,7 @@ const CON_IMG = {};
 function conImg(c) {
   const id = c.skin.id;
   let im = CON_IMG[id];
-  if (!im) { im = CON_IMG[id] = new Image(); im.src = `img/con_${id}.webp`; }
+  if (!im) { im = CON_IMG[id] = new Image(); im.src = imgUrl(`con_${id}.webp`); }
   return im.complete && im.naturalWidth ? im : null;
 }
 function drawConArt(c, k, im, mine) {
@@ -1007,7 +1019,15 @@ function drawCon(sys, c, t) {
   const lineC = mine ? c.skin.pal.line : '255,123,138';
   ctx.globalAlpha = c.alpha * (c.stun > 0 ? .55 : 1) * (sys.conFade ?? 1);
   ctx.lineCap = 'round';
-  const im = conImg(c);
+  const im = conImg(c), buffs = mine && G.state !== 'home' ? G.buffs || [] : [];
+  if (buffs.length && !c.dead) { // buffed (초신성 가속 등): a pulsing halo in the first buff's colour
+    const pulse = .55 + .25 * Math.sin(t * 6 + c.slot), col = buffs[0].rgb;
+    const g = ctx.createRadialGradient(c.x, c.y, k * .3, c.x, c.y, k * 1.55);
+    g.addColorStop(0, `rgba(${col},${.7 * pulse})`); g.addColorStop(.6, `rgba(${col},${.3 * pulse})`); g.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c.x, c.y, k * 1.55, 0, TAU); ctx.fill();
+    ctx.strokeStyle = `rgba(${col},${.9 * pulse})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(c.x, c.y, k * (1.12 + .05 * Math.sin(t * 6)), 0, TAU); ctx.stroke();
+  }
   if (im) drawConArt(c, k, im, mine);
   else {
     const glowW = mine && c.chain ? 5 + c.chain * 2 : 5;
@@ -1030,6 +1050,17 @@ function drawCon(sys, c, t) {
   const bw = k * 1.7, bx = c.x - bw / 2, by = c.y + k * .95;
   ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(bx, by, bw, 3);
   ctx.fillStyle = mine ? '#52e3a4' : '#ff5a6e'; ctx.fillRect(bx, by, bw * clamp(c.hp / c.maxHp, 0, 1), 3);
+  if (buffs.length) { // the buffs it is under, as small chips right below the life bar
+    ctx.font = '700 8px "Noto Sans KR", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const ws = buffs.map(b => ctx.measureText(b.t).width + 6), tw = ws.reduce((a, w) => a + w, 0) + 2 * (buffs.length - 1);
+    let x = c.x - tw / 2;
+    buffs.forEach((b, i) => {
+      ctx.fillStyle = `rgba(${b.rgb},.9)`; ctx.fillRect(x, by + 5, ws[i], 11);
+      ctx.fillStyle = '#10142a'; ctx.fillText(b.t, x + ws[i] / 2, by + 10.5);
+      x += ws[i] + 2;
+    });
+    ctx.textBaseline = 'alphabetic';
+  }
   if (mine && (c.lv > 1 || c.chain)) {
     ctx.font = `700 ${Math.round(10 * c.s + 1)}px "Chakra Petch", sans-serif`; ctx.fillStyle = '#f5c451'; ctx.textAlign = 'left';
     ctx.fillText((c.lv > 1 ? 'Lv' + c.lv : '') + (c.chain ? ' ' + ROMAN[c.chain] : ''), bx + bw + 3, by + 4);
@@ -1113,9 +1144,21 @@ function draw(t) {
   drawScene(t);
   if (sk) ctx.restore();
 }
+// Buffs my constellations are under right now (gauge skills like 초신성 가속, 포효 awakenings)
+function myBuffs() {
+  const b = [];
+  if (G.nova > 0) b.push({ t: '가속', rgb: '120,215,255' });
+  if (G.roar > 0) b.push({ t: '공격↑', rgb: '255,140,90' });
+  if (SK.crit > 0) b.push({ t: '치명↑', rgb: '255,210,63' });
+  if (SK.cd > 0) b.push({ t: '치피↑', rgb: '255,110,210' });
+  if (G.shield > 0) b.push({ t: '보호', rgb: '110,165,255' });
+  if (SK.regen > 0) b.push({ t: '재생', rgb: '95,224,160' });
+  return b;
+}
 function drawScene(t) {
   drawBg(t);
   if (!G.me) return;
+  G.buffs = myBuffs();
   const arc = G.mode === 'arcade';
   for (const sys of arc ? [G.me] : [G.foe, G.me]) {
     const oy = introOffset(sys);
