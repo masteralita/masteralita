@@ -13,6 +13,7 @@ import { getFirestore, doc, getDoc, getDocs, setDoc, updateDoc, onSnapshot, coll
 import { makeOps } from './ops.js';
 import { makeStats } from './stats.js';
 import { makeLegal } from './legal.js';
+import { makeStoreAdmin, shopMap } from './store.js';
 
 const app = initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
@@ -20,7 +21,7 @@ const db = getFirestore(app, FIREBASE_DB);
 
 const ADM = {
   phase: 'loading', // loading | signin | denied | ready
-  user: null, area: 'balance', sec: BAL_SECTIONS[0].id, // area: balance | assets | ops | players | stats | legal
+  user: null, area: 'balance', sec: BAL_SECTIONS[0].id, // area: balance | gacha | shop | assets | ops | players | stats | legal
   rs: { kind: 'all', cat: 'all', q: '' }, assetData: {},  // 이미지·글 tab: filters, and loaded image data by asset id
   draft: {}, saved: {}, savedAt: null, savedBy: null, // saved = config/balance
   content: {}, savedContent: {}, open: null,          // added items (balance.js applyContent), open = card being edited
@@ -35,12 +36,14 @@ const fmtTime = t => t ? new Date(t).toLocaleString('ko-KR') : '';
 const ctx = { db, ADM, esc, fmtTime, toast: (...a) => toast(...a), confirmBox: (...a) => confirmBox(...a), render: () => render() };
 const OPS = makeOps(ctx), STATS = makeStats(ctx), LEGAL = makeLegal(ctx);
 const liveRel = () => ADM.releases.find(r => ADM.meta && r.version === ADM.meta.version) || { values: {}, content: {} };
+const STORE = makeStoreAdmin({ ...ctx, curVal: p => curVal(p), setDraft: (p, v) => setDraft(p, v), clone, liveRel, sameVal });
 const live = () => liveRel().values || {};
 
 const curVal = p => (p in ADM.draft ? ADM.draft[p] : BAL_DEFAULTS[p]);
 const diff = (a, b) => [...new Set([...Object.keys(a), ...Object.keys(b)])].filter(p => !sameVal(a[p], b[p]));
 const CT_KINDS = ['skins', 'pskins', 'oskins'];
-const ctDiff = (a = {}, b = {}) => [...CT_KINDS, 'images'].reduce((n, k) => n + diff(a[k] || {}, b[k] || {}).length, 0); // images: 이미지·글 tab
+const ctDiff = (a = {}, b = {}) => [...CT_KINDS, 'images'].reduce((n, k) => n + diff(a[k] || {}, b[k] || {}).length, 0) // images: 이미지·글 tab
+  + diff(shopMap(a), shopMap(b)).length + (!!a.shop !== !!b.shop ? 1 : 0); // shop: 상점 관리 (no content.shop = data.js products)
 const unsavedCount = () => diff(ADM.draft, ADM.saved).length + ctDiff(ADM.content, ADM.savedContent);
 const pendingCount = () => diff(ADM.saved, live()).length + ctDiff(ADM.savedContent, liveRel().content);
 const isDirty = () => unsavedCount() > 0;
@@ -121,7 +124,8 @@ function statusChips() {
     : `<span class="ad-chip">게임 적용 중: ${ADM.meta && ADM.meta.version ? `v${ADM.meta.version}` : '내장 기본값'}</span>`);
   return out.join('');
 }
-const AREAS = [['balance', '밸런스'], ['assets', '이미지·글'], ['ops', '운영'], ['players', '플레이어'], ['stats', '통계'], ['legal', '약관·정책']];
+const AREAS = [['balance', '밸런스'], ['gacha', '뽑기 관리'], ['shop', '상점 관리'], ['assets', '이미지·글'], ['ops', '운영'], ['players', '플레이어'], ['stats', '통계'], ['legal', '약관·정책']];
+const DRAFT_AREAS = new Set(['balance', 'gacha', 'shop', 'assets']); // areas on the draft → save → publish flow
 function render() {
   if (ADM.phase !== 'ready') { root.innerHTML = gateHtml(); return; }
   const body = root.querySelector('.ad-body'), scroll = body ? body.scrollTop : 0, a = ADM.area;
@@ -138,7 +142,9 @@ function render() {
       <div class="ad-scroll">${sectionHtml(s)}</div>` : ADM.sec === 'content' ? contentHtml() : `
       <div class="ad-desc"><h2>배포 기록</h2><p>[배포]를 누를 때마다 버전이 하나씩 쌓여요. 예전 버전을 초안으로 불러와 다시 배포하면 되돌릴 수 있어요.</p></div>
       <div class="ad-scroll">${releasesHtml()}</div>`;
-  } else if (a === 'assets') { tabs = rsTabsHtml(); main = rsHtml(); }
+  } else if (a === 'gacha') { tabs = STORE.gachaTabs(); main = STORE.gachaHtml(); }
+  else if (a === 'shop') { tabs = STORE.shopTabs(); main = STORE.shopHtml(); }
+  else if (a === 'assets') { tabs = rsTabsHtml(); main = rsHtml(); }
   else if (a === 'ops') { tabs = OPS.tabsHtml(); main = OPS.html(); }
   else if (a === 'players') main = playersHtml();
   else if (a === 'stats') main = STATS.html();
@@ -147,7 +153,7 @@ function render() {
   root.innerHTML = `
     <header class="ad-top">
       <div class="ad-title"><span class="eyebrow">GALAXY WAR · ADMIN</span><h1>갤럭시워 관리자</h1></div>
-      ${a === 'balance' || a === 'assets' ? `<div class="ad-actions">
+      ${DRAFT_AREAS.has(a) ? `<div class="ad-actions">
         <button class="ghost sm" data-ad="export" type="button">엑셀 내보내기</button>
         <label class="ghost sm file">엑셀 가져오기<input type="file" id="adImport" accept=".xlsx"></label>
         <button class="ghost sm" data-ad="defaults" type="button">전체 기본값</button>
@@ -155,9 +161,9 @@ function render() {
         <button class="ghost sm" data-ad="save" type="button"${isDirty() && !ADM.busy ? '' : ' disabled'}>초안 저장</button>
         <button class="cta sm" data-ad="publish" type="button"${pending && !ADM.busy ? '' : ' disabled'}>배포</button>
       </div>` : '<div></div>'}
-      <div class="ad-status">${a === 'balance' || a === 'assets' ? statusChips() : ''}<span class="who">${esc(ADM.user.email || ADM.user.uid)} · <a href="../play/" target="_blank" rel="noopener">게임 열기</a> · <button class="link" data-ad="signout" type="button">로그아웃</button></span></div>
+      <div class="ad-status">${DRAFT_AREAS.has(a) ? statusChips() : ''}<span class="who">${esc(ADM.user.email || ADM.user.uid)} · <a href="../play/" target="_blank" rel="noopener">게임 열기</a> · <button class="link" data-ad="signout" type="button">로그아웃</button></span></div>
     </header>
-    <nav class="ad-areas" aria-label="관리 영역">${AREAS.map(([id, label]) => `<button type="button" data-area="${id}" aria-current="${id === a ? 'page' : 'false'}">${label}${(id === 'balance' || id === 'assets') && isDirty() ? '<em>•</em>' : ''}</button>`).join('')}</nav>
+    <nav class="ad-areas" aria-label="관리 영역">${AREAS.map(([id, label]) => `<button type="button" data-area="${id}" aria-current="${id === a ? 'page' : 'false'}">${label}${DRAFT_AREAS.has(id) && isDirty() ? '<em>•</em>' : ''}</button>`).join('')}</nav>
     ${tabs}
     <div class="ad-body">${main}</div>`;
   root.querySelector('.ad-body').scrollTop = scroll;
@@ -468,8 +474,9 @@ async function saveDraft() {
   await setDoc(doc(db, 'config', 'balance'), { v: 1, values, content, savedAt: new Date().toISOString(), by: ADM.user.email || ADM.user.uid });
 }
 async function publish() {
-  const bad = ctInvalid();
-  if (bad) { toast(`추가 항목 ${bad}개에 고칠 곳이 있어요 · 고치거나 지운 뒤 배포해 주세요`); ADM.sec = 'content'; render(); return; }
+  const bad = ctInvalid(), badShop = STORE.shopInvalid();
+  if (bad) { toast(`추가 항목 ${bad}개에 고칠 곳이 있어요 · 고치거나 지운 뒤 배포해 주세요`); ADM.area = 'balance'; ADM.sec = 'content'; render(); return; }
+  if (badShop) { toast(`상품 ${badShop}개에 고칠 곳이 있어요 · 고치거나 지운 뒤 배포해 주세요`); ADM.area = 'shop'; render(); return; }
   const note = await confirmBox('배포', `초안을 새 버전으로 배포해요. 게임은 다음 실행 때 새 값을 받아요.<br>기본값과 다른 값 ${Object.keys(ADM.draft).length}개 · 추가 항목 ${ctCount()}개`, '배포', { input: '메모 (예: 궁수 공속 하향)' });
   if (note === null) return;
   ADM.busy = true; render();
@@ -492,6 +499,7 @@ async function publish() {
 root.addEventListener('click', async e => {
   const ar = e.target.closest('[data-area]'); if (ar) { ADM.area = ar.dataset.area; render(); root.querySelector('.ad-body').scrollTop = 0; return; }
   if (await contentClick(e)) return;
+  if ((ADM.area === 'gacha' || ADM.area === 'shop') && await STORE.click(e)) return;
   const t = e.target.closest('[data-sec]'); if (t) { ADM.sec = t.dataset.sec; render(); root.querySelector('.ad-body').scrollTop = 0; return; }
   const l = e.target.closest('[data-load]');
   if (l) {
@@ -520,6 +528,7 @@ root.addEventListener('change', e => {
   if (el.id === 'adImport') { adminImport(el.files[0]); el.value = ''; return; }
   if (el.dataset.rsup) { rsUpload(el.dataset.rsup, el.files[0]); el.value = ''; return; }
   if (el.dataset.ct) { contentChange(el); return; }
+  if (STORE.change(el)) return;
   const path = el.dataset.path; if (!path) return;
   const f = BAL_FIELDS[path];
   if (f.kind === 'chain') {
