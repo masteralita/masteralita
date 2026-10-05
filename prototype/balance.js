@@ -11,7 +11,7 @@ const BAL_ROOTS = {
   con: CON, skin: SKIN, planet: PLANET, orbit: ORBIT_BASE, pskin: PSKIN, oskin: OSKIN,
   grade: GRADES, gacha: GACHA, tier: SKIN_TIER, chest: CHEST_ODDS, adchest: AD_CHEST,
   income: INCOME, slot: SLOT, enhance: ENHANCE_RATE, wave: WAVE, eskill: ESKILL, skgacha: SKILL_GACHA, sklv: SKILL_LV,
-  stamina: STAMINA, account: ACCOUNT, hole: HOLE,
+  stamina: STAMINA, account: ACCOUNT, hole: HOLE, pool: GACHA_POOL,
 };
 
 // Param defaults per effect type, taken from the first skin that uses it (for switching an awakening's type)
@@ -71,7 +71,7 @@ const BAL_SECTIONS = [
     path: (r, c) => `sklv/${r}/${c}` },
   { id:'skgacha', title:'스킬 뽑기', desc:'등급별 뽑기 가중치 (가중치 합 기준 확률)와 최고 레벨 스킬이 또 나왔을 때 돌려주는 Star Dust',
     rows: DRAW_GRADES.map(g => ({ id:g, label:g, sub:SKILL_GRADES[g].name })),
-    cols: [{ key:'free', label:'무료 뽑기 가중치', kind:'num' }, { key:'paid', label:'유료 뽑기 가중치', kind:'num' }, { key:'dupe', label:'최고 레벨 중복 시 Star Dust', kind:'int' }],
+    cols: [{ key:'free', label:'골드 뽑기 가중치', kind:'num' }, { key:'paid', label:'별모래 뽑기 가중치', kind:'num' }, { key:'dupe', label:'최고 레벨 중복 시 Star Dust', kind:'int' }],
     path: (r, c) => c === 'dupe' ? `skgacha/dupe/${r}` : `skgacha/${c}/w/${r}` },
   { id:'orbit', title:'궤도', desc:'궤도 기본 능력치 (그 궤도의 별자리에게 적용)',
     rows: [{ id:'single/0', label:'단일 궤도', sub:'궤도 1개 행성' }, { id:'dual/0', label:'안쪽 궤도', sub:'궤도 2개 행성' }, { id:'dual/1', label:'바깥 궤도', sub:'궤도 2개 행성' }],
@@ -91,13 +91,13 @@ const BAL_SECTIONS = [
     path: (r, c) => `oskin/${r}/${c}` },
   { id:'grade', title:'등급·뽑기', desc:'등급 배율과 뽑기 가중치 (가중치 합 기준 확률)',
     rows: GRADES.map((g, i) => ({ id:String(i), label:g.name, sub:g.en })),
-    cols: [{ key:'mult', label:'능력치 배율', kind:'num' }, { key:'gold', label:'골드 뽑기 가중치', kind:'num' }, { key:'paid', label:'유료 뽑기 가중치', kind:'num' }],
+    cols: [{ key:'mult', label:'능력치 배율', kind:'num' }, { key:'gold', label:'골드 뽑기 가중치', kind:'num' }, { key:'paid', label:'별모래 뽑기 가중치', kind:'num' }],
     path: (r, c) => c === 'mult' ? `grade/${r}/mult` : `gacha/${c}/w/${r}` },
   { id:'econ', title:'경제·확률', desc:'가격, 확률, 보상량', kv: [
       ['gacha/gold/cost', '골드 뽑기 1회 (Star Dust)', 'int'], ['gacha/gold/cost10', '골드 뽑기 10회 (Star Dust)', 'int'],
-      ['gacha/paid/cost', '유료 뽑기 1회 (Star Piece)', 'int'], ['gacha/paid/cost10', '유료 뽑기 10회 (Star Piece)', 'int'],
-      ['skgacha/free/cost', '무료 스킬 뽑기 1회 (Star Dust)', 'int'], ['skgacha/free/cost10', '무료 스킬 뽑기 10회 (Star Dust)', 'int'],
-      ['skgacha/paid/cost', '유료 스킬 뽑기 1회 (Star Piece)', 'int'], ['skgacha/paid/cost10', '유료 스킬 뽑기 10회 (Star Piece)', 'int'],
+      ['gacha/paid/cost', '별모래 뽑기 1회 (Star Piece)', 'int'], ['gacha/paid/cost10', '별모래 뽑기 10회 (Star Piece)', 'int'],
+      ['skgacha/free/cost', '골드 스킬 뽑기 1회 (Star Dust)', 'int'], ['skgacha/free/cost10', '골드 스킬 뽑기 10회 (Star Dust)', 'int'],
+      ['skgacha/paid/cost', '별모래 스킬 뽑기 1회 (Star Piece)', 'int'], ['skgacha/paid/cost10', '별모래 스킬 뽑기 10회 (Star Piece)', 'int'],
       ['tier/supernova/price', '스페셜 스킨 가격 (Star Piece)', 'int'],
       ['chest/skin', '보물 상자 · 성운 스킨 확률', 'pct'], ['chest/dust', '보물 상자 · Star Dust 확률', 'pct'],
       ['chest/piece', '보물 상자 · Star Piece 확률', 'pct'], ['chest/con', '보물 상자 · 별자리 카드 확률', 'pct'],
@@ -131,6 +131,11 @@ for (const s of BAL_SECTIONS) {
   if (s.kv) for (const [path, label, kind] of s.kv) BAL_FIELDS[path] = { kind, label, sec: s.id };
   else for (const r of s.rows) for (const c of s.cols) BAL_FIELDS[s.path(r.id, c.key)] = { kind: c.kind, neutral: c.neutral, label: `${r.label} · ${c.label}`, sec: s.id };
 }
+// 뽑기 관리 (관리자 [뽑기 관리]): on/off per item and draw, not shown in the 밸런스 tables
+const POOL_DRAWS = { con: [['gold', '골드 뽑기'], ['paid', '별모래 뽑기']], skill: [['free', '골드 스킬 뽑기'], ['paid', '별모래 스킬 뽑기']] };
+for (const [kind, ids] of [['con', ALL_CONS.map(c => c.id)], ['skill', Object.keys(ESKILL)]])
+  for (const id of ids) for (const [d, label] of POOL_DRAWS[kind])
+    BAL_FIELDS[`pool/${kind}/${id}/${d}`] = { kind: 'bool', label: `${kind === 'con' ? `${CON[id].name}자리` : ESKILL[id].name} · ${label}`, sec: 'pool' };
 
 /* ---------- Path access ---------- */
 function balGet(path) {
@@ -200,6 +205,34 @@ function contentProblems(kind, d) {
   if (kind === 'skins' ? SKIN_BASE.has(d.id) : kind === 'pskins' ? PSKIN_BASE.has(d.id) : OSKIN_BASE.has(d.id)) out.push('기본 항목과 id가 같아요');
   return out;
 }
+// 상점 상품 (content.shop: { id: product }, see data.js SHOP_DEFAULT); no content.shop → the data.js products
+function shopProblems(d) {
+  const out = [];
+  if (!d || typeof d.id !== 'string' || !d.id) return ['id가 없어요'];
+  if (!String(d.name || '').trim()) out.push('이름을 입력해 주세요');
+  if (!SHOP_TABS[d.tab]) out.push('노출 위치를 골라 주세요');
+  if (!SHOP_TYPES[d.type]) out.push('상품 구분을 골라 주세요');
+  if (!['krw', 'piece', 'dust'].includes(d.cur)) out.push('결제 수단을 골라 주세요');
+  if (!isNum(d.price) || d.price < 0) out.push('가격을 입력해 주세요');
+  if (!isNum(d.limit) || d.limit < 0) out.push('구매 횟수를 입력해 주세요');
+  if (d.start && d.end && d.start >= d.end) out.push('노출 종료가 시작보다 빨라요');
+  const r = d.reward || {};
+  if (r.con && !CON[r.con]) out.push('보상 별자리가 올바르지 않아요');
+  if (r.skill && !ESKILL[r.skill]) out.push('보상 스킬이 올바르지 않아요');
+  if (!(r.piece > 0 || r.dust > 0 || r.con || r.skill || r.ads)) out.push('보상을 하나 이상 넣어 주세요');
+  return out;
+}
+// 노출 기간 (start / end: <input type="datetime-local"> value, device time; empty = no limit)
+function shopOpen(p, now = Date.now()) {
+  const at = s => { const v = s ? Date.parse(s) : NaN; return Number.isFinite(v) ? v : null; };
+  const a = at(p.start), b = at(p.end);
+  return (a === null || now >= a) && (b === null || now < b);
+}
+const shopSort = (a, b) => (a.order || 0) - (b.order || 0) || String(a.id).localeCompare(String(b.id));
+function applyShop(shop) {
+  const list = shop && typeof shop === 'object' ? Object.values(shop).filter(d => !shopProblems(d).length) : SHOP_DEFAULT;
+  SHOP.splice(0, SHOP.length, ...JSON.parse(JSON.stringify(list)).sort(shopSort));
+}
 const SKIN_BASE = new Set(Object.keys(SKIN)), PSKIN_BASE = new Set(Object.keys(PSKIN)), OSKIN_BASE = new Set(Object.keys(OSKIN));
 const ADDED = { skins: [], pskins: [], oskins: [] };
 function applyContent(content) {
@@ -212,6 +245,7 @@ function applyContent(content) {
   for (const sk of items('skins')) { sk.stats = sk.stats.map(x => [x.key, x.name || '']); prepSkin(sk, sk.con); SKINS[sk.con].push(sk); SKIN[sk.id] = sk; ADDED.skins.push(sk.id); }
   for (const ps of items('pskins')) { ps.bonus = ps.bonus || {}; ps.flavor = ps.flavor || ''; PLANET_SKINS.push(ps); PSKIN[ps.id] = ps; ADDED.pskins.push(ps.id); }
   for (const os of items('oskins')) { os.bonus = os.bonus || {}; os.flavor = os.flavor || ''; ORBIT_SKINS.push(os); OSKIN[os.id] = os; ADDED.oskins.push(os.id); }
+  applyShop(content.shop);
 }
 
 /* ---------- Images (관리자 [이미지·글] 탭) ----------
@@ -227,7 +261,7 @@ const IMG_FIXED = [
   ['nav_home.png', 'ui', '메뉴 · 로비'], ['nav_team.png', 'ui', '메뉴 · 팀'], ['nav_planets.png', 'ui', '메뉴 · 행성'], ['nav_const.png', 'ui', '메뉴 · 별자리'], ['nav_store.png', 'ui', '메뉴 · 상점'],
   ['icon_mail.png', 'ui', '우편함 아이콘'], ['icon_rank.png', 'ui', '랭킹 아이콘'],
   ['btn_teal.png', 'ui', '버튼 · 청록'], ['btn_steel.png', 'ui', '버튼 · 강철'], ['btn_red.png', 'ui', '버튼 · 빨강'],
-  ['banner_ophiuchus.png', 'ui', '상점 배너 · 뱀주인'], ['banner_gold.png', 'ui', '상점 배너 · 골드 뽑기'], ['banner_premium.png', 'ui', '상점 배너 · 유료 뽑기'],
+  ['banner_ophiuchus.png', 'ui', '상점 배너 · 뱀주인'], ['banner_gold.png', 'ui', '상점 배너 · 골드 뽑기'], ['banner_premium.png', 'ui', '상점 배너 · 별모래 뽑기'],
   ['card_common.png', 'ui', '카드 틀 · 커먼'], ['card_magic.png', 'ui', '카드 틀 · 매직'], ['card_rare.png', 'ui', '카드 틀 · 레어'],
   ['card_unique.png', 'ui', '카드 틀 · 유니크'], ['card_epic.png', 'ui', '카드 틀 · 에픽'], ['card_legend.png', 'ui', '카드 틀 · 레전드'],
   ['cur_dust.png', 'item', 'Star Dust'], ['cur_piece.png', 'item', 'Star Piece'], ['chest_closed.png', 'item', '보물 상자 (로비 낙하)'], ['icon_chest.png', 'item', '보물 상자 아이콘'],

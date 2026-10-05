@@ -316,6 +316,14 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .piece-pack{display:grid;gap:4px;justify-items:center;padding:14px 6px;border-radius:12px;border:1px solid rgba(195,91,255,.4);background:rgba(195,91,255,.08);font-family:var(--f-disp)}
 .piece-pack b{font-size:16px}
 .piece-pack span{font-size:12px;color:var(--dim);font-family:var(--f-body)}
+.piece-pack small{font-size:11px;color:var(--ink);font-family:var(--f-body)}
+.piece-pack:disabled{opacity:.45}
+.store-tabs{position:sticky;top:-1px;z-index:2;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:4px;border-radius:12px;border:1px solid var(--line);background:#0a1030;box-shadow:0 6px 14px rgba(0,0,0,.45)}
+.store-tabs button{border:0;border-radius:9px;background:none;padding:8px 4px;font-size:13px;color:var(--dim)}
+.store-tabs button[aria-pressed="true"]{background:var(--gold);color:#1d1403;font-weight:700}
+.shop-odds{display:grid;gap:6px}
+.shop-odds .mtxt{text-align:left;font-size:12px;margin-top:4px}
+.prob li small{margin-left:6px;color:var(--dim);font-size:11px}
 
 /* planets */
 .planet-hero{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;padding:16px;border-radius:16px;border:1px solid var(--line);background:rgba(15,22,52,.8)}

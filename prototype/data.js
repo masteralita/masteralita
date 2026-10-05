@@ -448,13 +448,19 @@ function skillAtLv(s, lv) {
   else o.v = +Math.min(SKILL_CAP[s.type] || 99, s.v * m).toFixed(4);
   return o;
 }
-// 스킬 뽑기 (상점): free = Star Dust (R~SSR), paid = Star Piece (R~MR); weights per grade, and Star Dust paid back for a skill already owned
+// 스킬 뽑기 (상점): free = 골드 (Star Dust, R~SSR), paid = 별모래 (Star Piece, R~MR); weights per grade, and Star Dust paid back for a skill already owned
 const SKILL_GACHA = {
-  free: { name:'무료 스킬 뽑기', cur:'dust',  cost:5000, cost10:45000, w:{ R:75, SR:22, SSR:3, LR:0, MR:0 } },
-  paid: { name:'유료 스킬 뽑기', cur:'piece', cost:250,  cost10:2250,  w:{ R:55, SR:28, SSR:12, LR:4, MR:1 } },
+  free: { name:'골드 스킬 뽑기', cur:'dust',  cost:5000, cost10:45000, w:{ R:75, SR:22, SSR:3, LR:0, MR:0 } },
+  paid: { name:'별모래 스킬 뽑기', cur:'piece', cost:250,  cost10:2250,  w:{ R:55, SR:28, SSR:12, LR:4, MR:1 } },
   dupe: { R:200, SR:600, SSR:2000, LR:4000, MR:8000 },
 };
 const SKILL_DRAWS = ['free', 'paid'];
+// 뽑기 관리 (관리자): which constellations / skills each draw can give. con: gold · paid, skill: free · paid
+const GACHA_POOL = { con: {}, skill: {} };
+for (const id of Object.keys(ESKILL)) GACHA_POOL.skill[id] = { free: true, paid: true };
+// Effective grade weights of a skill draw: a grade with no skill in the pool can't come up
+const skPoolW = (k, w = SKILL_GACHA[k].w, inPool = id => GACHA_POOL.skill[id] && GACHA_POOL.skill[id][k]) =>
+  Object.fromEntries(DRAW_GRADES.map(g => [g, Object.keys(ESKILL).some(id => ESKILL[id].grade === g && inPool(id)) ? (w[g] || 0) : 0]));
 const skillDesc = s => (GSKILL[s.type] || GSKILL.meteor).desc(s);
 /* ---------- Orbits (궤도): belong to the planet, carry their own base stats and skin ---------- */
 // A planet with a single orbit gets a stronger orbit to make up for fewer constellations.
@@ -500,8 +506,24 @@ const GRADES = [
 ];
 const GACHA = {
   gold: { name:'골드 뽑기', cur:'dust',  cost:3000, cost10:27000, w:[50, 28, 15, 5, 1.7, .3] },
-  paid: { name:'유료 뽑기', cur:'piece', cost:300,  cost10:2700,  w:[0, 0, 55, 28, 13, 4] },
+  paid: { name:'별모래 뽑기', cur:'piece', cost:300,  cost10:2700,  w:[0, 0, 55, 28, 13, 4] },
 };
+
+for (const c of ALL_CONS) GACHA_POOL.con[c.id] = { gold: !c.special, paid: true }; // 뱀주인 only from the 별모래 draw
+
+/* ---------- 상점 상품 (관리자 [상점 관리]에서 바꿀 수 있어요) ----------
+   tab: rec 추천 · con 별자리 · skill 스킬 · piece 별모래 / type: always 상시 · banner 배너 (별자리·스킬 탭 위 최대 2개)
+   cur: krw (실결제, 프로토타입은 바로 지급) · piece · dust / limit: 계정당 구매 횟수 (0 = 무제한)
+   start / end: 노출 기간 'YYYY-MM-DDTHH:mm' (비우면 제한 없음) / reward: { piece, dust, con, grade, skill, ads } */
+const SHOP_TABS = { rec:'추천', con:'별자리', skill:'스킬', piece:'별모래' };
+const SHOP_TYPES = { always:'상시', banner:'배너' };
+const SHOP_DEFAULT = [
+  { id:'noads', tab:'rec', type:'always', order:1, name:'광고 제거', desc:'모든 광고 제거 · 로비 보물 상자와 광고 보상을 광고 없이 바로 받아요', cur:'krw', price:9900, limit:1, start:'', end:'', reward:{ ads:true } },
+  { id:'pkg_oph', tab:'con', type:'banner', order:1, name:'특수 별자리 패키지', desc:'뱀주인자리 (에픽) 확정 + Star Piece 500', cur:'krw', price:9900, limit:0, start:'', end:'', reward:{ con:'oph', grade:4, piece:500 } },
+  ...[[100, 1200], [400, 4900], [1200, 14000], [2700, 29000], [4500, 49000], [9000, 99000]].map(([n, p], i) =>
+    ({ id:`piece_${n}`, tab:'piece', type:'always', order:i + 1, name:`별모래 ${n.toLocaleString('ko-KR')}`, desc:'', cur:'krw', price:p, limit:0, start:'', end:'', reward:{ piece:n } })),
+];
+const SHOP = JSON.parse(JSON.stringify(SHOP_DEFAULT));
 
 /* ---------- Star slots & parts (컨셉 이미지: 별자리 화면) ---------- */
 const SLOT = {
