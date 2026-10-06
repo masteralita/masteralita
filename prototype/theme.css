@@ -161,3 +161,7 @@
 .pp-item{display:grid;grid-template-columns:40px 1fr auto;gap:10px;align-items:center;text-align:left}
 .pp-item .orb{width:40px;height:40px}
 .pp-item > span:nth-child(2){display:grid;gap:2px;min-width:0}
+.team-planet .tp-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.team-planet .tp-head > b{font-size:15px}
+.tp-btns{width:100%}
+.tp-btns button{width:100%;min-width:0;margin:0;justify-content:center}

@@ -1232,13 +1232,13 @@ function renderTeam() {
     <section class="team-planet">
       <div class="sk-preview tp-pv"><canvas id="teamPv" aria-label="${pd.name} 미리보기"></canvas></div>
       <div class="tp-head">
-        <div class="tp-txt"><b>${pd.name} <small>Lv ${ps.lv}</small></b>
-          <span class="schips"><span class="schip">HP ${fmt(pd.hp * planetHpMul(ps.lv))}</span>${pd.desc !== 'HP가 높은 기본 행성' ? `<span class="schip">${pd.desc}</span>` : ''}<span class="schip">궤도 ${n}개</span></span></div>
+        <b>${pd.name} (${(PSKIN[ps.skin] || PSKIN.basic).name}) <small>Lv ${ps.lv}</small></b>
+        <span class="schip">HP ${fmt(pd.hp * planetHpMul(ps.lv))}</span><span class="schip">궤도 ${n}개 · ${(OSKIN[ps.orbitSkins[0]] || OSKIN.dash).name}</span>${pd.desc !== 'HP가 높은 기본 행성' ? `<span class="schip">${pd.desc}</span>` : ''}
       </div>
       <div class="tp-btns">
-        <button class="ghost sm" data-tact="planet" type="button">행성 변경<span class="mini">${pd.name}</span></button>
-        <button class="ghost sm" data-pskin type="button">행성 스킨<span class="mini">${(PSKIN[ps.skin] || PSKIN.basic).name}</span></button>
-        <button class="ghost sm" data-oskin type="button">궤도 스킨<span class="mini">${(OSKIN[ps.orbitSkins[0]] || OSKIN.dash).name}</span></button>
+        <button class="ghost sm" data-tact="planet" type="button">행성 변경</button>
+        <button class="ghost sm" data-pskin type="button">행성 스킨</button>
+        <button class="ghost sm" data-oskin type="button">궤도 스킨</button>
       </div>
       <div class="team-sk">
         ${planetSkills(pid).map((s, k) => (k === 1 ? '<hr class="sk-div">' : '') + (k ? skillRow(s, `장착 ${k}`, `<button class="ghost sm" data-teq="${k - 1}" type="button">${s ? '변경' : '장착'}</button>`) : skillRow(s, '고유'))).join('')}
