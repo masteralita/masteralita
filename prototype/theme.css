@@ -22,7 +22,7 @@
 .shell.see-through{background:transparent}
 
 /* ---------- Frames: bevelled silver panel (padding-box inner + border-box metal) ---------- */
-.hcard,.hpill,.pcell,.prow,.team-planet,.team-sk,.orbit-card,.slot-panel,.star-stage,.lv-row,.mail-row,.notice-row,.set-group,.planet-hero,
+.hcard,.hpill,.pcell,.prow,.team-planet,.orbit-card,.slot-panel,.star-stage,.lv-row,.mail-row,.notice-row,.set-group,.planet-hero,
 .skin-item,.con-pick,.oslot,.tslot,.lv-me,.doc-body,.sk-preview,.ccell.locked,.skin-card{
   border:2px solid transparent!important;
   background:var(--inner) padding-box,var(--metal) border-box!important;
@@ -148,3 +148,8 @@
 .pm-btns .armed{filter:brightness(1.35) saturate(1.3);animation:armed .5s ease-in-out infinite alternate}
 @keyframes armed{to{transform:scale(1.04)}}
 @media (prefers-reduced-motion:reduce){.pm-btns .armed{animation:none}}
+
+/* 팀 화면: 행성 카드 안의 게이지 스킬 */
+.team-sk{display:grid;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.team-sk h3{margin:0;font-size:14px}
+.team-sk .sk-div{width:100%;margin:2px 0;border:0;border-top:1px solid var(--line)}

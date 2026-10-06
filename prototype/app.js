@@ -1234,11 +1234,10 @@ function renderTeam() {
         <button class="ghost sm" data-tact="planet" type="button">행성 변경</button>
       </div>
       <div class="skin-line"><span class="lbl">행성 스킨</span><b>${(PSKIN[ps.skin] || PSKIN.basic).name}</b><button class="ghost sm" data-pskin type="button">변경</button></div>
-    </section>
-    <section class="psk team-sk">
-      <div class="psk-h"><h3>게이지 스킬 <small>전투에서 기력을 써서 발동해요</small></h3></div>
-      ${planetSkills(pid).map((s, k) => k ? skillRow(s, `장착 ${k}`, `<button class="ghost sm" data-teq="${k - 1}" type="button">${s ? '변경' : '장착'}</button>`) : skillRow(s, '고유')).join('')}
-      <p class="fine">고유 스킬은 ${pd.name}만의 스킬이에요. 장착 칸 2개에는 상점 스킬 뽑기로 얻은 스킬을 자유롭게 넣을 수 있어요.</p>
+      <div class="team-sk">
+        <h3>게이지 스킬</h3>
+        ${planetSkills(pid).map((s, k) => (k === 1 ? '<hr class="sk-div">' : '') + (k ? skillRow(s, `장착 ${k}`, `<button class="ghost sm" data-teq="${k - 1}" type="button">${s ? '변경' : '장착'}</button>`) : skillRow(s, '고유'))).join('')}
+      </div>
     </section>
     ${Array.from({ length: n }, (_, k) => { const os = orbitStats(pid, k), a = save.form[k]; return `
     <section class="orbit-card">
