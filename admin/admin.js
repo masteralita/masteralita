@@ -50,13 +50,17 @@ const isDirty = () => unsavedCount() > 0;
 
 /* ---------- Value formatting ---------- */
 function showNum(kind, v) { return kind === 'pct' ? +(v * 100).toFixed(4) : v; }
+// select cells: stored key → label shown in the admin (an imported cell may hold either)
+const OPT_KINDS = { role: ROLE_LABEL, dmg: KIND_LABEL };
 function parseCell(kind, raw) {
   if (kind === 'text') return String(raw ?? '');
+  if (OPT_KINDS[kind]) { const t = String(raw ?? '').trim(), L = OPT_KINDS[kind]; return L[t] ? t : Object.keys(L).find(k => L[k] === t); }
   if (kind === 'gskill') { const t = String(raw ?? '').trim(); return GSKILL[t] ? t : undefined; }
   const n = Number(String(raw).replace('%', '').trim());
   if (!Number.isFinite(n)) return undefined;
   if (kind === 'pct') return +(n / 100).toFixed(6);
   if (kind === 'int') return Math.round(n);
+  if (OPT_KINDS[kind]) return `<td class="${cls}" title="${esc(title)}"><select data-path="${path}">${Object.entries(OPT_KINDS[kind]).map(([k, l]) => `<option value="${k}"${k === v ? ' selected' : ''}>${l}</option>`).join('')}</select></td>`;
   if (kind === 'orbits') return n >= 2 ? 2 : 1;
   return n;
 }
@@ -78,7 +82,7 @@ function setDraft(path, v) {
 function cellHtml(path, kind) {
   const v = curVal(path), mod = path in ADM.draft, dirty = !sameVal(ADM.draft[path], ADM.saved[path]);
   const cls = `${mod ? ' mod' : ''}${dirty ? ' dirty' : ''}`;
-  const title = `기본값: ${kind === 'chain' ? chainText(BAL_DEFAULTS[path]) : showNum(kind, BAL_DEFAULTS[path])}`;
+  const title = `기본값: ${kind === 'chain' ? chainText(BAL_DEFAULTS[path]) : OPT_KINDS[kind] ? OPT_KINDS[kind][BAL_DEFAULTS[path]] : showNum(kind, BAL_DEFAULTS[path])}`;
   if (kind === 'chain') {
     const params = Object.entries(v.p).filter(([, x]) => typeof x !== 'boolean').map(([k, x]) =>
       `<label class="pp"><span>${k}</span><input type="number" step="any" data-path="${path}" data-param="${k}" value="${x}"></label>`).join('');

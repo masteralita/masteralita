@@ -10,44 +10,44 @@ const CRIT_COL = ['#fff4cf', '#c07bff', '#ffd23f', '#ff4a4a', '#4aa8ff', '#16161
 /* ---------- Constellations (갤럭시워.xlsx 별자리 시트) ---------- */
 function shape(pts, edges, key) { return { pts, edges: edges.split(' ').map(e => e.split('-').map(Number)), key }; }
 const ZODIAC = [
-  { id:'sgr', name:'궁수', en:'Sagittarius', stat:'공격속도', kind:'phys', style:'arrow', hp:240, atk:8, rate:2.4, def:10, mdef:10,
+  { id:'sgr', name:'궁수', en:'Sagittarius', stat:'공격속도', role:'atk', kind:'phys', style:'arrow', hp:240, atk:8, rate:2.4, def:10, mdef:10,
     sig:'빠르게 화살을 연사해요.',
     sh: shape([[-.9,.5],[-.5,.1],[-.1,.3],[.2,-.1],[.6,.1],[.5,-.5],[.1,-.6],[-.3,-.3],[.9,-.3]], '0-1 1-2 2-3 3-4 4-5 5-6 6-7 7-1 3-7 4-8', 3) },
-  { id:'cap', name:'염소', en:'Capricorn', stat:'물리 공격', kind:'phys', style:'missile', hp:260, atk:24, rate:.9, def:12, mdef:8,
+  { id:'cap', name:'염소', en:'Capricorn', stat:'물리 공격', role:'atk', kind:'phys', style:'missile', hp:260, atk:24, rate:.9, def:12, mdef:8,
     sig:'점점 빨라지는 유도 미사일을 쏴요.',
     sh: shape([[-.9,-.3],[-.3,-.1],[.3,-.4],[.9,-.5],[.6,.3],[.1,.6],[-.5,.3]], '0-1 1-2 2-3 3-4 4-5 5-6 6-0', 2) },
-  { id:'aqr', name:'물병', en:'Aquarius', stat:'마법 방어', kind:'magic', style:'drop', hp:300, atk:13, rate:1, def:10, mdef:45,
+  { id:'aqr', name:'물병', en:'Aquarius', stat:'마법 방어', role:'def', kind:'magic', style:'drop', hp:300, atk:13, rate:1, def:10, mdef:45,
     sig:'물방울을 포물선으로 던지고, 마법 공격에 강해요.',
     sh: shape([[-.9,-.6],[-.5,-.2],[-.1,-.5],[.2,-.1],[.5,-.4],[.3,.3],[.7,.6],[-.2,.5]], '0-1 1-2 2-3 3-4 3-5 5-6 5-7', 3) },
-  { id:'psc', name:'물고기', en:'Pisces', stat:'마법 공격', kind:'magic', style:'curve', hp:230, atk:22, rate:.95, def:8, mdef:15,
+  { id:'psc', name:'물고기', en:'Pisces', stat:'마법 공격', role:'atk', kind:'magic', style:'curve', hp:230, atk:22, rate:.95, def:8, mdef:15,
     sig:'양쪽으로 휘어 들어가는 유도 레이저를 쏴요.',
     sh: shape([[-.9,-.7],[-.6,-.2],[-.3,.3],[0,.7],[.4,.4],[.8,.2],[.9,.6],[.6,.7]], '0-1 1-2 2-3 3-4 4-5 5-6 6-7 7-5', 3) },
-  { id:'ari', name:'양', en:'Aries', stat:'방어력', kind:'phys', style:'bullet', hp:300, atk:12, rate:1, def:45, mdef:10,
+  { id:'ari', name:'양', en:'Aries', stat:'방어력', role:'def', kind:'phys', style:'bullet', hp:300, atk:12, rate:1, def:45, mdef:10,
     sig:'빠른 총알을 쏘는, 물리 공격에 강한 방어형이에요.',
     sh: shape([[-.8,-.3],[-.2,-.5],[.4,-.2],[.8,.4]], '0-1 1-2 2-3', 1) },
-  { id:'tau', name:'황소', en:'Taurus', stat:'HP', kind:'phys', style:'boulder', hp:520, atk:11, rate:.9, def:15, mdef:15,
+  { id:'tau', name:'황소', en:'Taurus', stat:'HP', role:'def', kind:'phys', style:'boulder', hp:520, atk:11, rate:.9, def:15, mdef:15,
     sig:'바위를 던지는, HP가 가장 높은 탱커예요.',
     sh: shape([[-.9,-.7],[-.4,-.2],[0,0],[.3,.2],[.9,-.1],[.2,.6],[-.3,.3]], '0-1 1-2 2-3 3-4 2-6 6-5 3-5', 2) },
-  { id:'gem', name:'쌍둥이', en:'Gemini', stat:'물리·마법 공격', kind:'both', style:'twin', hp:240, atk:11, rate:1, def:10, mdef:10,
+  { id:'gem', name:'쌍둥이', en:'Gemini', stat:'물리·마법 공격', role:'atk', kind:'both', style:'twin', hp:240, atk:11, rate:1, def:10, mdef:10,
     sig:'물리탄과 마법탄을 동시에 쏴요.',
     sh: shape([[-.6,-.9],[-.5,-.3],[-.6,.3],[-.8,.8],[.3,-.9],[.4,-.3],[.3,.3],[.5,.8]], '0-1 1-2 2-3 4-5 5-6 6-7 1-5', 0) },
-  { id:'cnc', name:'게', en:'Cancer', stat:'물리 방어', kind:'phys', style:'bubble', hp:320, atk:12, rate:1, def:40, mdef:12,
+  { id:'cnc', name:'게', en:'Cancer', stat:'물리 방어', role:'def', kind:'phys', style:'bubble', hp:320, atk:12, rate:1, def:40, mdef:12,
     sig:'거품을 뿜고, 단단한 껍질로 버티는 방어형이에요.',
     sh: shape([[0,-.2],[-.5,-.8],[.1,.2],[-.6,.7],[.7,.5]], '0-1 0-2 2-3 2-4', 0) },
-  { id:'leo', name:'사자', en:'Leo', stat:'공격력', kind:'phys', style:'beam', hp:260, atk:30, rate:.7, def:14, mdef:10,
+  { id:'leo', name:'사자', en:'Leo', stat:'공격력', role:'atk', kind:'phys', style:'beam', hp:260, atk:30, rate:.7, def:14, mdef:10,
     sig:'즉시 명중하는 굵은 직선 레이저를 쏴요.',
     sh: shape([[-.9,.4],[-.3,.3],[.2,.4],[.5,-.1],[.3,-.5],[.6,-.8],[.9,-.5],[-.2,-.1]], '0-1 1-2 2-3 3-4 4-5 5-6 1-7 7-3', 2) },
-  { id:'vir', name:'처녀', en:'Virgo', stat:'HP 회복', kind:'magic', style:'heal', hp:250, atk:9, rate:.8, def:10, mdef:18,
+  { id:'vir', name:'처녀', en:'Virgo', stat:'HP 회복', role:'sup', kind:'magic', style:'heal', hp:250, atk:9, rate:.8, def:10, mdef:18,
     sig:'공격할 때마다 행성과 다친 별자리를 회복해요.',
     sh: shape([[-.9,-.2],[-.4,0],[0,-.3],[.4,-.1],[.8,-.5],[.1,.3],[.4,.8],[-.3,.6]], '0-1 1-2 2-3 3-4 2-5 5-6 5-7', 6) },
-  { id:'lib', name:'천칭', en:'Libra', stat:'물리·마법 방어', kind:'magic', style:'sword', hp:300, atk:12, rate:1, def:30, mdef:30,
+  { id:'lib', name:'천칭', en:'Libra', stat:'물리·마법 방어', role:'def', kind:'magic', style:'sword', hp:300, atk:12, rate:1, def:30, mdef:30,
     sig:'날아가는 검을 던지는, 물리와 마법 모두 버티는 균형형이에요.',
     sh: shape([[0,-.8],[-.6,-.1],[.6,-.2],[-.4,.7],[.5,.6]], '0-1 0-2 1-2 1-3 2-4', 0) },
-  { id:'sco', name:'전갈', en:'Scorpio', stat:'상태이상 감소', kind:'phys', style:'poison', hp:260, atk:10, rate:1, def:14, mdef:14,
+  { id:'sco', name:'전갈', en:'Scorpio', stat:'상태이상 감소', role:'sup', kind:'phys', style:'poison', hp:260, atk:10, rate:1, def:14, mdef:14,
     sig:'독을 걸고, 아군의 기절 시간을 줄여줘요.',
     sh: shape([[-.9,-.8],[-.7,-.4],[-.8,0],[-.4,.1],[0,.2],[.3,.5],[.6,.8],[.9,.5],[.8,.1]], '0-1 1-2 1-3 3-4 4-5 5-6 6-7 7-8', 3) },
 ];
-const SPECIAL = { id:'oph', name:'뱀주인', en:'Ophiuchus', stat:'행성 직접 타격', kind:'magic', style:'serpent', hp:220, atk:18, rate:.6, def:10, mdef:10, special:true,
+const SPECIAL = { id:'oph', name:'뱀주인', en:'Ophiuchus', stat:'행성 직접 타격', role:'atk', kind:'magic', style:'serpent', hp:220, atk:18, rate:.6, def:10, mdef:10, special:true,
   sig:'꿈틀대는 뱀 레이저로 적 별자리를 무시하고 행성을 바로 공격해요.',
   sh: shape([[-.5,-.9],[.3,-.8],[.7,0],[.4,.8],[-.3,.8],[-.7,.1],[0,-.1]], '0-1 1-2 2-3 3-4 4-5 5-0 6-0 6-3', 6) };
 const ALL_CONS = [...ZODIAC, SPECIAL];
@@ -245,6 +245,9 @@ for (const [cid, list] of Object.entries(SKINS)) for (const s of list) prepSkin(
 const STYLE_LABEL = { arrow:'화살', shot:'탄환', bullet:'총알', missile:'미사일', drop:'물방울', bubble:'거품', boulder:'바위', sword:'날아가는 검',
   curve:'곡선 유도 레이저', orb:'구체', beam:'직선 레이저', serpent:'뱀 레이저', heal:'회복', poison:'독침', twin:'쌍탄' };
 const KIND_LABEL = { phys:'물리', magic:'마법', both:'물리·마법' };
+// 별자리 타입: 공격형은 물리/마법(속성)으로 나뉘어요. col = 타입 칩 색
+const ROLE = { atk:{ name:'공격', col:'#ff6b5a', desc:'적을 쓰러뜨리는 딜러' }, def:{ name:'방어', col:'#4aa8ff', desc:'피해를 버티는 탱커' }, sup:{ name:'보조', col:'#6be08a', desc:'회복·상태이상으로 아군을 돕는' } };
+const ROLE_LABEL = Object.fromEntries(Object.entries(ROLE).map(([k, r]) => [k, r.name]));
 const STAT_MAX = 3;
 
 /* ---------- Voyage zones ---------- */

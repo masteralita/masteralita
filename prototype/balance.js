@@ -28,12 +28,13 @@ const FX_LABEL = {
 };
 
 /* ---------- Sections (tables the admin shows and the xlsx exports) ---------- */
-// col: { key, label, kind: num|int|pct|text|orbits|chain, neutral? }  (pct = stored as fraction, shown ×100)
+// col: { key, label, kind: num|int|pct|text|orbits|chain|role|dmg, neutral? }  (role/dmg = pick from ROLE_LABEL / KIND_LABEL)  (pct = stored as fraction, shown ×100)
 const BAL_SECTIONS = [
   { id:'con', title:'별자리', desc:'별자리 기본 능력치 (등급 배율·파츠·스킨 보정 전)',
     rows: ALL_CONS.map(c => ({ id:c.id, label:`${c.name}자리`, sub:c.en })),
     cols: [{ key:'hp', label:'HP', kind:'int' }, { key:'atk', label:'공격력', kind:'num' }, { key:'rate', label:'공격속도(/s)', kind:'num' },
            { key:'def', label:'물리 방어', kind:'int' }, { key:'mdef', label:'마법 방어', kind:'int' },
+           { key:'role', label:'타입', kind:'role' }, { key:'kind', label:'공격 속성', kind:'dmg' },
            { key:'name', label:'이름', kind:'text' }, { key:'en', label:'영문명', kind:'text' }, { key:'stat', label:'특징', kind:'text' }, { key:'sig', label:'설명', kind:'text' }],
     path: (r, c) => `con/${r}/${c}` },
   { id:'skin', title:'스킨·스킬', desc:'스킨별 능력치 보정(배율)과 각성 I~III 효과',
