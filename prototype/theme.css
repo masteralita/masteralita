@@ -153,3 +153,5 @@
 .team-sk{display:grid;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
 .team-sk h3{margin:0;font-size:14px}
 .team-sk .sk-div{width:100%;margin:2px 0;border:0;border-top:1px solid var(--line)}
+.tp-pv canvas{height:200px}
+.team-planet .tp-head{grid-template-columns:1fr auto}

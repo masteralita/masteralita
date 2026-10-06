@@ -1221,21 +1221,22 @@ function openSkinPopup(kind, id, k) {
 
 /* ---------- 팀 (Team formation): planet → orbits → constellations ---------- */
 const statChips = o => [o.atk && `공격력 +${Math.round(o.atk * 100)}%`, o.rate && `공격속도 +${Math.round(o.rate * 100)}%`, o.hp && `HP +${Math.round(o.hp * 100)}%`].filter(Boolean).map(x => `<span class="schip">${x}</span>`).join('');
-const skinOrb = (pid, sk) => `<span class="orb" style="${orbStyle(pid, PSKIN[sk] && PSKIN[sk].tint)}"></span>`;
+let TEAM_PV = null; // live, rotating view of the main planet with its current skins and team
 function renderTeam() {
   normalizeForm();
   const pid = save.mainPlanet, pd = PLANET[pid], ps = save.planets[pid], n = pd.orbits, cap = teamCap(pid);
   $('pane-team').innerHTML = `
     <section class="team-planet">
+      <div class="sk-preview tp-pv"><canvas id="teamPv" aria-label="${pd.name} 미리보기"></canvas></div>
       <div class="tp-head">
-        ${skinOrb(pid, ps.skin)}
         <div class="tp-txt"><b>${pd.name} <small>Lv ${ps.lv}</small></b>
           <span class="schips"><span class="schip">HP ${fmt(pd.hp * planetHpMul(ps.lv))}</span>${pd.desc !== 'HP가 높은 기본 행성' ? `<span class="schip">${pd.desc}</span>` : ''}<span class="schip">궤도 ${n}개</span></span></div>
         <button class="ghost sm" data-tact="planet" type="button">행성 변경</button>
       </div>
       <div class="skin-line"><span class="lbl">행성 스킨</span><b>${(PSKIN[ps.skin] || PSKIN.basic).name}</b><button class="ghost sm" data-pskin type="button">변경</button></div>
+      ${Array.from({ length: n }, (_, k) => `
+      <div class="skin-line"><span class="lbl">${n === 1 ? '궤도 스킨' : `궤도 ${k + 1} 스킨`}</span><b>${(OSKIN[ps.orbitSkins[k]] || OSKIN.dash).name}</b><button class="ghost sm" data-oskin="${k}" type="button">변경</button></div>`).join('')}
       <div class="team-sk">
-        <h3>게이지 스킬</h3>
         ${planetSkills(pid).map((s, k) => (k === 1 ? '<hr class="sk-div">' : '') + (k ? skillRow(s, `장착 ${k}`, `<button class="ghost sm" data-teq="${k - 1}" type="button">${s ? '변경' : '장착'}</button>`) : skillRow(s, '고유'))).join('')}
       </div>
     </section>
@@ -1247,9 +1248,9 @@ function renderTeam() {
           <button class="oslot" type="button" data-slot="${k}:${j}" aria-label="${CON[a[j]].name}자리 변경">${conSvg(a[j], 44)}<b>${SKIN[equippedSkin(a[j])].name}</b><span class="x">변경</span></button>`
           : `<button class="oslot empty" type="button" data-slot="${k}:${j}"><span>+</span><span class="mini">빈 자리</span></button>`).join('')}
       </div>
-      <div class="skin-line"><span class="lbl">궤도 스킨</span><b>${(OSKIN[ps.orbitSkins[k]] || OSKIN.dash).name}</b><button class="ghost sm" data-oskin="${k}" type="button">변경</button></div>
     </section>`; }).join('')}
     <p class="fine">별자리 <b>${save.team.length} / ${cap}</b> · 최소 ${TEAM_MIN}개 · 궤도마다 최대 ${ORBIT_CAP}개 · 칸을 눌러 별자리를 등록하거나 바꿔요${n === 1 ? ' · 궤도가 1개인 행성은 궤도 능력치가 더 높아요' : ''}</p>`;
+  TEAM_PV = { canvas: $('teamPv'), sys: buildMySystem() };
 }
 $('pane-team').addEventListener('click', e => {
   const pid = save.mainPlanet, ps = save.planets[pid];
@@ -1461,6 +1462,7 @@ function frame(now) {
   if (fps < 60 && now - lastDraw < 1000 / fps - 2) { requestAnimationFrame(frame); return; }
   const ddt = Math.min(.05, (now - (lastDraw || now)) / 1000) || dt; lastDraw = now;
   if (PREVIEW) { if ($('modal').hidden) PREVIEW = null; else drawPreview(PREVIEW.canvas, PREVIEW.sys, now / 1000, ddt); }
+  if (TEAM_PV && tab === 'team' && !$('shell').hidden && TEAM_PV.canvas.isConnected) drawPreview(TEAM_PV.canvas, TEAM_PV.sys, now / 1000, ddt);
   if (G.state === 'home') {
     updateHome(ddt); drawHome(now / 1000);
     incT += ddt; if (incT > 1 && tab === 'home') { incT = 0; renderHome(); }
