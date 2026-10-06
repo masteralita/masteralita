@@ -31,6 +31,12 @@ const skLv = id => clamp(save.skillLv[id] || 1, 1, skillMaxLv());
 const skNeed = id => skLv(id) >= skillMaxLv() ? 0 : SKILL_LV[skLv(id) - 1].need;
 const skillOf = id => ({ ...skillAtLv(ESKILL[id], skLv(id)), id }); // the skill at the player's level
 const planetSkills = pid => [{ ...PLANET[pid].uskill, grade: 'UR' }, ...equipOf(pid).map(id => id ? skillOf(id) : null)];
+// 별자리 타입 (방어/공격/보조). 공격형은 장착 스킨의 속성으로 물리/마법이 갈려요
+function conRole(id, sk) {
+  const d = CON[id], r = ROLE[d.role] || ROLE.atk, k = (sk && sk.kind) || d.kind;
+  return { ...r, id: d.role, sub: d.role === 'atk' ? KIND_LABEL[k] : '' };
+}
+const roleChip = r => `<span class="rchip" style="--r:${r.col}">${r.name}${r.sub ? ` · ${r.sub}` : ''}</span>`;
 const skinStyle = sk => { const d = CON[sk.con]; return `${STYLE_LABEL[sk.style || d.style]} · ${KIND_LABEL[sk.kind || d.kind]}`; };
 let save = (() => {
   try { const v = JSON.parse(localStorage.getItem(SAVE_KEY)); if (v && v.v === 1) return loadSave(v); } catch {}
@@ -1007,6 +1013,7 @@ function renderStars() {
   $('pane-stars').innerHTML = `
     <div class="detail-head"><button class="back" type="button" data-sact="list" aria-label="별자리 목록으로">‹ 목록</button>
       <b>${d.name}자리</b><span>${d.en}</span>${o ? gradeChip(o.g) : '<span class="gchip" style="--g:#59608a">미보유</span>'}</div>
+    <div class="role-row">${(r => `${roleChip(r)}<span class="mini">${r.desc} 타입${r.sub ? ` · ${r.sub} 피해를 줘요` : ''}</span>`)(conRole(starSel, eq))}</div>
     ${skinSection(starSel, o)}
     <section class="star-stage">
       <svg class="graph" style="--ln:rgb(${eq.pal.line})" viewBox="${-sw / 2} -125 ${sw} 250" role="img" aria-label="${d.name}자리 별 슬롯">
