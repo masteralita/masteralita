@@ -874,7 +874,7 @@ function openSkillEquip(pid) {
       ${pick ? `<p class="mtxt">${ESKILL[pick].name}(으)로 바꿀 장착 스킬의 <b>교체</b>를 눌러요.</p>` : ''}
       <div class="mbtns"><button class="cta sm" data-act="close" type="button">완료</button></div>`;
   };
-  const set = e => { save.equip[pid] = e; persist(); renderPlanets(); };
+  const set = e => { save.equip[pid] = e; persist(); if (tab === 'team') renderTeam(); else renderPlanets(); };
   const redraw = () => openModal(body(), onAct);
   function onAct(act, b) {
     const cur = equipOf(pid);
@@ -1235,6 +1235,11 @@ function renderTeam() {
       </div>
       <div class="skin-line"><span class="lbl">행성 스킨</span><b>${(PSKIN[ps.skin] || PSKIN.basic).name}</b><button class="ghost sm" data-pskin type="button">변경</button></div>
     </section>
+    <section class="psk team-sk">
+      <div class="psk-h"><h3>게이지 스킬 <small>전투에서 기력을 써서 발동해요</small></h3></div>
+      ${planetSkills(pid).map((s, k) => k ? skillRow(s, `장착 ${k}`, `<button class="ghost sm" data-teq="${k - 1}" type="button">${s ? '변경' : '장착'}</button>`) : skillRow(s, '고유')).join('')}
+      <p class="fine">고유 스킬은 ${pd.name}만의 스킬이에요. 장착 칸 2개에는 상점 스킬 뽑기로 얻은 스킬을 자유롭게 넣을 수 있어요.</p>
+    </section>
     ${Array.from({ length: n }, (_, k) => { const os = orbitStats(pid, k), a = save.form[k]; return `
     <section class="orbit-card">
       <div class="oc-head"><b>${n === 1 ? os.name : `궤도 ${k + 1} · ${os.name}`}</b><span class="schips">${statChips(os)}</span></div>
@@ -1252,6 +1257,7 @@ $('pane-team').addEventListener('click', e => {
   if (e.target.closest('[data-tact="planet"]')) { planetView = 'list'; setTab('planets'); return; }
   const osb = e.target.closest('[data-oskin]'); if (osb) { openSkinList('o', +osb.dataset.oskin); return; }
   if (e.target.closest('[data-pskin]')) { openSkinList('p'); return; }
+  if (e.target.closest('[data-teq]')) { openSkillEquip(pid); return; }
   const sl = e.target.closest('[data-slot]'); if (!sl) return;
   const [k, j] = sl.dataset.slot.split(':').map(Number), cur = save.form[k][j];
   if (cur) confirmBox('별자리 변경', `${CON[cur].name}자리를 변경하시겠습니까?`, '변경', () => pickConPopup(k, j));

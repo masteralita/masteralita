@@ -22,7 +22,7 @@
 .shell.see-through{background:transparent}
 
 /* ---------- Frames: bevelled silver panel (padding-box inner + border-box metal) ---------- */
-.hcard,.hpill,.pcell,.prow,.team-planet,.orbit-card,.slot-panel,.star-stage,.lv-row,.mail-row,.notice-row,.set-group,.planet-hero,
+.hcard,.hpill,.pcell,.prow,.team-planet,.team-sk,.orbit-card,.slot-panel,.star-stage,.lv-row,.mail-row,.notice-row,.set-group,.planet-hero,
 .skin-item,.con-pick,.oslot,.tslot,.lv-me,.doc-body,.sk-preview,.ccell.locked,.skin-card{
   border:2px solid transparent!important;
   background:var(--inner) padding-box,var(--metal) border-box!important;
