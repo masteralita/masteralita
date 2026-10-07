@@ -15,6 +15,7 @@
   --pas:#5b8cff;       /* passive slot / shield */
   --lim:#c35bff;       /* limited / special */
   --ok:#52e3a4;        /* heal / hp */
+  --ico-sword:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cg stroke='%23ffe27a' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M3 3l9 9M13 3l-9 9'/%3E%3Cpath d='M10.5 13.5l3-3M5.5 13.5l-3-3' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E"); /* 배틀 에너지: 교차한 칼 */
   --f-disp:"Chakra Petch","Noto Sans KR",system-ui,sans-serif;
   --f-body:"Noto Sans KR",system-ui,-apple-system,sans-serif;
   color-scheme:dark;
@@ -186,7 +187,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .cur.en{color:var(--ink);font:inherit;font-family:var(--f-disp);font-size:11px;gap:2px}
 .cur.en i{display:inline-block;width:13px;height:13px;flex:none;font-style:normal;line-height:13px;text-align:center;font-size:11px}
 .cur.en.arc i::before{content:"⚡";color:#ffe27a}
-.cur.en.pvp i{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cg stroke='%23ffe27a' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M3 3l9 9M13 3l-9 9'/%3E%3Cpath d='M10.5 13.5l3-3M5.5 13.5l-3-3' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat}
+.cur.en.pvp i{background:var(--ico-sword) center/contain no-repeat}
 .cur.en b{color:#ffe27a;font-variant-numeric:tabular-nums}
 .cur.en.low b{color:#ff8a9a}
 .cur{display:flex;align-items:center;gap:5px;padding:4px 8px 4px 5px;border-radius:999px;background:rgba(15,22,52,.9);border:1px solid var(--line);font-family:var(--f-disp);font-size:12px;font-variant-numeric:tabular-nums}
@@ -236,6 +237,8 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .hpill:disabled{opacity:.6}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 .mode .en{font-style:normal;font-weight:700}
+.mode .en::before{content:"⚡"}
+.mode.pvp .en::before{content:"";display:inline-block;width:.95em;height:.95em;margin-right:1px;vertical-align:-.1em;background:var(--ico-sword) center/contain no-repeat}
 .hcard{display:grid;gap:6px;padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,44,.88);min-width:0}
 .hcard h3{margin:0;font-size:12px;color:var(--dim);font-weight:500;display:flex;justify-content:space-between;gap:6px}
 .hcard .big{font-family:var(--f-disp);font-size:15px;font-variant-numeric:tabular-nums;display:flex;gap:10px;flex-wrap:wrap}
@@ -764,8 +767,8 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
           </button>
         </div>
         <div class="modes">
-          <button class="mode pvp" id="pvpBtn" type="button"><b>배틀</b><span><span id="homePvp">0승 0패</span> · <i class="en">⚡1</i></span></button>
-          <button class="mode" id="arcadeBtn" type="button"><b>아케이드</b><span><span id="homeBest">기록 없음</span> · <i class="en">⚡1</i></span></button>
+          <button class="mode pvp" id="pvpBtn" type="button"><b>배틀</b><span><span id="homePvp">0승 0패</span> · <i class="en">1</i></span></button>
+          <button class="mode" id="arcadeBtn" type="button"><b>아케이드</b><span><span id="homeBest">기록 없음</span> · <i class="en">1</i></span></button>
         </div>
       </div>
       <div class="pane" id="pane-store" hidden></div>

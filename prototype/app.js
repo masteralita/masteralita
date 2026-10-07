@@ -352,7 +352,7 @@ function renderHome() {
   $('chestOpen').textContent = chests ? `열기 ×${chests}` : `${save.chest % CHEST_STEP} / ${CHEST_STEP}`;
   $('chestBtn').disabled = chests === 0;
   renderEnergy();
-  document.querySelectorAll('.mode .en').forEach(e => { e.textContent = `⚡${STAMINA.cost}`; });
+  document.querySelectorAll('.mode .en').forEach(e => { e.textContent = STAMINA.cost; });
   $('homeBest').textContent = save.best ? `최고 WAVE ${save.best}` : '기록 없음';
   $('homePvp').textContent = `${save.wins}승 ${save.losses}패`;
   $('homePower').textContent = fmt(teamPower());
@@ -1287,8 +1287,8 @@ function renderTeam() {
       </div>
       <div class="tp-btns">
         <button class="ghost sm" data-tact="planet" type="button">행성 변경</button>
-        <button class="ghost sm" data-pskin type="button">행성 스킨</button>
-        <button class="ghost sm" data-oskin type="button">궤도 스킨</button>
+        <button class="ghost sm" data-pskin type="button">행성 스킨 변경</button>
+        <button class="ghost sm" data-oskin type="button">궤도 스킨 변경</button>
       </div>
       <div class="team-sk">
         ${planetSkills(pid).map((s, k) => (k === 1 ? '<hr class="sk-div">' : '') + (k ? skillRow(s, `장착 ${k}`, `<button class="ghost sm" data-teq="${k - 1}" type="button">${s ? '변경' : '장착'}</button>`) : skillRow(s, '고유'))).join('')}
@@ -1317,7 +1317,7 @@ $('pane-team').addEventListener('click', e => {
   if (cur) confirmBox('별자리 변경', `${CON[cur].name}자리를 변경하시겠습니까?`, '변경', () => pickConPopup(k, j));
   else pickConPopup(k, j);
 });
-// 행성 변경: owned planets → 행성 스킨 → 궤도 스킨, one popup after another
+// 행성 변경: pick one of the owned planets (skins have their own buttons)
 function pickPlanetPopup() {
   let sel = save.mainPlanet;
   const owned = PLANETS.filter(p => save.planets[p.id]);
@@ -1331,7 +1331,7 @@ function pickPlanetPopup() {
           ${p.id === save.mainPlanet ? '<em class="eq">현재</em>' : ''}
         </button>`; }).join('')}
     </div>
-    <div class="mbtns"><button class="ghost" data-act="close" type="button">취소</button><button class="cta sm" data-act="ok" type="button">다음</button></div>`,
+    <div class="mbtns"><button class="ghost" data-act="close" type="button">취소</button><button class="cta sm" data-act="ok" type="button">변경</button></div>`,
   act => {
     if (act === 'close') { closeModal(); return; }
     if (act !== 'ok') return;
@@ -1340,7 +1340,6 @@ function pickPlanetPopup() {
       save.mainPlanet = sel; normalizeForm(); persist(); enterHomeSystemOnly(); renderTeam();
       toast(`대표 행성을 ${PLANET[sel].name}(으)로 바꿨어요`);
     }
-    openSkinList('p', 0, sel, () => openSkinList('o', 'all', sel));
   });
   $('modalBody').querySelector('.skin-list').addEventListener('click', e => {
     const b = e.target.closest('[data-pp]'); if (!b) return;
