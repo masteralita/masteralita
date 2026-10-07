@@ -220,7 +220,7 @@ function shopProblems(d) {
   const r = d.reward || {};
   if (r.con && !CON[r.con]) out.push('보상 별자리가 올바르지 않아요');
   if (r.skill && !ESKILL[r.skill]) out.push('보상 스킬이 올바르지 않아요');
-  if (!(r.piece > 0 || r.dust > 0 || r.con || r.skill || r.ads)) out.push('보상을 하나 이상 넣어 주세요');
+  if (!(r.piece > 0 || r.dust > 0 || r.con || r.skill || r.ads || r.pass > 0)) out.push('보상을 하나 이상 넣어 주세요');
   return out;
 }
 // 노출 기간 (start / end: <input type="datetime-local"> value, device time; empty = no limit)
@@ -231,7 +231,7 @@ function shopOpen(p, now = Date.now()) {
 }
 const shopSort = (a, b) => (a.order || 0) - (b.order || 0) || String(a.id).localeCompare(String(b.id));
 function applyShop(shop) {
-  const list = shop && typeof shop === 'object' ? Object.values(shop).filter(d => !shopProblems(d).length) : SHOP_DEFAULT;
+  const list = shop && typeof shop === 'object' ? withPassProduct(Object.values(shop).filter(d => !shopProblems(d).length)) : SHOP_DEFAULT;
   SHOP.splice(0, SHOP.length, ...JSON.parse(JSON.stringify(list)).sort(shopSort));
 }
 const SKIN_BASE = new Set(Object.keys(SKIN)), PSKIN_BASE = new Set(Object.keys(PSKIN)), OSKIN_BASE = new Set(Object.keys(OSKIN));

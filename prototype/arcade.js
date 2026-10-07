@@ -215,6 +215,10 @@ function arcadeClear() {
   G.state = 'clear'; G.clearT = 1.4; G.proj = G.proj.filter(p => !p.foeShot);
   gainXp(15 + G.wave * 2);
   banner('CLEAR', G.wave % 10 === 0 ? '구역 보스 격파' : G.wave % 5 === 0 ? '모선 격파' : `WAVE ${G.wave}`, 1.2);
+  if (G.wave > (save.arcClear || 0)) { // 최고 클리어 WAVE (app.js 전투 배속 해금)
+    save.arcClear = G.wave; persist();
+    if (G.wave === SPEED.unlockWave) { banner('1.5배속 해금', '위쪽 ×1 버튼으로 속도를 바꿀 수 있어요', 2.2); toast('1.5배속이 열렸어요'); }
+  }
 }
 // called from killCon for every mob my side destroys
 function arcadeKilled(m) {

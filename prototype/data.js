@@ -517,16 +517,24 @@ for (const c of ALL_CONS) GACHA_POOL.con[c.id] = { gold: !c.special, paid: true 
 /* ---------- 상점 상품 (관리자 [상점 관리]에서 바꿀 수 있어요) ----------
    tab: rec 추천 · con 별자리 · skill 스킬 · piece 별모래 / type: always 상시 · banner 배너 (별자리·스킬 탭 위 최대 2개)
    cur: krw (실결제, 프로토타입은 바로 지급) · piece · dust / limit: 계정당 구매 횟수 (0 = 무제한)
-   start / end: 노출 기간 'YYYY-MM-DDTHH:mm' (비우면 제한 없음) / reward: { piece, dust, con, grade, skill, ads } */
+   start / end: 노출 기간 'YYYY-MM-DDTHH:mm' (비우면 제한 없음) / reward: { piece, dust, con, grade, skill, ads, pass }
+   pass: 패스 일수 (save.passUntil, 다시 사면 남은 기간에 더해져요). 패스 혜택: 전투 2배속 (SPEED) */
 const SHOP_TABS = { rec:'추천', con:'별자리', skill:'스킬', piece:'별모래' };
 const SHOP_TYPES = { always:'상시', banner:'배너' };
 const SHOP_DEFAULT = [
+  { id:'pass30', tab:'rec', type:'always', order:0, name:'30일 패스', desc:'30일 동안 전투 2배속 · 패스 혜택은 계속 늘어나요', cur:'krw', price:5500, limit:0, start:'', end:'', reward:{ pass:30 } },
   { id:'noads', tab:'rec', type:'always', order:1, name:'광고 제거', desc:'모든 광고 제거 · 로비 보물 상자와 광고 보상을 광고 없이 바로 받아요', cur:'krw', price:9900, limit:1, start:'', end:'', reward:{ ads:true } },
   { id:'pkg_oph', tab:'con', type:'banner', order:1, name:'특수 별자리 패키지', desc:'뱀주인자리 (에픽) 확정 + 별모래 500', cur:'krw', price:9900, limit:0, start:'', end:'', reward:{ con:'oph', grade:4, piece:500 } },
   ...[[100, 1200], [400, 4900], [1200, 14000], [2700, 29000], [4500, 49000], [9000, 99000]].map(([n, p], i) =>
     ({ id:`piece_${n}`, tab:'piece', type:'always', order:i + 1, name:`별모래 ${n.toLocaleString('ko-KR')}`, desc:'', cur:'krw', price:p, limit:0, start:'', end:'', reward:{ piece:n } })),
 ];
 const SHOP = JSON.parse(JSON.stringify(SHOP_DEFAULT));
+// A shop published before the pass existed still gets the 30일 패스 (관리자에서 저장하면 그 뒤로는 관리자 목록 그대로)
+const withPassProduct = list => list.some(p => p && p.reward && p.reward.pass > 0) ? list : [...list, JSON.parse(JSON.stringify(SHOP_DEFAULT.find(p => p.id === 'pass30')))];
+
+/* ---------- 전투 배속 ----------
+   1배 기본 · 1.5배 = 아케이드 WAVE unlock 클리어 (save.arcClear) · 2배 = 패스 기간 중 (save.passUntil) */
+const SPEED = { steps: [1, 1.5, 2], unlockWave: 10 };
 
 /* ---------- Star slots & parts (컨셉 이미지: 별자리 화면) ---------- */
 const SLOT = {

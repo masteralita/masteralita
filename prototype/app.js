@@ -9,7 +9,7 @@ const SAVE_KEY = 'gw.save.v1';
 function freshSave() {
   return {
     v: 1, name: '', lv: 1, xp: 0, dust: 30000, piece: 1500, birthday: null,
-    skins: [], lastCollect: Date.now(), chest: 0, stamina: { n: STAMINA.max, t: Date.now() }, staminaA: { n: STAMINA.arcadeMax, t: Date.now() }, best: 0, wins: 0, losses: 0, adPass: false,
+    skins: [], lastCollect: Date.now(), chest: 0, stamina: { n: STAMINA.max, t: Date.now() }, staminaA: { n: STAMINA.arcadeMax, t: Date.now() }, best: 0, arcClear: 0, passUntil: 0, wins: 0, losses: 0, adPass: false,
     planets: { earth: { lv: 1 } }, mainPlanet: 'earth',
     cons: { sgr: newCon(0), leo: newCon(0), vir: newCon(0) },
     team: ['sgr', 'leo', 'vir'], form: [['sgr', 'leo'], ['vir']],
@@ -101,6 +101,7 @@ function loadSave(v) {
   if (!o.stamina || typeof o.stamina.n !== 'number') o.stamina = { n: STAMINA.max, t: Date.now() }; // older saves start full
   if (!o.staminaA || typeof o.staminaA.n !== 'number') o.staminaA = { n: STAMINA.arcadeMax, t: Date.now() }; // 아케이드 에너지 (added later): starts full
   delete o.title; // the old 'Star Wanderer' subtitle
+  o.arcClear = Math.max(o.arcClear || 0, (o.best || 0) - 1); // 최고 WAVE n에서 끝났으면 n-1까지 클리어 (배속 해금 이전 기록)
   return o;
 }
 // cloud.js: the server copy is newer (or the player switched accounts) → replace this device's progress
@@ -768,7 +769,7 @@ const shopBanner = p => `
     </section>`;
 const shopRow = p => `
     <section class="shop-card row-card">
-      <div><h3>${p.name}</h3><p class="mini">${p.reward && p.reward.ads && save.adPass ? '적용 중 · 모든 광고 없이 바로 보상' : p.desc || ''}${shopSub(p) ? ` · ${shopSub(p)}` : ''}</p></div>
+      <div><h3>${p.name}</h3><p class="mini">${p.reward && p.reward.ads && save.adPass ? '적용 중 · 모든 광고 없이 바로 보상' : p.reward && p.reward.pass > 0 && passOn() ? `적용 중 · ${passDate()}까지 · 다시 사면 기간이 늘어나요` : p.desc || ''}${shopSub(p) ? ` · ${shopSub(p)}` : ''}</p></div>
       <button class="buy fit" data-prod="${p.id}" type="button" ${shopSoldOut(p) ? 'disabled' : ''}>${shopPrice(p)}</button>
     </section>`;
 const piecePack = p => `
@@ -780,6 +781,7 @@ function buyProduct(p) {
   const r = p.reward || {}, extra = [], cards = [];
   save.shopBuys = { ...(save.shopBuys || {}), [p.id]: shopBought(p) + 1 };
   if (r.ads) { save.adPass = true; extra.push('광고 제거 적용'); }
+  if (r.pass > 0) { save.passUntil = Math.max(Date.now(), save.passUntil || 0) + r.pass * 864e5; extra.push(`패스 ${passDate()}까지 · 2배속 해금`); }
   if (r.piece > 0) { save.piece += r.piece; extra.push(`별모래 +${fmt(r.piece)}`); }
   if (r.dust > 0) { save.dust += r.dust; extra.push(`미네랄 +${fmt(r.dust)}`); }
   if (r.con && CON[r.con]) cards.push(grantCon(r.con, clamp(r.grade | 0, 0, GRADES.length - 1)));
@@ -1504,6 +1506,26 @@ function setPaused(p) {
   if (p) { $('pauseStats').setAttribute('aria-selected', 'false'); renderPause(); }
 }
 $('pauseBtn').addEventListener('click', () => setPaused(true));
+
+/* ---------- 전투 배속 (data.js SPEED): 1배 기본 · 1.5배 아케이드 WAVE 10 클리어 · 2배 패스 기간 중 ---------- */
+const passOn = () => (save.passUntil || 0) > Date.now();
+const passDate = () => { const d = new Date(save.passUntil); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+const speedOk = x => x === 1 || (x === 1.5 && (save.arcClear || 0) >= SPEED.unlockWave) || (x === 2 && passOn());
+// the chosen speed, or the fastest one still open below it (the pass ran out)
+const battleSpeed = () => { const want = save.settings.spd || 1; return [...SPEED.steps].reverse().find(x => x <= want && speedOk(x)) || 1; };
+let shownSpd = 0;
+function renderSpeed() {
+  shownSpd = battleSpeed();
+  $('spdBtn').textContent = `×${shownSpd}`; $('spdBtn').setAttribute('aria-label', `전투 속도 ${shownSpd}배`);
+  $('spdBtn').classList.toggle('on', shownSpd > 1);
+}
+$('spdBtn').addEventListener('click', () => {
+  const open = SPEED.steps.filter(speedOk);
+  if (open.length < 2) { toast(`아케이드 WAVE ${SPEED.unlockWave}을 클리어하면 1.5배속이 열려요`); return; }
+  const next = open[(open.indexOf(battleSpeed()) + 1) % open.length];
+  if (next === 1 && !passOn()) toast('2배속은 상점의 30일 패스로 열려요');
+  save.settings.spd = next; persist(); renderSpeed();
+});
 $('resumeBtn').addEventListener('click', () => setPaused(false));
 $('pauseTabSkills').addEventListener('click', () => { $('pauseStats').setAttribute('aria-selected', 'false'); renderPause(); });
 $('pauseStats').addEventListener('click', () => { $('pauseStats').setAttribute('aria-selected', 'true'); renderPause(); });
@@ -1534,7 +1556,11 @@ function frame(now) {
     incT += ddt; if (incT > 1) { incT = 0; if (tab === 'home') renderHome(); else renderEnergy(); }
   } else if (G.state === 'title') { drawBg(now / 1000); }
   else {
-    if (!G.paused && !G.choosing) update(ddt);
+    if (!G.paused && !G.choosing) {
+      const sp = battleSpeed(), n = Math.ceil(sp); // faster = more steps of the same size, so hits can't skip past
+      if (sp !== shownSpd) renderSpeed();
+      for (let i = 0; i < n && !G.paused && !G.choosing; i++) update(ddt * sp / n);
+    }
     draw(now / 1000); hud();
   }
   requestAnimationFrame(frame);

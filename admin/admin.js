@@ -396,7 +396,7 @@ function playerDetail(p) {
   const cons = Object.entries(s.cons || {}).map(([id, c]) => `${(CON[id] || {}).name || id}(${(GRADES[c.g] || {}).name || c.g})`).join(', ');
   const rows = [['미네랄', fmtN(s.dust)], ['별모래', fmtN(s.piece)], ['레벨 · 경험치', `Lv ${s.lv} · ${fmtN(s.xp)}`], ['최고 웨이브', s.best || 0],
     ['대전', `${s.wins || 0}승 ${s.losses || 0}패`], ['별자리', cons || '-'], ['팀', (s.team || []).map(id => (CON[id] || {}).name || id).join(', ') || '-'],
-    ['행성', Object.entries(s.planets || {}).map(([id, x]) => `${(PLANET[id] || {}).name || id} Lv ${x.lv}`).join(', ')], ['광고 제거', s.adPass ? '구매함' : '-'],
+    ['행성', Object.entries(s.planets || {}).map(([id, x]) => `${(PLANET[id] || {}).name || id} Lv ${x.lv}`).join(', ')], ['광고 제거', s.adPass ? '구매함' : '-'], ['패스', s.passUntil > Date.now() ? `${new Date(s.passUntil).toLocaleString('ko-KR')}까지` : '-'], ['아케이드 클리어', s.arcClear ? `WAVE ${s.arcClear}` : '-'],
     ['생일', s.birthday ? `${s.birthday[0]}월 ${s.birthday[1]}일` : '-']];
   const lb = ADM.lb[p.uid];
   if (lb === undefined) { ADM.lb[p.uid] = 'loading'; getDoc(doc(db, 'leaderboard', p.uid)).then(d => { ADM.lb[p.uid] = d.exists() ? d.data() : null; render(); }).catch(() => { ADM.lb[p.uid] = null; render(); }); }
