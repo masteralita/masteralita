@@ -118,6 +118,7 @@ window.gwResetLocal = () => {
 };
 
 const fmt = n => Math.floor(n).toLocaleString('en-US');
+const fmtShort = n => n < 1e4 ? fmt(n) : n < 1e6 ? `${+(Math.floor(n / 100) / 10).toFixed(1)}K` : `${+(Math.floor(n / 1e4) / 100).toFixed(2)}M`; // 상단 바: 한 줄에 4칸이 들어가게
 const CUR = { dust: '미네랄', piece: '별모래' };
 function spend(cur, n) {
   if (save[cur] < n) { toast(`${CUR[cur]}${cur === 'dust' ? '이' : '가'} ${fmt(n - save[cur])} 부족해요`); return false; }
@@ -309,15 +310,15 @@ document.querySelector('.nav').addEventListener('click', e => { const b = e.targ
 function renderTopBar() {
   $('tbLv').textContent = save.lv;
   $('tbName').textContent = save.name || '게스트';
-  $('tbDust').textContent = fmt(save.dust);
-  $('tbPiece').textContent = fmt(save.piece);
+  $('tbDust').textContent = fmtShort(save.dust); $('tbDust').parentNode.title = `미네랄 ${fmt(save.dust)}`;
+  $('tbPiece').textContent = fmtShort(save.piece); $('tbPiece').parentNode.title = `별모래 ${fmt(save.piece)}`;
   $('tbXp').style.transform = `scaleX(${clamp(save.xp / accNeed(save.lv), 0, 1)})`;
   renderEnergy();
 }
 $('gearBtn').addEventListener('click', openSettings);
 
 /* ---------- Lobby (화면설계서 5–10p) ---------- */
-const HOME = { sys: null, rocks: [], shots: [], booms: [], spawn: 0, skyBottom: 0, chestCd: rnd(...AD_CHEST.first), loot: null };
+const HOME = { sys: null, rocks: [], shots: [], booms: [], spawn: 0, skyBottom: 0, ufoAt: Date.now() + rnd(...AD_CHEST.first) * 1000, loot: null };
 function enterHome() {
   G.state = 'home'; G.me = null; G.foe = null; G.zone = ZONES[1]; G.shield = 0; G.pShield = 0;
   G.fx = []; G.texts = []; G.proj = []; G.beams = []; $('banner').classList.remove('show');
@@ -365,7 +366,7 @@ function refreshPowerRank() {
   if (power === PRANK.power && Date.now() - PRANK.at < 60000) return;
   PRANK.busy = true; PRANK.power = power; PRANK.at = Date.now();
   CLOUD.powerRank(power).then(r => {
-    $('homeRankN').textContent = `${fmt(r.rank)}위`; $('homeRankT').textContent = `/ ${fmt(r.total)}명`; $('homeRank').hidden = false;
+    $('homeRankN').textContent = `${fmt(r.rank)}위`; $('homeRank').hidden = false;
   }).catch(err => console.warn('power rank', err)).finally(() => { PRANK.busy = false; });
 }
 $('homeRank').addEventListener('click', () => window.LIVE && LIVE.open('ranking', 'power'));
@@ -408,13 +409,14 @@ function updateHome(dt) {
     const pts = Array.from({ length: 8 }, (_, i) => [Math.cos(i / 8 * TAU) * rnd(.72, 1), Math.sin(i / 8 * TAU) * rnd(.72, 1)]);
     HOME.rocks.push({ x, y: -24, vx: (tx - x) / ((s.cy + 24) / vy), vy, r: rnd(8, 15), rot: rnd(0, TAU), vr: rnd(-1.2, 1.2), pts, v: Math.floor(Math.random() * 4), hp: 1, locked: 0 });
   }
-  // 보물 우주선: a UFO crosses the sky; shoot it down and it drops the reward chest. At most one flying or waiting at a time
-  HOME.chestCd -= dt;
-  if (HOME.chestCd <= 0 && !HOME.loot && !HOME.rocks.some(r => r.kind === 'ufo')) {
-    HOME.chestCd = rnd(...AD_CHEST.cd);
+  // 보물 우주선: only while the 로비 tab is open, a UFO flies in, roams the sky for AD_CHEST.stay seconds, then leaves;
+  // the next one comes AD_CHEST.every seconds after that one appeared. Shoot it down and it drops the reward chest.
+  const lobby = tab === 'home' && !$('shell').hidden;
+  if (lobby && Date.now() >= HOME.ufoAt && !HOME.loot && !HOME.rocks.some(r => r.kind === 'ufo')) { // 5분은 실제 시간 (전투·다른 탭에 있어도 흘러요)
+    HOME.ufoAt = Date.now() + AD_CHEST.every * 1000;
     const sky0 = HOME.skyBottom || H * .5, left = Math.random() < .5, sp = rnd(52, 64);
     const by = 70 + (sky0 - 70) * rnd(.5, .7); // inside the band the constellations aim at
-    HOME.rocks.push({ kind: 'ufo', x: left ? -30 : W + 30, y: by, by, ph: rnd(0, TAU), vx: left ? sp : -sp, vy: 0, r: 18, rot: 0, vr: 0, hp: AD_CHEST.hp, locked: 0 });
+    HOME.rocks.push({ kind: 'ufo', x: left ? -30 : W + 30, y: by, by, ph: rnd(0, TAU), vx: left ? sp : -sp, vy: 0, r: 18, rot: 0, vr: 0, hp: AD_CHEST.hp, locked: 0, stay: AD_CHEST.stay });
   }
   if (HOME.loot && (HOME.loot.t += dt) > AD_CHEST.life) { HOME.loot = null; } // unclaimed chest drifts away
   const sky = HOME.skyBottom || H * .5;
@@ -449,9 +451,11 @@ function updateHome(dt) {
   }
   HOME.rocks = HOME.rocks.filter(r => {
     if (r.flash > 0) r.flash -= dt;
-    if (r.kind === 'ufo') { // weaving flight across the sky; it gets away if it reaches the far side
+    if (r.kind === 'ufo') { // weaving flight: turns back at the screen edges while it stays, flies off once its time is up
+      if (!lobby) return true; // holds still (and its stay time) while another tab is open
       r.ph += dt * 1.6; r.x += r.vx * dt; r.y = r.by + Math.sin(r.ph) * 14;
-      if (r.x < -40 || r.x > W + 40) r.hp = 0; // escaped: in-flight shots drop it
+      if ((r.stay -= dt) > 0) { if ((r.x < W * .12 && r.vx < 0) || (r.x > W * .88 && r.vx > 0)) r.vx = -r.vx; }
+      else if (r.x < -40 || r.x > W + 40) r.hp = 0; // escaped: in-flight shots drop it
       return r.hp > 0;
     }
     r.x += r.vx * dt; r.y += r.vy * dt; r.rot += r.vr * dt;

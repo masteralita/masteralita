@@ -174,15 +174,19 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 /* ---------- App shell ---------- */
 .shell{position:absolute;inset:0;display:grid;grid-template-rows:auto 1fr auto;background:rgba(6,10,26,.97)}
 .shell.see-through{background:transparent}
-.topbar{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:8px;padding-inline:16px;padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:10px;background:linear-gradient(180deg,rgba(6,10,26,.95),rgba(6,10,26,.75));border-bottom:1px solid rgba(38,48,95,.7)}
+.topbar{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:6px;padding-inline:16px;padding-top:calc(10px + env(safe-area-inset-top,0px));padding-bottom:10px;background:linear-gradient(180deg,rgba(6,10,26,.95),rgba(6,10,26,.75));border-bottom:1px solid rgba(38,48,95,.7)}
 .lvbadge{position:relative;width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(180deg,#ffd978,#e9a92f);color:#1d1403;font-family:var(--f-disp);font-weight:700;font-size:15px;overflow:hidden}
 .lvbadge i{position:absolute;left:0;bottom:0;height:3px;width:100%;background:rgba(29,20,3,.55);transform-origin:left}
 .who{display:grid;min-width:0}
 .who b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.curs{display:grid;grid-template-columns:auto auto;gap:4px}
-.cur.en{color:var(--ink);font:inherit;font-family:var(--f-disp);font-size:12px;justify-content:space-between}
-.cur.en small{font-family:inherit;font-size:9.5px;color:var(--dim);white-space:nowrap}
-.cur.en small::before{content:"⚡";color:#ffe27a;margin-right:2px}
+.curs{display:flex;gap:3px;min-width:0;white-space:nowrap}
+.curs .cur{padding:3px 7px 3px 4px;font-size:11px}
+@media (max-width:420px){.topbar{padding-inline:10px;gap:5px}.who{display:none}.topbar{grid-template-columns:auto 1fr auto}.curs{justify-content:center}.curs .cur{padding:2px 6px 2px 3px}}
+.curs .cur .dust::before,.curs .cur .piece::before{width:15px!important;height:15px!important;margin-right:2px}
+.cur.en{color:var(--ink);font:inherit;font-family:var(--f-disp);font-size:11px;gap:2px}
+.cur.en i{display:inline-block;width:13px;height:13px;flex:none;font-style:normal;line-height:13px;text-align:center;font-size:11px}
+.cur.en.arc i::before{content:"⚡";color:#ffe27a}
+.cur.en.pvp i{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cg stroke='%23ffe27a' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M3 3l9 9M13 3l-9 9'/%3E%3Cpath d='M10.5 13.5l3-3M5.5 13.5l-3-3' stroke-width='1.6'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat}
 .cur.en b{color:#ffe27a;font-variant-numeric:tabular-nums}
 .cur.en.low b{color:#ff8a9a}
 .cur{display:flex;align-items:center;gap:5px;padding:4px 8px 4px 5px;border-radius:999px;background:rgba(15,22,52,.9);border:1px solid var(--line);font-family:var(--f-disp);font-size:12px;font-variant-numeric:tabular-nums}
@@ -735,10 +739,10 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
       <div class="lvbadge" title="계정 레벨"><span id="tbLv">1</span><i id="tbXp"></i></div>
       <div class="who"><b id="tbName">게스트</b></div>
       <div class="curs">
+        <button class="cur en pvp" id="tbEnPvp" type="button" aria-label="배틀 에너지"><i aria-hidden="true"></i><b>10/10</b></button>
+        <button class="cur en arc" id="tbEnArc" type="button" aria-label="아케이드 에너지"><i aria-hidden="true"></i><b>15/15</b></button>
         <div class="cur" title="미네랄"><span class="dust" id="tbDust">0</span></div>
         <div class="cur" title="별모래"><span class="piece" id="tbPiece">0</span></div>
-        <button class="cur en" id="tbEnPvp" type="button" title="배틀 에너지"><small>배틀</small><b>10/10</b></button>
-        <button class="cur en" id="tbEnArc" type="button" title="아케이드 에너지"><small>아케이드</small><b>15/15</b></button>
       </div>
       <button class="gear" id="gearBtn" type="button" aria-label="설정">⚙</button>
     </header>
@@ -749,7 +753,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
           <button class="gear" type="button" data-live="mailbox" aria-label="우편함" title="우편함"><img src="img/icon_mail.png" alt="" aria-hidden="true"><i class="dot" id="mailDot" hidden></i></button>
           <button class="gear" type="button" data-live="ranking" aria-label="랭킹" title="랭킹"><img src="img/icon_rank.png" alt="" aria-hidden="true"></button>
         </div>
-        <div class="power">전투력 <b id="homePower">0</b><button class="prank" id="homeRank" type="button" hidden>랭킹 <b id="homeRankN">-</b><small id="homeRankT"></small></button></div>
+        <div class="power">전투력 <b id="homePower">0</b><button class="prank" id="homeRank" type="button" hidden>랭킹 <b id="homeRankN">-</b></button></div>
         <div class="home-strip">
           <button class="hpill" id="collectBtn" type="button" title="보관 중인 자원 수령">
             <small>보관 자원 <em>수령</em></small><span class="big"><span class="dust" id="incDust">+0</span><span class="piece" id="incPiece">+0</span></span>

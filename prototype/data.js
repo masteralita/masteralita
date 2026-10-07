@@ -598,4 +598,4 @@ const AD_CONFIG = {
   web:     { label:'Web',     network:'테스트', rewarded:null },
 };
 // 로비 낙하 보물상자: falls among the meteors, needs `hp` hits, then opens via rewarded ad (or instantly with the ad pass)
-const AD_CHEST = { first:[8, 14], cd:[45, 90], hp:3, reward:[20, 40], life:40 };
+const AD_CHEST = { first:[8, 14], cd:[45, 90], every:300, stay:30, hp:3, reward:[20, 40], life:40 }; // every: 보물 우주선 재등장 (초), stay: 로비에 머무는 시간 (초) · cd는 예전 값 (안 씀)
