@@ -9,7 +9,7 @@ const SAVE_KEY = 'gw.save.v1';
 function freshSave() {
   return {
     v: 1, name: '', lv: 1, xp: 0, dust: 30000, piece: 1500, birthday: null,
-    skins: [], lastCollect: Date.now(), chest: 0, stamina: { n: STAMINA.max, t: Date.now() }, staminaA: { n: STAMINA.arcadeMax, t: Date.now() }, best: 0, wins: 0, losses: 0, adPass: false,
+    skins: [], lastCollect: Date.now(), chest: 0, stamina: { n: STAMINA.max, t: Date.now() }, staminaA: { n: STAMINA.arcadeMax, t: Date.now() }, best: 0, arcClear: 0, passUntil: 0, wins: 0, losses: 0, adPass: false,
     planets: { earth: { lv: 1 } }, mainPlanet: 'earth',
     cons: { sgr: newCon(0), leo: newCon(0), vir: newCon(0) },
     team: ['sgr', 'leo', 'vir'], form: [['sgr', 'leo'], ['vir']],
@@ -101,6 +101,7 @@ function loadSave(v) {
   if (!o.stamina || typeof o.stamina.n !== 'number') o.stamina = { n: STAMINA.max, t: Date.now() }; // older saves start full
   if (!o.staminaA || typeof o.staminaA.n !== 'number') o.staminaA = { n: STAMINA.arcadeMax, t: Date.now() }; // 아케이드 에너지 (added later): starts full
   delete o.title; // the old 'Star Wanderer' subtitle
+  o.arcClear = Math.max(o.arcClear || 0, (o.best || 0) - 1); // 최고 WAVE n에서 끝났으면 n-1까지 클리어 (배속 해금 이전 기록)
   return o;
 }
 // cloud.js: the server copy is newer (or the player switched accounts) → replace this device's progress
@@ -117,6 +118,7 @@ window.gwResetLocal = () => {
 };
 
 const fmt = n => Math.floor(n).toLocaleString('en-US');
+const fmtShort = n => n < 1e4 ? fmt(n) : n < 1e6 ? `${+(Math.floor(n / 100) / 10).toFixed(1)}K` : `${+(Math.floor(n / 1e4) / 100).toFixed(2)}M`; // 상단 바: 한 줄에 4칸이 들어가게
 const CUR = { dust: '미네랄', piece: '별모래' };
 function spend(cur, n) {
   if (save[cur] < n) { toast(`${CUR[cur]}${cur === 'dust' ? '이' : '가'} ${fmt(n - save[cur])} 부족해요`); return false; }
@@ -308,15 +310,15 @@ document.querySelector('.nav').addEventListener('click', e => { const b = e.targ
 function renderTopBar() {
   $('tbLv').textContent = save.lv;
   $('tbName').textContent = save.name || '게스트';
-  $('tbDust').textContent = fmt(save.dust);
-  $('tbPiece').textContent = fmt(save.piece);
+  $('tbDust').textContent = fmtShort(save.dust); $('tbDust').parentNode.title = `미네랄 ${fmt(save.dust)}`;
+  $('tbPiece').textContent = fmtShort(save.piece); $('tbPiece').parentNode.title = `별모래 ${fmt(save.piece)}`;
   $('tbXp').style.transform = `scaleX(${clamp(save.xp / accNeed(save.lv), 0, 1)})`;
   renderEnergy();
 }
 $('gearBtn').addEventListener('click', openSettings);
 
 /* ---------- Lobby (화면설계서 5–10p) ---------- */
-const HOME = { sys: null, rocks: [], shots: [], booms: [], spawn: 0, skyBottom: 0, chestCd: rnd(...AD_CHEST.first), loot: null };
+const HOME = { sys: null, rocks: [], shots: [], booms: [], spawn: 0, skyBottom: 0, ufoAt: Date.now() + rnd(...AD_CHEST.first) * 1000, loot: null };
 function enterHome() {
   G.state = 'home'; G.me = null; G.foe = null; G.zone = ZONES[1]; G.shield = 0; G.pShield = 0;
   G.fx = []; G.texts = []; G.proj = []; G.beams = []; $('banner').classList.remove('show');
@@ -350,7 +352,7 @@ function renderHome() {
   $('chestOpen').textContent = chests ? `열기 ×${chests}` : `${save.chest % CHEST_STEP} / ${CHEST_STEP}`;
   $('chestBtn').disabled = chests === 0;
   renderEnergy();
-  document.querySelectorAll('.mode .en').forEach(e => { e.textContent = `⚡${STAMINA.cost}`; });
+  document.querySelectorAll('.mode .en').forEach(e => { e.textContent = STAMINA.cost; });
   $('homeBest').textContent = save.best ? `최고 WAVE ${save.best}` : '기록 없음';
   $('homePvp').textContent = `${save.wins}승 ${save.losses}패`;
   $('homePower').textContent = fmt(teamPower());
@@ -364,7 +366,7 @@ function refreshPowerRank() {
   if (power === PRANK.power && Date.now() - PRANK.at < 60000) return;
   PRANK.busy = true; PRANK.power = power; PRANK.at = Date.now();
   CLOUD.powerRank(power).then(r => {
-    $('homeRankN').textContent = `${fmt(r.rank)}위`; $('homeRankT').textContent = `/ ${fmt(r.total)}명`; $('homeRank').hidden = false;
+    $('homeRankN').textContent = `${fmt(r.rank)}위`; $('homeRank').hidden = false;
   }).catch(err => console.warn('power rank', err)).finally(() => { PRANK.busy = false; });
 }
 $('homeRank').addEventListener('click', () => window.LIVE && LIVE.open('ranking', 'power'));
@@ -407,12 +409,14 @@ function updateHome(dt) {
     const pts = Array.from({ length: 8 }, (_, i) => [Math.cos(i / 8 * TAU) * rnd(.72, 1), Math.sin(i / 8 * TAU) * rnd(.72, 1)]);
     HOME.rocks.push({ x, y: -24, vx: (tx - x) / ((s.cy + 24) / vy), vy, r: rnd(8, 15), rot: rnd(0, TAU), vr: rnd(-1.2, 1.2), pts, v: Math.floor(Math.random() * 4), hp: 1, locked: 0 });
   }
-  // 낙하 보물상자: at most one falling or waiting at a time
-  HOME.chestCd -= dt;
-  if (HOME.chestCd <= 0 && !HOME.loot && !HOME.rocks.some(r => r.kind === 'chest')) {
-    HOME.chestCd = rnd(...AD_CHEST.cd);
-    const x = rnd(W * .2, W * .8);
-    HOME.rocks.push({ kind: 'chest', x, y: -30, vx: (s.cx - x) / ((s.cy + 30) / 34), vy: 34, r: 15, rot: 0, vr: 0, hp: AD_CHEST.hp, locked: 0 });
+  // 보물 우주선: only while the 로비 tab is open, a UFO flies in, roams the sky for AD_CHEST.stay seconds, then leaves;
+  // the next one comes AD_CHEST.every seconds after that one appeared. Shoot it down and it drops the reward chest.
+  const lobby = tab === 'home' && !$('shell').hidden;
+  if (lobby && Date.now() >= HOME.ufoAt && !HOME.loot && !HOME.rocks.some(r => r.kind === 'ufo')) { // 5분은 실제 시간 (전투·다른 탭에 있어도 흘러요)
+    HOME.ufoAt = Date.now() + AD_CHEST.every * 1000;
+    const sky0 = HOME.skyBottom || H * .5, left = Math.random() < .5, sp = rnd(52, 64);
+    const by = 70 + (sky0 - 70) * rnd(.5, .7); // inside the band the constellations aim at
+    HOME.rocks.push({ kind: 'ufo', x: left ? -30 : W + 30, y: by, by, ph: rnd(0, TAU), vx: left ? sp : -sp, vy: 0, r: 18, rot: 0, vr: 0, hp: AD_CHEST.hp, locked: 0, stay: AD_CHEST.stay });
   }
   if (HOME.loot && (HOME.loot.t += dt) > AD_CHEST.life) { HOME.loot = null; } // unclaimed chest drifts away
   const sky = HOME.skyBottom || H * .5;
@@ -421,7 +425,7 @@ function updateHome(dt) {
     if (c.cd > 0) continue;
     // aim only at meteors that are well inside the open sky and not already locked by two shots
     const skyTop = 70 + (sky - 70) * .35; // let meteors fall into view first
-    const cand = HOME.rocks.filter(r => r.hp > 0 && r.y > skyTop && r.y < sky && r.locked < (r.kind === 'chest' ? r.hp : 2));
+    const cand = HOME.rocks.filter(r => r.hp > 0 && r.y > skyTop && r.y < sky && r.locked < (r.kind === 'ufo' ? r.hp : 2) && (r.kind !== 'ufo' || (r.x > W * .25 && r.x < W * .75))); // the UFO flies into view first
     if (!cand.length) { c.cd = .1; continue; }
     const t = cand.sort((a, b) => b.y - a.y)[0];
     t.locked += 1; c.cd = 1;
@@ -431,7 +435,7 @@ function updateHome(dt) {
     const p = HOME.shots[i], dx = p.t.x - p.x, dy = p.t.y - p.y, d = Math.hypot(dx, dy);
     p.trail.push([p.x, p.y]); if (p.trail.length > 6) p.trail.shift();
     if (p.t.hp <= 0) { HOME.shots.splice(i, 1); continue; }
-    if (d < p.t.r && p.t.kind === 'chest') {
+    if (d < p.t.r && p.t.kind === 'ufo') {
       HOME.shots.splice(i, 1); p.t.hp -= 1; p.t.locked -= 1; p.t.flash = .15;
       burst(p.t.x, p.t.y, 8, '#ffe08a');
       if (p.t.hp <= 0) chestBroken(p.t);
@@ -446,9 +450,15 @@ function updateHome(dt) {
     p.vx = dx / d; p.vy = dy / d; p.x += p.vx * 420 * dt; p.y += p.vy * 420 * dt;
   }
   HOME.rocks = HOME.rocks.filter(r => {
-    r.x += r.vx * dt; r.y += r.vy * dt; r.rot += r.vr * dt;
     if (r.flash > 0) r.flash -= dt;
-    if (r.hp > 0 && r.kind === 'chest' && r.y > sky + 10) { chestBroken(r); return false; } // caught before it reaches the planet
+    if (r.kind === 'ufo') { // weaving flight: turns back at the screen edges while it stays, flies off once its time is up
+      if (!lobby) return true; // holds still (and its stay time) while another tab is open
+      r.ph += dt * 1.6; r.x += r.vx * dt; r.y = r.by + Math.sin(r.ph) * 14;
+      if ((r.stay -= dt) > 0) { if ((r.x < W * .12 && r.vx < 0) || (r.x > W * .88 && r.vx > 0)) r.vx = -r.vx; }
+      else if (r.x < -40 || r.x > W + 40) r.hp = 0; // escaped: in-flight shots drop it
+      return r.hp > 0;
+    }
+    r.x += r.vx * dt; r.y += r.vy * dt; r.rot += r.vr * dt;
     if (r.hp > 0 && Math.hypot(r.x - s.cx, r.y - s.cy) < s.pr) { burst(r.x, r.y, 10, '#9fb8ff'); return false; } // absorbed by the planet's field
     return r.hp > 0 && r.y < H + 30;
   });
@@ -459,7 +469,21 @@ function chestBroken(r) {
   r.hp = 0;
   const sky = HOME.skyBottom || H * .5;
   HOME.loot = { x: clamp(r.x, 40, W - 40), y: clamp(r.y, 110, sky - 20), t: 0 };
-  burst(r.x, r.y, 26, '#ffd76a'); HOME.booms.push({ x: r.x, y: r.y, r: 18, t: .45, col: '#ffd76a' });
+  burst(r.x, r.y, 18, '#ffb05a'); burst(r.x, r.y, 26, '#ffd76a'); HOME.booms.push({ x: r.x, y: r.y, r: 18, t: .45, col: '#ffd76a' });
+}
+function drawUfo(r, t) { // the reward ship: arcade saucer art with a golden glow so it reads as loot
+  ctx.save(); ctx.globalAlpha = .3 + .15 * Math.sin(t * 6); ctx.fillStyle = '#ffd76a';
+  ctx.beginPath(); ctx.arc(r.x, r.y, r.r * 1.9, 0, TAU); ctx.fill(); ctx.restore();
+  const im = pxSprite('ship_saucer'), w = r.r * SHIP_LOOK.saucer.w;
+  if (im) {
+    const h = w * im.naturalHeight / im.naturalWidth, tilt = Math.cos(r.ph) * .12 * Math.sign(r.vx);
+    ctx.save(); ctx.imageSmoothingEnabled = false; ctx.translate(r.x, r.y); ctx.rotate(tilt);
+    ctx.drawImage(im, -w / 2, -h / 2, w, h);
+    if (r.flash > 0) { ctx.globalAlpha = .7; ctx.drawImage(shipWhite('saucer', im), -w / 2, -h / 2, w, h); }
+    ctx.restore();
+  } else drawChest(r.x, r.y, r.r * 2, false, r.flash);
+  for (let i = 0; i < AD_CHEST.hp; i++) { ctx.fillStyle = i < r.hp ? '#ffd76a' : 'rgba(255,255,255,.2)'; ctx.fillRect(r.x - 12 + i * 9, r.y + r.r + 6, 7, 3); }
+  if (save.settings.glow && Math.random() < .5) G.fx.push({ x: r.x - Math.sign(r.vx) * w * .45, y: r.y + rnd(-2, 2), vx: -r.vx * .4, vy: rnd(-8, 8), t: rnd(.2, .4), c: Math.random() < .5 ? '#ffd76a' : '#9fe8ff' });
 }
 function drawChest(x, y, w, open, flash) {
   const im = pxSprite('chest_closed');
@@ -492,16 +516,10 @@ function drawHome(t) {
   drawBg(t);
   const s = HOME.sys; if (!s) return;
   for (const r of HOME.rocks) {
+    if (r.kind === 'ufo') { drawUfo(r, t); continue; }
     // fiery entry trail, then the rock itself
     const sp = Math.hypot(r.vx, r.vy), ux = r.vx / sp, uy = r.vy / sp;
     if (save.settings.glow) pixelTrail(r.x, r.y, ux, uy, r.r);
-    if (r.kind === 'chest') {
-      ctx.save(); ctx.globalAlpha = .35 + .15 * Math.sin(t * 6); ctx.fillStyle = '#ffd76a';
-      ctx.beginPath(); ctx.arc(r.x, r.y, r.r * 1.9, 0, TAU); ctx.fill(); ctx.restore();
-      drawChest(r.x, r.y + Math.sin(t * 3) * 2, r.r * 2, false, r.flash);
-      for (let i = 0; i < AD_CHEST.hp; i++) { ctx.fillStyle = i < r.hp ? '#ffd76a' : 'rgba(255,255,255,.2)'; ctx.fillRect(r.x - 12 + i * 9, r.y + r.r + 6, 7, 3); }
-      continue;
-    }
     const rim = pxSprite('rock_' + (r.v || 0));
     if (rim) pxDraw(ctx, rim, r.x, r.y, r.r * 2.3, r.rot);
     else {
@@ -768,7 +786,7 @@ const shopBanner = p => `
     </section>`;
 const shopRow = p => `
     <section class="shop-card row-card">
-      <div><h3>${p.name}</h3><p class="mini">${p.reward && p.reward.ads && save.adPass ? '적용 중 · 모든 광고 없이 바로 보상' : p.desc || ''}${shopSub(p) ? ` · ${shopSub(p)}` : ''}</p></div>
+      <div><h3>${p.name}</h3><p class="mini">${p.reward && p.reward.ads && save.adPass ? '적용 중 · 모든 광고 없이 바로 보상' : p.reward && p.reward.pass > 0 && passOn() ? `적용 중 · ${passDate()}까지 · 다시 사면 기간이 늘어나요` : p.desc || ''}${shopSub(p) ? ` · ${shopSub(p)}` : ''}</p></div>
       <button class="buy fit" data-prod="${p.id}" type="button" ${shopSoldOut(p) ? 'disabled' : ''}>${shopPrice(p)}</button>
     </section>`;
 const piecePack = p => `
@@ -780,6 +798,7 @@ function buyProduct(p) {
   const r = p.reward || {}, extra = [], cards = [];
   save.shopBuys = { ...(save.shopBuys || {}), [p.id]: shopBought(p) + 1 };
   if (r.ads) { save.adPass = true; extra.push('광고 제거 적용'); }
+  if (r.pass > 0) { save.passUntil = Math.max(Date.now(), save.passUntil || 0) + r.pass * 864e5; extra.push(`패스 ${passDate()}까지 · 2배속 해금`); }
   if (r.piece > 0) { save.piece += r.piece; extra.push(`별모래 +${fmt(r.piece)}`); }
   if (r.dust > 0) { save.dust += r.dust; extra.push(`미네랄 +${fmt(r.dust)}`); }
   if (r.con && CON[r.con]) cards.push(grantCon(r.con, clamp(r.grade | 0, 0, GRADES.length - 1)));
@@ -1167,6 +1186,7 @@ function openSkinList(kind, k, pid = save.mainPlanet, next = null) {
   let sel = cur;
   const item = s => `<button class="skin-item" type="button" role="radio" data-os="${s.id}" aria-checked="${s.id === sel}">
       <b>${s.name}</b><span class="mini">${Object.keys(s.bonus).length ? bonusLines(s.bonus, '').map(x => x.trim()).join(' · ') : '능력치 없음'}</span>
+      ${s.flavor ? `<span class="mini flavor">${s.flavor}</span>` : ''}
       ${s.id === cur ? '<em class="eq">장착</em>' : save[ownKey].includes(s.id) ? '<em class="own">보유</em>' : `<em class="piece">${fmt(s.price)}</em>`}
     </button>`;
   const info = () => {
@@ -1174,8 +1194,7 @@ function openSkinList(kind, k, pid = save.mainPlanet, next = null) {
     const btn = sel === cur ? '<button class="cta sm" type="button" disabled>장착 중</button>'
       : own ? '<button class="cta sm" data-act="equip" type="button">장착</button>'
       : `<button class="cta sm" data-act="buy" type="button">구매 <b class="piece">${fmt(d.price)}</b></button>`;
-    return `<p class="mtxt">${d.flavor}</p>${skinBonusText(kind, d.bonus)}
-      <div class="mbtns"><button class="ghost" data-act="close" type="button">${next ? '다음' : '취소'}</button>${btn}</div>`;
+    return `<div class="mbtns"><button class="ghost" data-act="close" type="button">${next ? '다음' : '취소'}</button>${btn}</div>`;
   };
   const title = isP ? '행성 스킨' : all || PLANET[pid].orbits === 1 ? '궤도 스킨' : `궤도 ${k + 1} 스킨`;
   openModal(`
@@ -1268,8 +1287,8 @@ function renderTeam() {
       </div>
       <div class="tp-btns">
         <button class="ghost sm" data-tact="planet" type="button">행성 변경</button>
-        <button class="ghost sm" data-pskin type="button">행성 스킨</button>
-        <button class="ghost sm" data-oskin type="button">궤도 스킨</button>
+        <button class="ghost sm" data-pskin type="button">행성 스킨 변경</button>
+        <button class="ghost sm" data-oskin type="button">궤도 스킨 변경</button>
       </div>
       <div class="team-sk">
         ${planetSkills(pid).map((s, k) => (k === 1 ? '<hr class="sk-div">' : '') + (k ? skillRow(s, `장착 ${k}`, `<button class="ghost sm" data-teq="${k - 1}" type="button">${s ? '변경' : '장착'}</button>`) : skillRow(s, '고유'))).join('')}
@@ -1298,7 +1317,7 @@ $('pane-team').addEventListener('click', e => {
   if (cur) confirmBox('별자리 변경', `${CON[cur].name}자리를 변경하시겠습니까?`, '변경', () => pickConPopup(k, j));
   else pickConPopup(k, j);
 });
-// 행성 변경: owned planets → 행성 스킨 → 궤도 스킨, one popup after another
+// 행성 변경: pick one of the owned planets (skins have their own buttons)
 function pickPlanetPopup() {
   let sel = save.mainPlanet;
   const owned = PLANETS.filter(p => save.planets[p.id]);
@@ -1312,7 +1331,7 @@ function pickPlanetPopup() {
           ${p.id === save.mainPlanet ? '<em class="eq">현재</em>' : ''}
         </button>`; }).join('')}
     </div>
-    <div class="mbtns"><button class="ghost" data-act="close" type="button">취소</button><button class="cta sm" data-act="ok" type="button">다음</button></div>`,
+    <div class="mbtns"><button class="ghost" data-act="close" type="button">취소</button><button class="cta sm" data-act="ok" type="button">변경</button></div>`,
   act => {
     if (act === 'close') { closeModal(); return; }
     if (act !== 'ok') return;
@@ -1321,7 +1340,6 @@ function pickPlanetPopup() {
       save.mainPlanet = sel; normalizeForm(); persist(); enterHomeSystemOnly(); renderTeam();
       toast(`대표 행성을 ${PLANET[sel].name}(으)로 바꿨어요`);
     }
-    openSkinList('p', 0, sel, () => openSkinList('o', 'all', sel));
   });
   $('modalBody').querySelector('.skin-list').addEventListener('click', e => {
     const b = e.target.closest('[data-pp]'); if (!b) return;
@@ -1504,6 +1522,26 @@ function setPaused(p) {
   if (p) { $('pauseStats').setAttribute('aria-selected', 'false'); renderPause(); }
 }
 $('pauseBtn').addEventListener('click', () => setPaused(true));
+
+/* ---------- 전투 배속 (data.js SPEED): 1배 기본 · 1.5배 아케이드 WAVE 10 클리어 · 2배 패스 기간 중 ---------- */
+const passOn = () => (save.passUntil || 0) > Date.now();
+const passDate = () => { const d = new Date(save.passUntil); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+const speedOk = x => x === 1 || (x === 1.5 && (save.arcClear || 0) >= SPEED.unlockWave) || (x === 2 && passOn());
+// the chosen speed, or the fastest one still open below it (the pass ran out)
+const battleSpeed = () => { const want = save.settings.spd || 1; return [...SPEED.steps].reverse().find(x => x <= want && speedOk(x)) || 1; };
+let shownSpd = 0;
+function renderSpeed() {
+  shownSpd = battleSpeed();
+  $('spdBtn').textContent = `×${shownSpd}`; $('spdBtn').setAttribute('aria-label', `전투 속도 ${shownSpd}배`);
+  $('spdBtn').classList.toggle('on', shownSpd > 1);
+}
+$('spdBtn').addEventListener('click', () => {
+  const open = SPEED.steps.filter(speedOk);
+  if (open.length < 2) { toast(`아케이드 WAVE ${SPEED.unlockWave}을 클리어하면 1.5배속이 열려요`); return; }
+  const next = open[(open.indexOf(battleSpeed()) + 1) % open.length];
+  if (next === 1 && !passOn()) toast('2배속은 상점의 30일 패스로 열려요');
+  save.settings.spd = next; persist(); renderSpeed();
+});
 $('resumeBtn').addEventListener('click', () => setPaused(false));
 $('pauseTabSkills').addEventListener('click', () => { $('pauseStats').setAttribute('aria-selected', 'false'); renderPause(); });
 $('pauseStats').addEventListener('click', () => { $('pauseStats').setAttribute('aria-selected', 'true'); renderPause(); });
@@ -1534,7 +1572,11 @@ function frame(now) {
     incT += ddt; if (incT > 1) { incT = 0; if (tab === 'home') renderHome(); else renderEnergy(); }
   } else if (G.state === 'title') { drawBg(now / 1000); }
   else {
-    if (!G.paused && !G.choosing) update(ddt);
+    if (!G.paused && !G.choosing) {
+      const sp = battleSpeed(), n = Math.ceil(sp); // faster = more steps of the same size, so hits can't skip past
+      if (sp !== shownSpd) renderSpeed();
+      for (let i = 0; i < n && !G.paused && !G.choosing; i++) update(ddt * sp / n);
+    }
     draw(now / 1000); hud();
   }
   requestAnimationFrame(frame);

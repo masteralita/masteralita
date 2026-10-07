@@ -11,7 +11,12 @@ const STABS = [['all', '전체'], ...Object.entries(SHOP_TABS)];
 const CUR = { krw: '원 (실결제)', piece: '별모래', dust: '미네랄' };
 const pctTxt = v => `${+(v * 100).toFixed(3)}%`;
 export const shopDefaults = () => Object.fromEntries(SHOP_DEFAULT.map(p => [p.id, JSON.parse(JSON.stringify(p))]));
-export const shopMap = c => ((c || {}).shop && typeof c.shop === 'object' ? c.shop : shopDefaults());
+export const shopMap = c => {
+  if (!((c || {}).shop && typeof c.shop === 'object')) return shopDefaults();
+  if (Object.values(c.shop).some(p => p && p.reward && p.reward.pass > 0)) return c.shop;
+  const add = withPassProduct([]).find(p => !c.shop[p.id]); // published before the 30일 패스: the game shows it anyway (balance.js applyShop)
+  return add ? { ...c.shop, [add.id]: add } : c.shop;
+};
 
 export function makeStoreAdmin({ ADM, esc, render, toast, confirmBox, curVal, setDraft, clone, liveRel, sameVal }) {
   const S = { gtab: 'con', gopen: null, stab: 'all', sopen: null };
@@ -74,7 +79,7 @@ export function makeStoreAdmin({ ADM, esc, render, toast, confirmBox, curVal, se
 
   /* ---------- 상점 관리 ---------- */
   const cur = () => shopMap(ADM.content);
-  const own = () => { if (!ADM.content.shop) ADM.content = { ...ADM.content, shop: shopDefaults() }; return ADM.content.shop; }; // first edit copies the defaults
+  const own = () => { const m = shopMap(ADM.content); if (ADM.content.shop !== m) ADM.content = { ...ADM.content, shop: m }; return ADM.content.shop; }; // first edit copies the defaults (and the 30일 패스 when missing)
   const shopInvalid = () => Object.values(cur()).filter(d => shopProblems(d).length).length;
   function liveState(d, now = Date.now()) {
     const a = d.start ? Date.parse(d.start) : NaN, b = d.end ? Date.parse(d.end) : NaN;
@@ -105,6 +110,7 @@ export function makeStoreAdmin({ ADM, esc, render, toast, confirmBox, curVal, se
       ${field('별자리 카드', sel(d, 'reward/con', opt('', '없음', r.con || '') + ALL_CONS.map(c => opt(c.id, `${c.name}자리`, r.con)).join('')))}
       ${r.con ? field('별자리 등급', sel(d, 'reward/grade', GRADES.map((g, i) => opt(i, g.name, r.grade | 0)).join(''))) : ''}
       ${field('장착 스킬', sel(d, 'reward/skill', opt('', '없음', r.skill || '') + Object.entries(ESKILL).map(([id, k]) => opt(id, `[${k.grade}] ${k.name}`, r.skill)).join('')))}
+      ${field('패스 기간 (일) · 전투 2배속', inp(d, 'reward/pass', 'int', r.pass || ''))}
       <label class="op-chk"><input type="checkbox" data-sh="${esc(d.id)}|reward/ads" data-t="bool"${r.ads ? ' checked' : ''}> 광고 제거</label>
     </div>`;
   }

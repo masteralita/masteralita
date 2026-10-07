@@ -103,7 +103,7 @@ const BAL_SECTIONS = [
       ['chest/skin', '보물 상자 · 성운 스킨 확률', 'pct'], ['chest/dust', '보물 상자 · 미네랄 확률', 'pct'],
       ['chest/piece', '보물 상자 · 별모래 확률', 'pct'], ['chest/con', '보물 상자 · 별자리 카드 확률', 'pct'],
       ['adchest/reward/0', '광고 상자 보상 최소 (별모래)', 'int'], ['adchest/reward/1', '광고 상자 보상 최대 (별모래)', 'int'],
-      ['adchest/cd/0', '광고 상자 등장 간격 최소 (초)', 'int'], ['adchest/cd/1', '광고 상자 등장 간격 최대 (초)', 'int'],
+      ['adchest/every', '보물 우주선 재등장 간격 (초)', 'int'], ['adchest/stay', '보물 우주선 로비 체류 시간 (초)', 'int'],
       ['adchest/hp', '광고 상자 격추 횟수', 'int'], ['adchest/life', '광고 상자 유지 시간 (초)', 'int'],
       ['income/dustBase', '방치 수입 · 미네랄 기본 (시간당)', 'int'], ['income/dustPerLv', '방치 수입 · 레벨당 추가', 'int'],
       ['income/pieceRate', '방치 수입 · 별모래 (시간당)', 'num'], ['income/capHours', '방치 수입 · 최대 누적 (시간)', 'int'],
@@ -220,7 +220,7 @@ function shopProblems(d) {
   const r = d.reward || {};
   if (r.con && !CON[r.con]) out.push('보상 별자리가 올바르지 않아요');
   if (r.skill && !ESKILL[r.skill]) out.push('보상 스킬이 올바르지 않아요');
-  if (!(r.piece > 0 || r.dust > 0 || r.con || r.skill || r.ads)) out.push('보상을 하나 이상 넣어 주세요');
+  if (!(r.piece > 0 || r.dust > 0 || r.con || r.skill || r.ads || r.pass > 0)) out.push('보상을 하나 이상 넣어 주세요');
   return out;
 }
 // 노출 기간 (start / end: <input type="datetime-local"> value, device time; empty = no limit)
@@ -231,7 +231,7 @@ function shopOpen(p, now = Date.now()) {
 }
 const shopSort = (a, b) => (a.order || 0) - (b.order || 0) || String(a.id).localeCompare(String(b.id));
 function applyShop(shop) {
-  const list = shop && typeof shop === 'object' ? Object.values(shop).filter(d => !shopProblems(d).length) : SHOP_DEFAULT;
+  const list = shop && typeof shop === 'object' ? withPassProduct(Object.values(shop).filter(d => !shopProblems(d).length)) : SHOP_DEFAULT;
   SHOP.splice(0, SHOP.length, ...JSON.parse(JSON.stringify(list)).sort(shopSort));
 }
 const SKIN_BASE = new Set(Object.keys(SKIN)), PSKIN_BASE = new Set(Object.keys(PSKIN)), OSKIN_BASE = new Set(Object.keys(OSKIN));
