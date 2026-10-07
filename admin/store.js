@@ -8,7 +8,7 @@
 
 const GTABS = [['con', '별자리'], ['skill', '스킬']];
 const STABS = [['all', '전체'], ...Object.entries(SHOP_TABS)];
-const CUR = { krw: '원 (실결제)', piece: 'Star Piece', dust: 'Star Dust' };
+const CUR = { krw: '원 (실결제)', piece: '별모래', dust: '미네랄' };
 const pctTxt = v => `${+(v * 100).toFixed(3)}%`;
 export const shopDefaults = () => Object.fromEntries(SHOP_DEFAULT.map(p => [p.id, JSON.parse(JSON.stringify(p))]));
 export const shopMap = c => ((c || {}).shop && typeof c.shop === 'object' ? c.shop : shopDefaults());
@@ -100,8 +100,8 @@ export function makeStoreAdmin({ ADM, esc, render, toast, confirmBox, curVal, se
       ${field('노출 종료 (비우면 계속)', inp(d, 'end', 'dt', d.end))}
     </div>
     <h4>보상</h4><div class="ct-grid">
-      ${field('Star Piece (별모래)', inp(d, 'reward/piece', 'int', r.piece || ''))}
-      ${field('Star Dust', inp(d, 'reward/dust', 'int', r.dust || ''))}
+      ${field('별모래', inp(d, 'reward/piece', 'int', r.piece || ''))}
+      ${field('미네랄', inp(d, 'reward/dust', 'int', r.dust || ''))}
       ${field('별자리 카드', sel(d, 'reward/con', opt('', '없음', r.con || '') + ALL_CONS.map(c => opt(c.id, `${c.name}자리`, r.con)).join('')))}
       ${r.con ? field('별자리 등급', sel(d, 'reward/grade', GRADES.map((g, i) => opt(i, g.name, r.grade | 0)).join(''))) : ''}
       ${field('장착 스킬', sel(d, 'reward/skill', opt('', '없음', r.skill || '') + Object.entries(ESKILL).map(([id, k]) => opt(id, `[${k.grade}] ${k.name}`, r.skill)).join('')))}

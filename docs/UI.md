@@ -11,11 +11,11 @@
 새 세션에서: "docs/UI.md 보고 SpriteCook으로 그림 작업 이어서 해줘"
 
 만들 그림 (우선순위 순, 우주·별자리 테마 + 다크 판타지 톤, 벤치마크 그림 복제 금지):
-1. 재화 아이콘: Star Dust(금빛 별가루), Star Piece(보라 결정) — 64×64 PNG, 투명 배경
+1. 재화 아이콘: 미네랄(금빛 별가루), 별모래(보라 결정) — 64×64 PNG, 투명 배경
    → `.dust::before`, `.piece::before` 를 이미지로 교체
 2. 하단 메뉴 아이콘 5개: 상점·행성·로비·별자리·팀 — 96×96 PNG, 투명 배경
    → `index.html` 의 `.nav button svg` 를 `<img>` 로 교체
-3. 상점 배너: 특수 별자리 패키지(뱀주인자리), 골드/유료 뽑기 — 가로 3:1
+3. 상점 배너: 특수 별자리 패키지(뱀주인자리), 미네랄/별모래 뽑기 — 가로 3:1
    → `renderStore()` 의 `.banner-card`, 뽑기 카드 배경
 4. 별자리 카드 배경 (등급별 6종 프레임) — `.ccell`, `.gcard`
 5. 로비 우편함·랭킹 아이콘, 보물 상자 그림
@@ -30,7 +30,7 @@
 | `cur_dust.png`, `cur_piece.png` | 128×128 | `.dust::before`, `.piece::before` |
 | `nav_store/planets/home/const/team.png` | 192×192 | `.nav button svg` 교체 |
 | `icon_mail.png`, `icon_rank.png`, `icon_chest.png` | 192×192 | 로비 우편함·랭킹, 보물 상자 |
-| `banner_ophiuchus/gold/premium.webp` | 1024×~333 (3:1) | 상점 패키지 배너, 골드/유료 뽑기 카드 |
+| `banner_ophiuchus/gold/premium.webp` | 1024×~333 (3:1) | 상점 패키지 배너, 미네랄/별모래 뽑기 카드 |
 | `card_common/magic/rare/unique/epic/legend.webp` | 240×~360 | `.ccell`, `.gcard` 등급별 배경 |
 
 배너는 왼쪽 1/3이 어두워서 글자를 올리기 좋아요.

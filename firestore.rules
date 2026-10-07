@@ -27,13 +27,14 @@ service cloud.firestore {
       allow create, update: if request.auth != null && request.auth.uid == uid && validSave();
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
-    // 랭킹: name/best/lv copied from the save. Everyone can read; the owner writes their own entry, admins can only hide it.
+    // 랭킹: name/best/lv/power(전투력) copied from the save. Everyone can read; the owner writes their own entry, admins can only hide it.
     match /leaderboard/{uid} {
       function validEntry() {
         let d = request.resource.data;
-        return d.keys().hasOnly(['name', 'best', 'lv', 'linked', 'updatedAt', 'hidden'])
+        return d.keys().hasOnly(['name', 'best', 'lv', 'power', 'linked', 'updatedAt', 'hidden'])
           && d.name is string && d.name.size() > 0 && d.name.size() <= 24
           && d.best is int && d.best >= 0 && d.best <= 100000 && d.lv is int && d.lv >= 1 && d.lv <= 100000
+          && (!('power' in d) || (d.power is int && d.power >= 0 && d.power <= 1000000000))
           && d.linked is bool && d.updatedAt is int;
       }
       allow read: if true;

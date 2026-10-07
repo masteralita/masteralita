@@ -86,10 +86,11 @@ function boot(AP, A, F) {
     pushLeaderboard(s);
     flushStats();
   }
-  // 랭킹 entry: only when something it shows changed (merge keeps an admin's hidden flag)
+  // 랭킹 entry (최고 웨이브 · 전투력): only when something it shows changed (merge keeps an admin's hidden flag)
+  const myPower = () => { try { return Math.max(0, Math.round(teamPower())) | 0; } catch { return 0; } };
   function pushLeaderboard(s) {
-    if (!auth.currentUser || !s.best) return;
-    const e = { name: String(s.name).slice(0, 24), best: s.best | 0, lv: Math.max(1, s.lv | 0), linked: !auth.currentUser.isAnonymous };
+    if (!auth.currentUser || !s.name) return;
+    const e = { name: String(s.name).slice(0, 24), best: s.best | 0, lv: Math.max(1, s.lv | 0), power: myPower(), linked: !auth.currentUser.isAnonymous };
     const key = auth.currentUser.uid + JSON.stringify(e);
     if (key === lastLb) return;
     F.setDoc(F.doc(db, 'leaderboard', auth.currentUser.uid), { ...e, updatedAt: Date.now() }, { merge: true })
@@ -146,6 +147,12 @@ function boot(AP, A, F) {
   try { if (localStorage.getItem('gw-active-day') !== dayKey()) { count('active'); localStorage.setItem('gw-active-day', dayKey()); } } catch {}
   addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushStats(); });
 
+  // 로비의 전투력 랭킹 (전체 유저 기준): 나보다 전투력이 높은 사람 수 + 1, 그리고 전체 인원
+  CLOUD.powerRank = async power => {
+    const lb = F.collection(db, 'leaderboard'), n = async q => (await F.getCountFromServer(q)).data().count;
+    const [above, total] = await Promise.all([n(F.query(lb, F.where('power', '>', power))), n(F.query(lb, F.where('power', '>=', 0)))]);
+    return { rank: above + 1, total: Math.max(total, above + 1) };
+  };
   CLOUD.schedule = () => { if (!auth.currentUser) return; clearTimeout(timer); timer = setTimeout(push, PUSH_DELAY); };
   CLOUD.flush = () => (timer || CLOUD.state === 'offline' ? push() : pushing || Promise.resolve());
   addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && timer) push(); });
