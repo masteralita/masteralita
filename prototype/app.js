@@ -8,8 +8,8 @@
 const SAVE_KEY = 'gw.save.v1';
 function freshSave() {
   return {
-    v: 1, name: '', title: 'Star Wanderer', lv: 1, xp: 0, dust: 30000, piece: 1500, birthday: null,
-    skins: [], lastCollect: Date.now(), chest: 0, stamina: { n: STAMINA.max, t: Date.now() }, best: 0, wins: 0, losses: 0, adPass: false,
+    v: 1, name: '', lv: 1, xp: 0, dust: 30000, piece: 1500, birthday: null,
+    skins: [], lastCollect: Date.now(), chest: 0, stamina: { n: STAMINA.max, t: Date.now() }, staminaA: { n: STAMINA.arcadeMax, t: Date.now() }, best: 0, wins: 0, losses: 0, adPass: false,
     planets: { earth: { lv: 1 } }, mainPlanet: 'earth',
     cons: { sgr: newCon(0), leo: newCon(0), vir: newCon(0) },
     team: ['sgr', 'leo', 'vir'], form: [['sgr', 'leo'], ['vir']],
@@ -20,7 +20,7 @@ function freshSave() {
   };
 }
 function newCon(g) { return { g, slots: {}, skins: [], skin: null }; }
-// Every constellation owns its classic skin; others are bought with Star Piece in the 별자리 tab
+// Every constellation owns its classic skin; others are bought with 별모래 in the 별자리 tab
 const equippedSkin = id => { const s = save.cons[id] && save.cons[id].skin; return s && SKIN[s] ? s : id; }; // a skin a later release removed → classic
 // The classic skin comes with the constellation; other skins can be owned before it (chest, mail, purchase)
 const ownsSkin = (id, sid) => (sid === id ? !!save.cons[id] : (save.skins || []).includes(sid) || !!(save.cons[id] && (save.cons[id].skins || []).includes(sid)));
@@ -99,6 +99,8 @@ function loadSave(v) {
   if (!o.equip || typeof o.equip !== 'object') o.equip = {};
   for (const k of ['skillLv', 'skillCopies']) if (!o[k] || typeof o[k] !== 'object') o[k] = {};
   if (!o.stamina || typeof o.stamina.n !== 'number') o.stamina = { n: STAMINA.max, t: Date.now() }; // older saves start full
+  if (!o.staminaA || typeof o.staminaA.n !== 'number') o.staminaA = { n: STAMINA.arcadeMax, t: Date.now() }; // 아케이드 에너지 (added later): starts full
+  delete o.title; // the old 'Star Wanderer' subtitle
   return o;
 }
 // cloud.js: the server copy is newer (or the player switched accounts) → replace this device's progress
@@ -115,57 +117,75 @@ window.gwResetLocal = () => {
 };
 
 const fmt = n => Math.floor(n).toLocaleString('en-US');
-const CUR = { dust: 'Star Dust', piece: 'Star Piece' };
+const CUR = { dust: '미네랄', piece: '별모래' };
 function spend(cur, n) {
-  if (save[cur] < n) { toast(`${CUR[cur]}가 ${fmt(n - save[cur])} 부족해요`); return false; }
+  if (save[cur] < n) { toast(`${CUR[cur]}${cur === 'dust' ? '이' : '가'} ${fmt(n - save[cur])} 부족해요`); return false; }
   save[cur] -= n; persist(); renderTopBar(); return true;
 }
 function gain(cur, n) { save[cur] += n; persist(); renderTopBar(); }
-// 계정 레벨업 보상 (ACCOUNT in data.js): 에너지 가득 충전 + Star Dust (dust × 새 레벨) + Star Piece; 방치 수입도 레벨마다 늘어요
+// 계정 레벨업 보상 (ACCOUNT in data.js): 에너지 가득 충전 + 미네랄 (dust × 새 레벨) + 별모래; 방치 수입도 레벨마다 늘어요
 function gainAccXp(v) {
   save.xp += v; const out = { up: 0, dust: 0, piece: 0 };
   while (save.xp >= accNeed(save.lv)) {
     save.xp -= accNeed(save.lv); save.lv += 1; out.up += 1;
     out.dust += ACCOUNT.dust * save.lv; out.piece += ACCOUNT.piece;
   }
-  if (out.up) { save.dust += out.dust; save.piece += out.piece; const st = staminaNow(); st.n = Math.max(st.n, STAMINA.max); st.t = Date.now(); }
+  if (out.up) { save.dust += out.dust; save.piece += out.piece; for (const m of ['pvp', 'arcade']) { const st = staminaNow(m); st.n = Math.max(st.n, staMax(m)); st.t = Date.now(); } }
   persist(); return out;
 }
 
-/* ---------- 에너지 (STAMINA in data.js): 한 판에 cost, regenMin분마다 1칸, 최대 max ----------
-   save.stamina = { n, t }: t is when the current regen period started, so the count catches up
-   from the clock alone, even after days offline. */
+/* ---------- 에너지 (STAMINA in data.js): 배틀과 아케이드가 따로 · 한 판에 cost, regenMin분마다 1칸 ----------
+   save.stamina (배틀, 최대 max) and save.staminaA (아케이드, 최대 arcadeMax) = { n, t }: t is when the current
+   regen period started, so the count catches up from the clock alone, even after days offline. */
+const STA_NAME = { pvp: '배틀', arcade: '아케이드' };
+const staMode = m => (m === 'arcade' ? 'arcade' : 'pvp');
+const staMax = m => (staMode(m) === 'arcade' ? STAMINA.arcadeMax : STAMINA.max);
 const regenMs = () => Math.max(1, STAMINA.regenMin) * 60000;
-function staminaNow() {
-  const st = save.stamina, now = Date.now();
-  if (st.n >= STAMINA.max) { st.t = now; return st; }
+function staminaNow(m) {
+  const st = staMode(m) === 'arcade' ? save.staminaA : save.stamina, now = Date.now(), max = staMax(m);
+  if (st.n >= max) { st.t = now; return st; }
   if (st.t > now) st.t = now; // clock moved backwards
   const k = Math.floor((now - st.t) / regenMs());
-  if (k > 0) { st.n = Math.min(STAMINA.max, st.n + k); st.t = st.n >= STAMINA.max ? now : st.t + k * regenMs(); }
+  if (k > 0) { st.n = Math.min(max, st.n + k); st.t = st.n >= max ? now : st.t + k * regenMs(); }
   return st;
 }
-const staminaNext = () => { const st = staminaNow(); return st.n >= STAMINA.max ? 0 : regenMs() - (Date.now() - st.t); };
+const staminaNext = m => { const st = staminaNow(m); return st.n >= staMax(m) ? 0 : regenMs() - (Date.now() - st.t); };
 const clock = ms => { const t = Math.ceil(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), x = t % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); };
-function useStamina() {
-  const st = staminaNow();
+function useStamina(m) {
+  const st = staminaNow(m);
   if (st.n < STAMINA.cost) {
-    if (G.state === 'home') openStaminaInfo(); else toast(`에너지가 부족해요 · ${clock(staminaNext())} 후 1칸 충전돼요`);
+    if (G.state === 'home') openStaminaInfo(m); else toast(`${STA_NAME[staMode(m)]} 에너지가 부족해요 · ${clock(staminaNext(m))} 후 1칸 충전돼요`);
     return false;
   }
-  st.n -= STAMINA.cost; persist(); return true;
+  st.n -= STAMINA.cost; persist(); renderEnergy(); return true;
 }
-// Every battle start (로비 · 다시 출항 · 재시작) goes through here: team check, then one energy
+// Every battle start (로비 · 다시 출항 · 재시작) goes through here: team check, then one energy of that mode
 function tryStart(mode) {
-  if (!checkTeam() || !useStamina()) return false;
+  if (!checkTeam() || !useStamina(mode)) return false;
   startRun(mode); return true;
 }
-function openStaminaInfo() {
-  const st = staminaNow(), next = staminaNext();
-  openModal(`<h3>에너지 ${st.n} / ${STAMINA.max}</h3>
-    <p class="mtxt">대전과 아케이드는 한 판에 에너지 <b>${STAMINA.cost}</b>칸을 써요. 에너지는 <b>${STAMINA.regenMin}분</b>마다 1칸씩, 게임을 꺼 두어도 차올라요 (최대 ${STAMINA.max}칸).</p>
-    <p class="mtxt">${next ? `다음 충전까지 <b>${clock(next)}</b> · 가득 차기까지 ${clock(next + (STAMINA.max - st.n - 1) * regenMs())}` : '지금 가득 차 있어요.'}</p>
-    <p class="mtxt">계정 레벨이 오르면 에너지가 가득 채워져요.</p>
+function openStaminaInfo(focus) {
+  const row = m => {
+    const st = staminaNow(m), next = staminaNext(m), max = staMax(m);
+    return `<h4 class="set-h">${STA_NAME[m]} 에너지 ${st.n} / ${max}</h4>
+    <p class="mtxt">${next ? `다음 충전까지 <b>${clock(next)}</b> · 가득 차기까지 ${clock(next + (max - st.n - 1) * regenMs())}` : '지금 가득 차 있어요.'}</p>`;
+  };
+  const order = staMode(focus) === 'arcade' ? ['arcade', 'pvp'] : ['pvp', 'arcade'];
+  openModal(`<h3>에너지</h3>
+    <p class="mtxt">배틀과 아케이드는 에너지를 따로 써요. 한 판에 <b>${STAMINA.cost}</b>칸, <b>${STAMINA.regenMin}분</b>마다 1칸씩 게임을 꺼 두어도 차올라요 (배틀 최대 ${STAMINA.max}칸 · 아케이드 최대 ${STAMINA.arcadeMax}칸).</p>
+    ${order.map(row).join('')}
+    <p class="mtxt">계정 레벨이 오르면 두 에너지가 모두 가득 채워져요.</p>
     <div class="mbtns"><button class="cta sm" data-act="ok" type="button">확인</button></div>`, () => closeModal());
+}
+// 상단 재화 영역의 에너지 칩 (배틀 · 아케이드)
+function renderEnergy() {
+  for (const m of ['pvp', 'arcade']) {
+    const st = staminaNow(m), el = $(m === 'pvp' ? 'tbEnPvp' : 'tbEnArc');
+    el.querySelector('b').textContent = `${st.n}/${staMax(m)}`;
+    el.classList.toggle('low', st.n < STAMINA.cost);
+    const next = staminaNext(m);
+    el.title = `${STA_NAME[m]} 에너지 · ${next ? clock(next) + ' 후 +1' : '가득'}`;
+  }
 }
 // 계정 레벨: what earns XP and what a level-up gives
 function openAccountInfo() {
@@ -176,7 +196,7 @@ function openAccountInfo() {
     <h4 class="set-h">경험치 얻는 법</h4>
     <p class="mtxt">아케이드: 도달한 웨이브 × ${ACCOUNT.arcadeXp}<br>대전: 승리 ${ACCOUNT.winXp} · 패배 ${ACCOUNT.loseXp}<br>레벨 L에서 L+1로 가려면 ${ACCOUNT.need} × L 이 필요해요.</p>
     <h4 class="set-h">레벨업 보상</h4>
-    <p class="mtxt">에너지 가득 충전<br>Star Dust ${fmt(ACCOUNT.dust)} × 새 레벨 (Lv ${save.lv + 1} → ${fmt(ACCOUNT.dust * (save.lv + 1))})<br>Star Piece ${fmt(ACCOUNT.piece)}<br>방치 수입 시간당 Star Dust +${INCOME.dustPerLv}</p>
+    <p class="mtxt">에너지 가득 충전<br>미네랄 ${fmt(ACCOUNT.dust)} × 새 레벨 (Lv ${save.lv + 1} → ${fmt(ACCOUNT.dust * (save.lv + 1))})<br>별모래 ${fmt(ACCOUNT.piece)}<br>방치 수입 시간당 미네랄 +${INCOME.dustPerLv}</p>
     <div class="mbtns"><button class="cta sm" data-act="ok" type="button">확인</button></div>`, () => closeModal());
 }
 
@@ -288,10 +308,10 @@ document.querySelector('.nav').addEventListener('click', e => { const b = e.targ
 function renderTopBar() {
   $('tbLv').textContent = save.lv;
   $('tbName').textContent = save.name || '게스트';
-  $('tbTitle').textContent = save.title;
   $('tbDust').textContent = fmt(save.dust);
   $('tbPiece').textContent = fmt(save.piece);
   $('tbXp').style.transform = `scaleX(${clamp(save.xp / accNeed(save.lv), 0, 1)})`;
+  renderEnergy();
 }
 $('gearBtn').addEventListener('click', openSettings);
 
@@ -322,27 +342,37 @@ function renderHome() {
   const inc = pendingIncome();
   $('incDust').textContent = '+' + fmt(inc.dust);
   $('incPiece').textContent = '+' + fmt(inc.piece);
-  $('incRate').textContent = `시간당 Star Dust ${INCOME.dust(save.lv)} · Star Piece ${INCOME.piece()} · 최대 ${INCOME.capHours}시간`;
+  $('incRate').textContent = `시간당 미네랄 ${INCOME.dust(save.lv)} · 별모래 ${INCOME.piece()} · 최대 ${INCOME.capHours}시간`;
   $('collectBtn').disabled = inc.dust < 1 && inc.piece < 1;
   const chests = Math.floor(save.chest / CHEST_STEP);
   $('chestFill').style.transform = `scaleX(${(save.chest % CHEST_STEP) / CHEST_STEP})`;
   $('chestTxt').textContent = `${save.chest % CHEST_STEP} / ${CHEST_STEP}`;
   $('chestOpen').textContent = chests ? `열기 ×${chests}` : `${save.chest % CHEST_STEP} / ${CHEST_STEP}`;
   $('chestBtn').disabled = chests === 0;
-  const st = staminaNow(), next = staminaNext();
-  $('energyN').textContent = st.n; $('energyMax').textContent = STAMINA.max;
-  $('energyNext').textContent = next ? clock(next) : '가득';
-  $('energyBtn').classList.toggle('low', st.n < STAMINA.cost);
+  renderEnergy();
   document.querySelectorAll('.mode .en').forEach(e => { e.textContent = `⚡${STAMINA.cost}`; });
   $('homeBest').textContent = save.best ? `최고 WAVE ${save.best}` : '기록 없음';
   $('homePvp').textContent = `${save.wins}승 ${save.losses}패`;
   $('homePower').textContent = fmt(teamPower());
+  refreshPowerRank();
 }
+// 전투력 옆의 전체 랭킹: Firestore count, at most every 60s or when 전투력 changes
+const PRANK = { at: 0, power: -1, busy: false };
+function refreshPowerRank() {
+  const power = Math.round(teamPower());
+  if (PRANK.busy || !window.CLOUD || !CLOUD.powerRank || !CLOUD.uid) return;
+  if (power === PRANK.power && Date.now() - PRANK.at < 60000) return;
+  PRANK.busy = true; PRANK.power = power; PRANK.at = Date.now();
+  CLOUD.powerRank(power).then(r => {
+    $('homeRankN').textContent = `${fmt(r.rank)}위`; $('homeRankT').textContent = `/ ${fmt(r.total)}명`; $('homeRank').hidden = false;
+  }).catch(err => console.warn('power rank', err)).finally(() => { PRANK.busy = false; });
+}
+$('homeRank').addEventListener('click', () => window.LIVE && LIVE.open('ranking', 'power'));
 $('collectBtn').addEventListener('click', () => {
   const inc = pendingIncome();
   save.dust += inc.dust; save.piece += inc.piece;
   save.lastCollect = Date.now(); persist(); renderTopBar(); renderHome();
-  toast(`Star Dust ${fmt(inc.dust)} · Star Piece ${fmt(inc.piece)} 수령`);
+  toast(`미네랄 ${fmt(inc.dust)} · 별모래 ${fmt(inc.piece)} 수령`);
 });
 $('chestBtn').addEventListener('click', () => {
   const n = Math.floor(save.chest / CHEST_STEP); if (!n) return;
@@ -358,11 +388,12 @@ $('chestBtn').addEventListener('click', () => {
     else got.push(rollCon(GACHA.gold.w, 'gold'));
   }
   save.dust += dust; save.piece += piece; persist(); renderTopBar(); renderHome();
-  showGachaResult(got, `상자 ${n}개`, [dust && `Star Dust +${fmt(dust)}`, piece && `Star Piece +${fmt(piece)}`].filter(Boolean));
+  showGachaResult(got, `상자 ${n}개`, [dust && `미네랄 +${fmt(dust)}`, piece && `별모래 +${fmt(piece)}`].filter(Boolean));
 });
 $('arcadeBtn').addEventListener('click', () => tryStart('arcade'));
 $('pvpBtn').addEventListener('click', () => tryStart('pvp'));
-$('energyBtn').addEventListener('click', openStaminaInfo);
+$('tbEnPvp').addEventListener('click', () => openStaminaInfo('pvp'));
+$('tbEnArc').addEventListener('click', () => openStaminaInfo('arcade'));
 document.querySelector('.lvbadge').addEventListener('click', openAccountInfo);
 function checkTeam() { normalizeForm(); if (save.team.length < TEAM_MIN) { toast('팀 탭에서 별자리를 1개 이상 편성해 주세요'); setTab('team'); return false; } return true; }
 
@@ -528,7 +559,7 @@ function openAdChest() {
   const pass = save.adPass;
   openModal(`<div class="loot-art"><span class="box"></span></div>
     <h3>보물 상자</h3>
-    <p class="mtxt">열면 <b class="piece">Star Piece ${AD_CHEST.reward[0]}~${AD_CHEST.reward[1]}개</b>를 받아요.</p>
+    <p class="mtxt">열면 <b class="piece">별모래 ${AD_CHEST.reward[0]}~${AD_CHEST.reward[1]}개</b>를 받아요.</p>
     <div class="mbtns">
       <button class="ghost" data-act="later" type="button">나중에</button>
       <button class="cta sm" data-act="open" type="button">${pass ? '바로 열기' : '▶ 광고 보고 열기'}</button>
@@ -544,7 +575,7 @@ function openAdChest() {
     const { x, y } = HOME.loot; HOME.loot = null;
     burst(x, y, 30, '#c77dff'); HOME.booms.push({ x, y, r: 20, t: .45, col: '#c77dff' });
     gain('piece', n);
-    showGachaResult([], '보물 상자', [`Star Piece +${fmt(n)}`]);
+    showGachaResult([], '보물 상자', [`별모래 +${fmt(n)}`]);
   });
 }
 
@@ -554,13 +585,13 @@ function grantRewards(rewards, title) {
   const cards = [], extra = [];
   for (const r of rewards || []) {
     const n = Math.max(1, r.n | 0);
-    if (r.type === 'dust') { save.dust += n; extra.push(`Star Dust +${fmt(n)}`); }
-    else if (r.type === 'piece') { save.piece += n; extra.push(`Star Piece +${fmt(n)}`); }
+    if (r.type === 'dust') { save.dust += n; extra.push(`미네랄 +${fmt(n)}`); }
+    else if (r.type === 'piece') { save.piece += n; extra.push(`별모래 +${fmt(n)}`); }
     else if (r.type === 'chest') { save.chest = Math.min(CHEST_MAX, save.chest + n); extra.push(`보물 상자 +${n}칸`); }
     else if (r.type === 'con' && CON[r.id]) for (let i = 0; i < Math.min(n, 30); i++) cards.push(grantCon(r.id, clamp(r.g | 0, 0, GRADES.length - 1)));
     else if (r.type === 'skin' && SKIN[r.id]) {
       const sk = SKIN[r.id];
-      if (ownsSkin(sk.con, sk.id)) { save.piece += 100; extra.push(`${sk.name} (보유 중) → Star Piece +100`); }
+      if (ownsSkin(sk.con, sk.id)) { save.piece += 100; extra.push(`${sk.name} (보유 중) → 별모래 +100`); }
       else { addSkin(sk.id); cards.push({ skin: sk.id, id: sk.con }); }
     }
   }
@@ -571,7 +602,7 @@ function grantRewards(rewards, title) {
 function showProbability() {
   const pct = (v, sum) => `${(+(v / sum * 100).toFixed(2))}%`;
   const gacha = Object.keys(GACHA).map(k => conOddsHtml(k)).join('');
-  const csum = Object.values(CHEST_ODDS).reduce((a, b) => a + b, 0), cl = { skin: '성운 스킨', dust: 'Star Dust', piece: 'Star Piece', con: '별자리 카드' };
+  const csum = Object.values(CHEST_ODDS).reduce((a, b) => a + b, 0), cl = { skin: '성운 스킨', dust: '미네랄', piece: '별모래', con: '별자리 카드' };
   openModal(`<h3>확률 정보</h3><div class="doc-body prob-body">${gacha}
     ${SKILL_DRAWS.map(skillOddsHtml).join('')}
     <p class="mtxt">등급 안에서는 스킬마다 같은 확률이에요. UR(고유) 스킬은 뽑기에 나오지 않아요.</p>
@@ -599,7 +630,7 @@ function rollGrade(w) {
   for (let i = 0; i < w.length; i++) { r -= w[i]; if (r < 0) return i; }
   return w.length - 1;
 }
-// Grants a constellation card: new → owned, higher grade → upgrade, otherwise converts to Star Dust
+// Grants a constellation card: new → owned, higher grade → upgrade, otherwise converts to 미네랄
 function rollCon(w, draw) {
   let pool = ALL_CONS.filter(c => GACHA_POOL.con[c.id] && GACHA_POOL.con[c.id][draw]); // 뽑기 관리 (관리자)
   if (!pool.length) pool = ZODIAC;
@@ -625,7 +656,7 @@ function dropSkin() {
 }
 function showGachaResult(list, title, extra = []) {
   persist(); renderTopBar();
-  const label = r => r.res === 'new' ? '<em class="new">NEW</em>' : r.res === 'up' ? '<em class="up">등급 상승</em>' : `<em>Star Dust +${fmt(r.dust)}</em>`;
+  const label = r => r.res === 'new' ? '<em class="new">NEW</em>' : r.res === 'up' ? '<em class="up">등급 상승</em>' : `<em>미네랄 +${fmt(r.dust)}</em>`;
   const card = (r, i) => r.skin
     ? `<div class="gcard skin" style="--g:rgb(${SKIN[r.skin].pal.line});animation-delay:${i * 70}ms">
         ${conSvg(r.id, 64, { skin: r.skin })}<b>${SKIN[r.skin].name}</b><span class="gchip" style="--g:rgb(${SKIN[r.skin].pal.line})">${SKIN_TIER[SKIN[r.skin].tier].name} 스킨</span><em class="new">SKIN</em>
@@ -649,14 +680,14 @@ const skInPool = (k, id) => !!(GACHA_POOL.skill[id] && GACHA_POOL.skill[id][k]);
 const skSum = k => { const w = skPoolW(k); return DRAW_GRADES.reduce((a, g) => a + w[g], 0); };
 const skPct = (k, g) => `${+(skPoolW(k)[g] / (skSum(k) || 1) * 100).toFixed(2)}%`;
 const skOdds = (k, long) => DRAW_GRADES.filter(g => skPoolW(k)[g] > 0).map(g => `${g}${long ? `(${SKILL_GRADES[g].name})` : ''} ${skPct(k, g)}`).join(' · ');
-// Grade by weight, then a skill of that grade at equal odds; a skill already owned turns into Star Dust
+// Grade by weight, then a skill of that grade at equal odds; a skill already owned turns into 미네랄
 function rollSkill(k) {
   const pw = skPoolW(k), w = DRAW_GRADES.map(g => pw[g]), ids = Object.keys(ESKILL);
   let grade = DRAW_GRADES[rollGrade(w)], pool = ids.filter(id => ESKILL[id].grade === grade && skInPool(k, id));
   if (!pool.length) { pool = ids; grade = null; }
   const id = pool[Math.floor(Math.random() * pool.length)];
   if (!save.skills.includes(id)) { save.skills.push(id); return { id, res: 'new' }; }
-  if (skLv(id) >= skillMaxLv()) { const d = SKILL_GACHA.dupe[ESKILL[id].grade] || 0; save.dust += d; return { id, res: 'dup', dust: d }; } // max level: Star Dust
+  if (skLv(id) >= skillMaxLv()) { const d = SKILL_GACHA.dupe[ESKILL[id].grade] || 0; save.dust += d; return { id, res: 'dup', dust: d }; } // max level: 미네랄
   save.skillCopies[id] = (save.skillCopies[id] || 0) + 1;
   let up = false;
   while (skLv(id) < skillMaxLv() && save.skillCopies[id] >= skNeed(id)) { save.skillCopies[id] -= skNeed(id); save.skillLv[id] = skLv(id) + 1; up = true; }
@@ -666,7 +697,7 @@ function showSkillResult(list, title) {
   persist(); renderTopBar();
   const card = (r, i) => { const d = ESKILL[r.id], col = SKILL_GRADES[d.grade].col; return `<div class="gcard skill" style="--g:${col};animation-delay:${i * 70}ms">
       <img class="sk-ic" src="img/sk_${(GSKILL[d.type] || GSKILL.meteor).icon}.png" width="48" height="48" alt="" aria-hidden="true">
-      <b>${d.name}</b><span>${skillChip(d.grade)} ${catChip(d)}</span>${r.res === 'new' ? '<em class="new">NEW</em>' : r.res === 'up' ? `<em class="up">Lv ${r.lv} 달성</em>` : r.res === 'copy' ? `<em>누적 ${r.copies}/${r.need}</em>` : `<em>MAX · Star Dust +${fmt(r.dust)}</em>`}</div>`; };
+      <b>${d.name}</b><span>${skillChip(d.grade)} ${catChip(d)}</span>${r.res === 'new' ? '<em class="new">NEW</em>' : r.res === 'up' ? `<em class="up">Lv ${r.lv} 달성</em>` : r.res === 'copy' ? `<em>누적 ${r.copies}/${r.need}</em>` : `<em>MAX · 미네랄 +${fmt(r.dust)}</em>`}</div>`; };
   openModal(`<h3>${title}</h3><div class="gres">${list.map(card).join('')}</div>
     <p class="mtxt">새 스킬은 행성 탭에서 장착할 수 있어요.</p>
     <div class="mbtns"><button class="cta sm" data-act="ok" type="button">확인</button></div>`, () => { closeModal(); setTab(tab); });
@@ -692,10 +723,10 @@ function renderStore() {
         </section>`; }).join('') : '';
   const top = t === 'con' || t === 'skill' ? banners.slice(0, 2) : banners; // 별자리·스킬 탭: 배너 최대 2개
   const odds = t === 'con' ? `${Object.keys(GACHA).map(conOddsHtml).join('')}
-      <h4>보물 상자 1개</h4><p class="mtxt">성운 스킨 ${pct(CHEST_ODDS.skin)} · Star Dust ${pct(CHEST_ODDS.dust)} · Star Piece ${pct(CHEST_ODDS.piece)} · 별자리 카드 ${pct(CHEST_ODDS.con)} (성운 스킨을 모두 가지면 Star Dust로 바뀌어요)</p>
-      <p class="mtxt">이미 가진 별자리는 더 높은 등급이면 등급이 오르고, 아니면 Star Dust로 바뀌어요. 스페셜 스킨은 별자리 탭에서만 구매할 수 있어요.</p>`
+      <h4>보물 상자 1개</h4><p class="mtxt">성운 스킨 ${pct(CHEST_ODDS.skin)} · 미네랄 ${pct(CHEST_ODDS.dust)} · 별모래 ${pct(CHEST_ODDS.piece)} · 별자리 카드 ${pct(CHEST_ODDS.con)} (성운 스킨을 모두 가지면 미네랄로 바뀌어요)</p>
+      <p class="mtxt">이미 가진 별자리는 더 높은 등급이면 등급이 오르고, 아니면 미네랄로 바뀌어요. 스페셜 스킨은 별자리 탭에서만 구매할 수 있어요.</p>`
     : t === 'skill' ? `${SKILL_DRAWS.map(skillOddsHtml).join('')}
-      <p class="mtxt">등급 안에서는 스킬마다 같은 확률이에요. 이미 가진 스킬은 누적돼서 레벨이 올라요 (최고 레벨이면 Star Dust). UR 고유 스킬은 행성마다 정해져 있어 뽑기에 나오지 않아요.</p>` : '';
+      <p class="mtxt">등급 안에서는 스킬마다 같은 확률이에요. 이미 가진 스킬은 누적돼서 레벨이 올라요 (최고 레벨이면 미네랄). UR 고유 스킬은 행성마다 정해져 있어 뽑기에 나오지 않아요.</p>` : '';
   $('pane-store').innerHTML = `
     <nav class="store-tabs" aria-label="상점 분류">${Object.entries(SHOP_TABS).map(([k, n]) => `<button type="button" data-stab="${k}" aria-pressed="${k === t}">${n}</button>`).join('')}</nav>
     ${top.map(shopBanner).join('')}
@@ -749,8 +780,8 @@ function buyProduct(p) {
   const r = p.reward || {}, extra = [], cards = [];
   save.shopBuys = { ...(save.shopBuys || {}), [p.id]: shopBought(p) + 1 };
   if (r.ads) { save.adPass = true; extra.push('광고 제거 적용'); }
-  if (r.piece > 0) { save.piece += r.piece; extra.push(`Star Piece +${fmt(r.piece)}`); }
-  if (r.dust > 0) { save.dust += r.dust; extra.push(`Star Dust +${fmt(r.dust)}`); }
+  if (r.piece > 0) { save.piece += r.piece; extra.push(`별모래 +${fmt(r.piece)}`); }
+  if (r.dust > 0) { save.dust += r.dust; extra.push(`미네랄 +${fmt(r.dust)}`); }
   if (r.con && CON[r.con]) cards.push(grantCon(r.con, clamp(r.grade | 0, 0, GRADES.length - 1)));
   if (r.skill && ESKILL[r.skill]) {
     if (!save.skills.includes(r.skill)) save.skills.push(r.skill); else save.skillCopies[r.skill] = (save.skillCopies[r.skill] || 0) + 1;
@@ -924,7 +955,7 @@ function lvInfo(id, own) {
   return `<div class="lv-box"><b>Lv ${lv} / ${max}</b> <small>레벨당 +${b.up}% · 현재 +${pctUp}%</small>
     ${own && next ? `<div class="bar"><i style="width:${Math.min(100, (save.skillCopies[id] || 0) / skNeed(id) * 100)}%"></i></div>
       <small>같은 스킬 ${save.skillCopies[id] || 0} / ${skNeed(id)}개 모으면 Lv ${lv + 1}: ${skillDesc(next)}</small>`
-      : own ? '<small>최고 레벨이에요. 더 뽑히면 Star Dust로 바뀌어요.</small>' : `<small>뽑으면 Lv 1. 같은 스킬을 더 뽑으면 레벨이 올라요 (Lv 2까지 ${SKILL_LV[0].need}개).</small>`}</div>`;
+      : own ? '<small>최고 레벨이에요. 더 뽑히면 미네랄로 바뀌어요.</small>' : `<small>뽑으면 Lv 1. 같은 스킬을 더 뽑으면 레벨이 올라요 (Lv 2까지 ${SKILL_LV[0].need}개).</small>`}</div>`;
 }
 $('pane-skills').addEventListener('click', e => {
   const f = e.target.closest('[data-skf]'); if (f) { skFilter[f.dataset.skf] = f.dataset.v; renderSkills(); return; }
@@ -1418,7 +1449,7 @@ function finishBattle(win) {
     ? `${G.me.planet.name} 행성계가 ${G.zone.name} ${G.wave}웨이브에서 무너졌어요. 전투 Lv ${G.lv}까지 성장했어요. 최고 기록 WAVE ${save.best}.`
     : `${G.ghost.name}의 ${G.ghost.planet} 행성계와 싸웠어요. 전적 ${save.wins}승 ${save.losses}패.`;
   $('resRewards').innerHTML = [`<span class="dust">+${fmt(dust)}</span>`, `<span>상자 게이지 +${chest}</span>`, `<span>계정 경험치 +${xp}</span>`,
-    up.up ? `<span class="lvup-tag">계정 Lv ${save.lv} 달성 · 에너지 가득 · Star Dust +${fmt(up.dust)} · Star Piece +${fmt(up.piece)}</span>` : ''].join('');
+    up.up ? `<span class="lvup-tag">계정 Lv ${save.lv} 달성 · 에너지 가득 · 미네랄 +${fmt(up.dust)} · 별모래 +${fmt(up.piece)}</span>` : ''].join('');
   $('resPerks').innerHTML = arcade ? G.taken.map(t => `<span>${t}</span>`).join('') : '';
   $('retryBtn').textContent = arcade ? '다시 출항' : '다른 상대와 대전';
   $('hudTop').hidden = true; $('hudBot').hidden = true; $('lvup').hidden = true; $('resultScr').hidden = false;
@@ -1428,7 +1459,7 @@ $('lobbyBtn').addEventListener('click', () => { $('resultScr').hidden = true; en
 
 /* ---------- Pause menu ---------- */
 // 일시정지: the skills picked up this run (one orb per stat card / awakening, with its level),
-// a damage-by-constellation view (top-right button), Star Dust earned so far, and sound · resume · home.
+// a damage-by-constellation view (top-right button), 미네랄 earned so far, and sound · resume · home.
 const arcadeDust = () => 120 * G.wave + 20 * G.kills;
 function pauseSkills() {
   const out = [];
@@ -1479,7 +1510,7 @@ $('pauseStats').addEventListener('click', () => { $('pauseStats').setAttribute('
 $('restartBtn').addEventListener('click', () => {
   if (!confirmTap('restartBtn', `한 번 더 누르면 처음부터 다시 시작해요 (보상 없음 · 에너지 ${STAMINA.cost} 소모)`)) return;
   if (!(G.state === 'fight' || G.state === 'clear' || G.state === 'intro')) return;
-  if (!useStamina()) return;
+  if (!useStamina(G.mode)) return;
   setPaused(false); startRun(G.mode);
 });
 $('quitBtn').addEventListener('click', () => {
@@ -1500,7 +1531,7 @@ function frame(now) {
   if (TEAM_PV && tab === 'team' && !$('shell').hidden && TEAM_PV.canvas.isConnected) drawPreview(TEAM_PV.canvas, TEAM_PV.sys, now / 1000, ddt);
   if (G.state === 'home') {
     updateHome(ddt); drawHome(now / 1000);
-    incT += ddt; if (incT > 1 && tab === 'home') { incT = 0; renderHome(); }
+    incT += ddt; if (incT > 1) { incT = 0; if (tab === 'home') renderHome(); else renderEnergy(); }
   } else if (G.state === 'title') { drawBg(now / 1000); }
   else {
     if (!G.paused && !G.choosing) update(ddt);

@@ -184,7 +184,7 @@ function gateHtml() {
 
 /* ---------- 추가 항목: skins / planet skins / orbit skins created here (balance.js applyContent) ---------- */
 const CT_META = {
-  skins:  { title: '스킨', add: '스킨 추가', desc: '별자리에 새 스킨을 더해요. 성운 = 보물 상자에서 나옴, 스페셜 = Star Piece로 구매.' },
+  skins:  { title: '스킨', add: '스킨 추가', desc: '별자리에 새 스킨을 더해요. 성운 = 보물 상자에서 나옴, 스페셜 = 별모래로 구매.' },
   pskins: { title: '행성 스킨', add: '행성 스킨 추가', desc: '모든 행성에 쓸 수 있는 색(틴트)과 보너스예요.' },
   oskins: { title: '궤도 스킨', add: '궤도 스킨 추가', desc: '궤도 모양은 기존 4가지 중에서 골라요.' },
 };
@@ -225,7 +225,7 @@ function skinForm(d) {
       <span class="fx-desc">${STAT[st.key] ? STAT[st.key].txt(STAT[st.key].v) : ''}</span></div>`).join('');
   return `<div class="ct-grid">
       ${field('별자리', sel(k, d, 'con', ALL_CONS.map(c => opt(c.id, `${c.name}자리`, d.con)).join('')))}
-      ${field('등급', sel(k, d, 'tier', opt('nebula', '성운 (보물 상자)', d.tier) + opt('supernova', `스페셜 (구매 ${SKIN_TIER.supernova.price} Star Piece)`, d.tier)))}
+      ${field('등급', sel(k, d, 'tier', opt('nebula', '성운 (보물 상자)', d.tier) + opt('supernova', `스페셜 (구매 ${SKIN_TIER.supernova.price} 별모래)`, d.tier)))}
       ${field('이름', inp(k, d, 'name', 'text', d.name))}
       ${field('설명', inp(k, d, 'sig', 'text', d.sig), true)}
       ${field('공격 방식', sel(k, d, 'style', opt('', `별자리 기본 (${STYLE_LABEL[con.style]})`, d.style || '') + Object.entries(STYLE_LABEL).map(([v, l]) => opt(v, l, d.style)).join('')))}
@@ -238,7 +238,7 @@ function skinForm(d) {
 function cosmeticForm(k, d) {
   return `<div class="ct-grid">
       ${field('이름', inp(k, d, 'name', 'text', d.name))}
-      ${field('가격 (Star Piece)', inp(k, d, 'price', 'int', d.price))}
+      ${field('가격 (별모래)', inp(k, d, 'price', 'int', d.price))}
       ${k === 'pskins' ? field('색', inp(k, d, 'tint', 'color', rgbToHex(d.tint))) : field('모양', sel(k, d, 'look', Object.entries(ORBIT_LOOKS).map(([v, l]) => opt(v, l, d.look)).join('')))}
       ${BONUS[k].map(([b, l]) => field(`${l} (%)`, inp(k, d, `bonus/${b}`, 'pct', +(((d.bonus || {})[b] || 0) * 100).toFixed(4)))).join('')}
       ${field('설명', inp(k, d, 'flavor', 'text', d.flavor), true)}
@@ -249,7 +249,7 @@ function itemCard(k, d) {
   const saved = (ADM.savedContent[k] || {})[d.id], released = ((liveRel().content || {})[k] || {})[d.id];
   const tag = !saved ? '<span class="ad-chip gold">저장 전</span>' : !sameVal(saved, d) ? '<span class="ad-chip gold">변경됨</span>'
     : !sameVal(released, d) ? '<span class="ad-chip warn">배포 대기</span>' : '<span class="ad-chip ok">게임 적용 중</span>';
-  const sub = k === 'skins' ? `${(CON[d.con] || {}).name || '?'}자리 · ${(SKIN_TIER[d.tier] || {}).name || '?'}` : `${d.price ?? '?'} Star Piece`;
+  const sub = k === 'skins' ? `${(CON[d.con] || {}).name || '?'}자리 · ${(SKIN_TIER[d.tier] || {}).name || '?'}` : `${d.price ?? '?'} 별모래`;
   return `<article class="ct-card${probs.length ? ' bad' : ''}">
     <header><button class="ct-head" type="button" data-ctopen="${k}|${d.id}" aria-expanded="${open}"><b>${esc(d.name || '(이름 없음)')}</b><small>${esc(sub)}</small></button>
       ${tag}<button class="ghost sm" type="button" data-ctdel="${k}|${d.id}">삭제</button></header>
@@ -394,7 +394,7 @@ function playerDetail(p) {
   let s = null; try { s = JSON.parse(p.data); } catch {}
   if (!s) return '<p class="empty">저장 데이터를 읽지 못했어요.</p>';
   const cons = Object.entries(s.cons || {}).map(([id, c]) => `${(CON[id] || {}).name || id}(${(GRADES[c.g] || {}).name || c.g})`).join(', ');
-  const rows = [['Star Dust', fmtN(s.dust)], ['Star Piece', fmtN(s.piece)], ['레벨 · 경험치', `Lv ${s.lv} · ${fmtN(s.xp)}`], ['최고 웨이브', s.best || 0],
+  const rows = [['미네랄', fmtN(s.dust)], ['별모래', fmtN(s.piece)], ['레벨 · 경험치', `Lv ${s.lv} · ${fmtN(s.xp)}`], ['최고 웨이브', s.best || 0],
     ['대전', `${s.wins || 0}승 ${s.losses || 0}패`], ['별자리', cons || '-'], ['팀', (s.team || []).map(id => (CON[id] || {}).name || id).join(', ') || '-'],
     ['행성', Object.entries(s.planets || {}).map(([id, x]) => `${(PLANET[id] || {}).name || id} Lv ${x.lv}`).join(', ')], ['광고 제거', s.adPass ? '구매함' : '-'],
     ['생일', s.birthday ? `${s.birthday[0]}월 ${s.birthday[1]}일` : '-']];

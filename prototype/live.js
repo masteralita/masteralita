@@ -15,29 +15,33 @@ const day = t => new Date(t).toLocaleDateString('ko-KR', { month: 'numeric', day
 const LIVE = window.LIVE = { mail: [], notices: [], legal: null };
 const fb = () => CLOUD.fb, D = (...p) => fb().F.doc(fb().db, ...p), C = p => fb().F.collection(fb().db, p);
 
-LIVE.open = async name => {
+LIVE.open = async (name, arg) => {
   if (!await ready()) { toast('서버에 연결되지 않았어요. 잠시 후 다시 시도해 주세요'); return; }
-  ({ ranking: openRanking, mailbox: openMailbox, notices: openNotices, coupon: openCoupon,
+  ({ ranking: () => openRanking(arg), mailbox: openMailbox, notices: openNotices, coupon: openCoupon,
      terms: () => openDoc('terms', '이용약관'), privacy: () => openDoc('privacy', '개인정보 처리방침') })[name]?.();
 };
 document.querySelector('.side-icons').addEventListener('click', e => { const b = e.target.closest('[data-live]'); if (b) LIVE.open(b.dataset.live); });
 
-/* ---------- 랭킹: best wave, standard competition ranking (ties share a rank) ---------- */
-async function openRanking() {
-  openModal('<h3>랭킹 <small>최고 웨이브</small></h3><p class="mtxt">불러오는 중…</p>');
+/* ---------- 랭킹: 최고 웨이브 (best) or 전투력 (power), standard competition ranking (ties share a rank) ---------- */
+async function openRanking(kind = 'best') {
+  const K = kind === 'power' ? { f: 'power', h: '전투력', v: r => `전투력 ${fmt(r.power)}`, none: '전투력 기록이 없어요' } : { f: 'best', h: '최고 웨이브', v: r => `WAVE ${r.best}`, none: '아케이드 기록이 없어요' };
+  const tabs = `<div class="lv-tabs">${[['best', '최고 웨이브'], ['power', '전투력']].map(([k, l]) => `<button class="chip" aria-pressed="${k === kind}" data-act="${k}" type="button">${l}</button>`).join('')}</div>`;
+  const onAct = act => { if (act === 'close') closeModal(); else if (act !== kind && (act === 'best' || act === 'power')) openRanking(act); };
+  openModal(`<h3>랭킹 <small>${K.h}</small></h3>${tabs}<p class="mtxt">불러오는 중…</p>`, onAct);
   const { F } = fb(), me = CLOUD.uid, s = window.__save();
+  const myVal = kind === 'power' ? Math.round(teamPower()) : s.best;
   try {
-    const snap = await F.getDocs(F.query(C('leaderboard'), F.orderBy('best', 'desc'), F.limit(60)));
-    const rows = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(r => !r.hidden).slice(0, 50);
-    rows.forEach((r, i) => { r.rank = i && r.best === rows[i - 1].best ? rows[i - 1].rank : i + 1; });
+    const snap = await F.getDocs(F.query(C('leaderboard'), F.orderBy(K.f, 'desc'), F.limit(60)));
+    const rows = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(r => !r.hidden && r[K.f] > 0).slice(0, 50);
+    rows.forEach((r, i) => { r.rank = i && r[K.f] === rows[i - 1][K.f] ? rows[i - 1].rank : i + 1; });
     const mine = rows.find(r => r.uid === me);
     let myRank = mine ? mine.rank : null;
-    if (!myRank && s.best) myRank = (await F.getCountFromServer(F.query(C('leaderboard'), F.where('best', '>', s.best)))).data().count + 1;
-    openModal(`<h3>랭킹 <small>최고 웨이브 · 상위 50명</small></h3>
-      <div class="lv-me"><span>${esc(s.name || '나')}</span><span>${s.best ? `<b>${myRank}위</b> · WAVE ${s.best}` : '아케이드 기록이 없어요'}</span></div>
+    if (!myRank && myVal) myRank = (await F.getCountFromServer(F.query(C('leaderboard'), F.where(K.f, '>', myVal)))).data().count + 1;
+    openModal(`<h3>랭킹 <small>${K.h} · 상위 50명</small></h3>${tabs}
+      <div class="lv-me"><span>${esc(s.name || '나')}</span><span>${myVal ? `<b>${myRank}위</b> · ${K.v({ best: s.best, power: myVal })}` : K.none}</span></div>
       <ol class="lv-list">${rows.length ? rows.map(r => `<li class="lv-row${r.uid === me ? ' me' : ''}"><span class="rk${r.rank <= 3 ? ' top' : ''}">${r.rank}</span>
-        <b>${esc(r.name)}</b><em>WAVE ${r.best}</em><small>Lv ${r.lv}${r.linked ? '' : ' · 게스트'}</small></li>`).join('') : '<li class="mtxt">아직 기록이 없어요. 첫 번째가 되어 보세요!</li>'}</ol>
-      <div class="mbtns"><button class="cta sm" data-act="close" type="button">닫기</button></div>`, act => { if (act === 'close') closeModal(); });
+        <b>${esc(r.name)}</b><em>${K.v(r)}</em><small>Lv ${r.lv}${r.linked ? '' : ' · 게스트'}</small></li>`).join('') : '<li class="mtxt">아직 기록이 없어요. 첫 번째가 되어 보세요!</li>'}</ol>
+      <div class="mbtns"><button class="cta sm" data-act="close" type="button">닫기</button></div>`, onAct);
   } catch (err) { console.warn('ranking', err); openModal('<h3>랭킹</h3><p class="mtxt">랭킹을 불러오지 못했어요.</p><div class="mbtns"><button class="cta sm" data-act="close" type="button">닫기</button></div>', () => closeModal()); }
 }
 

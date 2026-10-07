@@ -451,9 +451,9 @@ function skillAtLv(s, lv) {
   else o.v = +Math.min(SKILL_CAP[s.type] || 99, s.v * m).toFixed(4);
   return o;
 }
-// 스킬 뽑기 (상점): free = 골드 (Star Dust, R~SSR), paid = 별모래 (Star Piece, R~MR); weights per grade, and Star Dust paid back for a skill already owned
+// 스킬 뽑기 (상점): free = 미네랄 (dust, R~SSR), paid = 별모래 (piece, R~MR); weights per grade, and 미네랄 paid back for a skill already owned
 const SKILL_GACHA = {
-  free: { name:'골드 스킬 뽑기', cur:'dust',  cost:5000, cost10:45000, w:{ R:75, SR:22, SSR:3, LR:0, MR:0 } },
+  free: { name:'미네랄 스킬 뽑기', cur:'dust',  cost:5000, cost10:45000, w:{ R:75, SR:22, SSR:3, LR:0, MR:0 } },
   paid: { name:'별모래 스킬 뽑기', cur:'piece', cost:250,  cost10:2250,  w:{ R:55, SR:28, SSR:12, LR:4, MR:1 } },
   dupe: { R:200, SR:600, SSR:2000, LR:4000, MR:8000 },
 };
@@ -508,7 +508,7 @@ const GRADES = [
   { name:'레전드', en:'LEGEND',    col:'#ff3d8b', mult:1.72 },
 ];
 const GACHA = {
-  gold: { name:'골드 뽑기', cur:'dust',  cost:3000, cost10:27000, w:[50, 28, 15, 5, 1.7, .3] },
+  gold: { name:'미네랄 뽑기', cur:'dust',  cost:3000, cost10:27000, w:[50, 28, 15, 5, 1.7, .3] },
   paid: { name:'별모래 뽑기', cur:'piece', cost:300,  cost10:2700,  w:[0, 0, 55, 28, 13, 4] },
 };
 
@@ -522,7 +522,7 @@ const SHOP_TABS = { rec:'추천', con:'별자리', skill:'스킬', piece:'별모
 const SHOP_TYPES = { always:'상시', banner:'배너' };
 const SHOP_DEFAULT = [
   { id:'noads', tab:'rec', type:'always', order:1, name:'광고 제거', desc:'모든 광고 제거 · 로비 보물 상자와 광고 보상을 광고 없이 바로 받아요', cur:'krw', price:9900, limit:1, start:'', end:'', reward:{ ads:true } },
-  { id:'pkg_oph', tab:'con', type:'banner', order:1, name:'특수 별자리 패키지', desc:'뱀주인자리 (에픽) 확정 + Star Piece 500', cur:'krw', price:9900, limit:0, start:'', end:'', reward:{ con:'oph', grade:4, piece:500 } },
+  { id:'pkg_oph', tab:'con', type:'banner', order:1, name:'특수 별자리 패키지', desc:'뱀주인자리 (에픽) 확정 + 별모래 500', cur:'krw', price:9900, limit:0, start:'', end:'', reward:{ con:'oph', grade:4, piece:500 } },
   ...[[100, 1200], [400, 4900], [1200, 14000], [2700, 29000], [4500, 49000], [9000, 99000]].map(([n, p], i) =>
     ({ id:`piece_${n}`, tab:'piece', type:'always', order:i + 1, name:`별모래 ${n.toLocaleString('ko-KR')}`, desc:'', cur:'krw', price:p, limit:0, start:'', end:'', reward:{ piece:n } })),
 ];
@@ -554,14 +554,14 @@ const WAVE = { planetHp:900, planetGrowth:1.2, statGrowth:1.13, deepFrom:20, dee
   rockHp:100, meteorHp:35, shipHp:48, shipAtk:16, rockPct:.06, meteorPct:.035, shipMax:30 };
 // 대전 블랙홀: 30초에 열려 매초 양쪽 행성(dmg)과 모든 별자리(conDmg)에 방어를 무시하는 고정 피해
 const HOLE = { at:30, dmg:50, conDmg:20, every:1 };
-/* ---------- 에너지: 대전·아케이드 한 판마다 cost 소모, regenMin분마다 1 충전 (접속하지 않아도 시간으로 계산) ---------- */
-const STAMINA = { max:10, regenMin:60, cost:1 };
+/* ---------- 에너지: 배틀(최대 max)과 아케이드(최대 arcadeMax)가 따로, 한 판마다 cost 소모, regenMin분마다 1 충전 (접속하지 않아도 시간으로 계산) ---------- */
+const STAMINA = { max:10, arcadeMax:15, regenMin:60, cost:1 };
 /* ---------- 계정 레벨: 판이 끝나면 경험치를 받고, 필요 경험치 = need × 현재 레벨 ----------
    경험치: 아케이드 arcadeXp × 도달 웨이브 · 대전 승리 winXp / 패배 loseXp
-   레벨업 보상: 에너지 가득 충전 · Star Dust dust × 새 레벨 · Star Piece piece, 방치 수입은 레벨마다 INCOME.dustPerLv 증가 */
+   레벨업 보상: 에너지 가득 충전 · 미네랄 dust × 새 레벨 · 별모래 piece, 방치 수입은 레벨마다 INCOME.dustPerLv 증가 */
 const ACCOUNT = { need:100, arcadeXp:12, winXp:40, loseXp:15, dust:300, piece:30 };
 const CHEST_STEP = 10, CHEST_MAX = 1000;
-// per chest: 성운 스킨 → Star Dust → Star Piece → 별자리 카드 (cumulative bands)
+// per chest: 성운 스킨 → 미네랄 → 별모래 → 별자리 카드 (cumulative bands)
 const CHEST_ODDS = { skin:.12, dust:.5, piece:.23, con:.15 };
 const accNeed = lv => ACCOUNT.need * lv;
 const ZODIAC_DATES = [ // 생일 → 별자리 (별자리 시트 조건 열)
@@ -570,7 +570,7 @@ const ZODIAC_DATES = [ // 생일 → 별자리 (별자리 시트 조건 열)
 ];
 function zodiacOf(m, d) { for (const [id, mm, dd] of ZODIAC_DATES) if (m < mm || (m === mm && d <= dd)) return id; return 'cap'; }
 /* ---------- Rewards (우편함 · 쿠폰): { type, n, id?, g? } ---------- */
-const REWARD_TYPES = { dust:'Star Dust', piece:'Star Piece', chest:'보물 상자 칸', con:'별자리 카드', skin:'스킨' };
+const REWARD_TYPES = { dust:'미네랄', piece:'별모래', chest:'보물 상자 칸', con:'별자리 카드', skin:'스킨' };
 function rewardText(r) {
   const n = Math.max(1, r.n | 0);
   if (r.type === 'con') return `${CON[r.id] ? CON[r.id].name + '자리' : '별자리'} ${(GRADES[r.g | 0] || GRADES[0]).name} 카드 ×${n}`;

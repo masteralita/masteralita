@@ -70,9 +70,9 @@ const BAL_SECTIONS = [
     rows: SKILL_LV.map((_, i) => ({ id:String(i), label:`Lv ${i + 1} → ${i + 2}` })),
     cols: [{ key:'need', label:'필요 개수', kind:'int' }, { key:'step', label:'구간 배율', kind:'num' }],
     path: (r, c) => `sklv/${r}/${c}` },
-  { id:'skgacha', title:'스킬 뽑기', desc:'등급별 뽑기 가중치 (가중치 합 기준 확률)와 최고 레벨 스킬이 또 나왔을 때 돌려주는 Star Dust',
+  { id:'skgacha', title:'스킬 뽑기', desc:'등급별 뽑기 가중치 (가중치 합 기준 확률)와 최고 레벨 스킬이 또 나왔을 때 돌려주는 미네랄',
     rows: DRAW_GRADES.map(g => ({ id:g, label:g, sub:SKILL_GRADES[g].name })),
-    cols: [{ key:'free', label:'골드 뽑기 가중치', kind:'num' }, { key:'paid', label:'별모래 뽑기 가중치', kind:'num' }, { key:'dupe', label:'최고 레벨 중복 시 Star Dust', kind:'int' }],
+    cols: [{ key:'free', label:'미네랄 뽑기 가중치', kind:'num' }, { key:'paid', label:'별모래 뽑기 가중치', kind:'num' }, { key:'dupe', label:'최고 레벨 중복 시 미네랄', kind:'int' }],
     path: (r, c) => c === 'dupe' ? `skgacha/dupe/${r}` : `skgacha/${c}/w/${r}` },
   { id:'orbit', title:'궤도', desc:'궤도 기본 능력치 (그 궤도의 별자리에게 적용)',
     rows: [{ id:'single/0', label:'단일 궤도', sub:'궤도 1개 행성' }, { id:'dual/0', label:'안쪽 궤도', sub:'궤도 2개 행성' }, { id:'dual/1', label:'바깥 궤도', sub:'궤도 2개 행성' }],
@@ -92,29 +92,29 @@ const BAL_SECTIONS = [
     path: (r, c) => `oskin/${r}/${c}` },
   { id:'grade', title:'등급·뽑기', desc:'등급 배율과 뽑기 가중치 (가중치 합 기준 확률)',
     rows: GRADES.map((g, i) => ({ id:String(i), label:g.name, sub:g.en })),
-    cols: [{ key:'mult', label:'능력치 배율', kind:'num' }, { key:'gold', label:'골드 뽑기 가중치', kind:'num' }, { key:'paid', label:'별모래 뽑기 가중치', kind:'num' }],
+    cols: [{ key:'mult', label:'능력치 배율', kind:'num' }, { key:'gold', label:'미네랄 뽑기 가중치', kind:'num' }, { key:'paid', label:'별모래 뽑기 가중치', kind:'num' }],
     path: (r, c) => c === 'mult' ? `grade/${r}/mult` : `gacha/${c}/w/${r}` },
   { id:'econ', title:'경제·확률', desc:'가격, 확률, 보상량', kv: [
-      ['gacha/gold/cost', '골드 뽑기 1회 (Star Dust)', 'int'], ['gacha/gold/cost10', '골드 뽑기 10회 (Star Dust)', 'int'],
-      ['gacha/paid/cost', '별모래 뽑기 1회 (Star Piece)', 'int'], ['gacha/paid/cost10', '별모래 뽑기 10회 (Star Piece)', 'int'],
-      ['skgacha/free/cost', '골드 스킬 뽑기 1회 (Star Dust)', 'int'], ['skgacha/free/cost10', '골드 스킬 뽑기 10회 (Star Dust)', 'int'],
-      ['skgacha/paid/cost', '별모래 스킬 뽑기 1회 (Star Piece)', 'int'], ['skgacha/paid/cost10', '별모래 스킬 뽑기 10회 (Star Piece)', 'int'],
-      ['tier/supernova/price', '스페셜 스킨 가격 (Star Piece)', 'int'],
-      ['chest/skin', '보물 상자 · 성운 스킨 확률', 'pct'], ['chest/dust', '보물 상자 · Star Dust 확률', 'pct'],
-      ['chest/piece', '보물 상자 · Star Piece 확률', 'pct'], ['chest/con', '보물 상자 · 별자리 카드 확률', 'pct'],
-      ['adchest/reward/0', '광고 상자 보상 최소 (Star Piece)', 'int'], ['adchest/reward/1', '광고 상자 보상 최대 (Star Piece)', 'int'],
+      ['gacha/gold/cost', '미네랄 뽑기 1회 (미네랄)', 'int'], ['gacha/gold/cost10', '미네랄 뽑기 10회 (미네랄)', 'int'],
+      ['gacha/paid/cost', '별모래 뽑기 1회 (별모래)', 'int'], ['gacha/paid/cost10', '별모래 뽑기 10회 (별모래)', 'int'],
+      ['skgacha/free/cost', '미네랄 스킬 뽑기 1회 (미네랄)', 'int'], ['skgacha/free/cost10', '미네랄 스킬 뽑기 10회 (미네랄)', 'int'],
+      ['skgacha/paid/cost', '별모래 스킬 뽑기 1회 (별모래)', 'int'], ['skgacha/paid/cost10', '별모래 스킬 뽑기 10회 (별모래)', 'int'],
+      ['tier/supernova/price', '스페셜 스킨 가격 (별모래)', 'int'],
+      ['chest/skin', '보물 상자 · 성운 스킨 확률', 'pct'], ['chest/dust', '보물 상자 · 미네랄 확률', 'pct'],
+      ['chest/piece', '보물 상자 · 별모래 확률', 'pct'], ['chest/con', '보물 상자 · 별자리 카드 확률', 'pct'],
+      ['adchest/reward/0', '광고 상자 보상 최소 (별모래)', 'int'], ['adchest/reward/1', '광고 상자 보상 최대 (별모래)', 'int'],
       ['adchest/cd/0', '광고 상자 등장 간격 최소 (초)', 'int'], ['adchest/cd/1', '광고 상자 등장 간격 최대 (초)', 'int'],
       ['adchest/hp', '광고 상자 격추 횟수', 'int'], ['adchest/life', '광고 상자 유지 시간 (초)', 'int'],
-      ['income/dustBase', '방치 수입 · Star Dust 기본 (시간당)', 'int'], ['income/dustPerLv', '방치 수입 · 레벨당 추가', 'int'],
-      ['income/pieceRate', '방치 수입 · Star Piece (시간당)', 'num'], ['income/capHours', '방치 수입 · 최대 누적 (시간)', 'int'],
-      ['slot/act/cost', '액티브 슬롯 열기 (Star Dust)', 'int'], ['slot/pas/cost', '패시브 슬롯 열기 (Star Dust)', 'int'], ['slot/lim/cost', '한정 슬롯 열기 (Star Piece)', 'int'],
+      ['income/dustBase', '방치 수입 · 미네랄 기본 (시간당)', 'int'], ['income/dustPerLv', '방치 수입 · 레벨당 추가', 'int'],
+      ['income/pieceRate', '방치 수입 · 별모래 (시간당)', 'num'], ['income/capHours', '방치 수입 · 최대 누적 (시간)', 'int'],
+      ['slot/act/cost', '액티브 슬롯 열기 (미네랄)', 'int'], ['slot/pas/cost', '패시브 슬롯 열기 (미네랄)', 'int'], ['slot/lim/cost', '한정 슬롯 열기 (별모래)', 'int'],
       ...ENHANCE_RATE.map((_, i) => [`enhance/${i}`, `강화 성공률 +${i} → +${i + 1}`, 'pct']),
     ] },
   { id:'account', title:'에너지·계정', desc:'판마다 쓰는 에너지와 계정 레벨 (필요 경험치 = 기준 × 현재 레벨) · 대전 블랙홀', kv: [
-      ['stamina/max', '에너지 최대', 'int'], ['stamina/regenMin', '에너지 1칸 충전 시간 (분)', 'int'], ['stamina/cost', '한 판에 쓰는 에너지', 'int'],
+      ['stamina/max', '배틀 에너지 최대', 'int'], ['stamina/arcadeMax', '아케이드 에너지 최대', 'int'], ['stamina/regenMin', '에너지 1칸 충전 시간 (분)', 'int'], ['stamina/cost', '한 판에 쓰는 에너지', 'int'],
       ['account/need', '레벨업 필요 경험치 기준 (× 현재 레벨)', 'int'], ['account/arcadeXp', '아케이드 경험치 (× 도달 웨이브)', 'int'],
       ['account/winXp', '대전 승리 경험치', 'int'], ['account/loseXp', '대전 패배 경험치', 'int'],
-      ['account/dust', '레벨업 보상 Star Dust (× 새 레벨)', 'int'], ['account/piece', '레벨업 보상 Star Piece', 'int'],
+      ['account/dust', '레벨업 보상 미네랄 (× 새 레벨)', 'int'], ['account/piece', '레벨업 보상 별모래', 'int'],
       ['hole/at', '블랙홀 등장 (초)', 'int'], ['hole/dmg', '블랙홀 행성 피해 (매초)', 'int'], ['hole/conDmg', '블랙홀 별자리 피해 (매초)', 'int'],
     ] },
   { id:'wave', title:'웨이브', desc:'아케이드 난이도 곡선', kv: [
@@ -133,7 +133,7 @@ for (const s of BAL_SECTIONS) {
   else for (const r of s.rows) for (const c of s.cols) BAL_FIELDS[s.path(r.id, c.key)] = { kind: c.kind, neutral: c.neutral, label: `${r.label} · ${c.label}`, sec: s.id };
 }
 // 뽑기 관리 (관리자 [뽑기 관리]): on/off per item and draw, not shown in the 밸런스 tables
-const POOL_DRAWS = { con: [['gold', '골드 뽑기'], ['paid', '별모래 뽑기']], skill: [['free', '골드 스킬 뽑기'], ['paid', '별모래 스킬 뽑기']] };
+const POOL_DRAWS = { con: [['gold', '미네랄 뽑기'], ['paid', '별모래 뽑기']], skill: [['free', '미네랄 스킬 뽑기'], ['paid', '별모래 스킬 뽑기']] };
 for (const [kind, ids] of [['con', ALL_CONS.map(c => c.id)], ['skill', Object.keys(ESKILL)]])
   for (const id of ids) for (const [d, label] of POOL_DRAWS[kind])
     BAL_FIELDS[`pool/${kind}/${id}/${d}`] = { kind: 'bool', label: `${kind === 'con' ? `${CON[id].name}자리` : ESKILL[id].name} · ${label}`, sec: 'pool' };
@@ -262,10 +262,10 @@ const IMG_FIXED = [
   ['nav_home.png', 'ui', '메뉴 · 로비'], ['nav_team.png', 'ui', '메뉴 · 팀'], ['nav_planets.png', 'ui', '메뉴 · 행성'], ['nav_const.png', 'ui', '메뉴 · 별자리'], ['nav_store.png', 'ui', '메뉴 · 상점'],
   ['icon_mail.png', 'ui', '우편함 아이콘'], ['icon_rank.png', 'ui', '랭킹 아이콘'],
   ['btn_teal.png', 'ui', '버튼 · 청록'], ['btn_steel.png', 'ui', '버튼 · 강철'], ['btn_red.png', 'ui', '버튼 · 빨강'],
-  ['banner_ophiuchus.png', 'ui', '상점 배너 · 뱀주인'], ['banner_gold.png', 'ui', '상점 배너 · 골드 뽑기'], ['banner_premium.png', 'ui', '상점 배너 · 별모래 뽑기'],
+  ['banner_ophiuchus.png', 'ui', '상점 배너 · 뱀주인'], ['banner_gold.png', 'ui', '상점 배너 · 미네랄 뽑기'], ['banner_premium.png', 'ui', '상점 배너 · 별모래 뽑기'],
   ['card_common.png', 'ui', '카드 틀 · 커먼'], ['card_magic.png', 'ui', '카드 틀 · 매직'], ['card_rare.png', 'ui', '카드 틀 · 레어'],
   ['card_unique.png', 'ui', '카드 틀 · 유니크'], ['card_epic.png', 'ui', '카드 틀 · 에픽'], ['card_legend.png', 'ui', '카드 틀 · 레전드'],
-  ['cur_dust.png', 'item', 'Star Dust'], ['cur_piece.png', 'item', 'Star Piece'], ['chest_closed.png', 'item', '보물 상자 (로비 낙하)'], ['icon_chest.png', 'item', '보물 상자 아이콘'],
+  ['cur_dust.png', 'item', '미네랄'], ['cur_piece.png', 'item', '별모래'], ['chest_closed.png', 'item', '보물 상자 (로비 낙하)'], ['icon_chest.png', 'item', '보물 상자 아이콘'],
 ];
 // skins: { id: { con, name, tier } } — the admin passes its added skins too, so they can get art
 function imgCatalog(skins = SKIN) {
