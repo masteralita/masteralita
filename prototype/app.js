@@ -1186,6 +1186,7 @@ function openSkinList(kind, k, pid = save.mainPlanet, next = null) {
   let sel = cur;
   const item = s => `<button class="skin-item" type="button" role="radio" data-os="${s.id}" aria-checked="${s.id === sel}">
       <b>${s.name}</b><span class="mini">${Object.keys(s.bonus).length ? bonusLines(s.bonus, '').map(x => x.trim()).join(' · ') : '능력치 없음'}</span>
+      ${s.flavor ? `<span class="mini flavor">${s.flavor}</span>` : ''}
       ${s.id === cur ? '<em class="eq">장착</em>' : save[ownKey].includes(s.id) ? '<em class="own">보유</em>' : `<em class="piece">${fmt(s.price)}</em>`}
     </button>`;
   const info = () => {
@@ -1193,8 +1194,7 @@ function openSkinList(kind, k, pid = save.mainPlanet, next = null) {
     const btn = sel === cur ? '<button class="cta sm" type="button" disabled>장착 중</button>'
       : own ? '<button class="cta sm" data-act="equip" type="button">장착</button>'
       : `<button class="cta sm" data-act="buy" type="button">구매 <b class="piece">${fmt(d.price)}</b></button>`;
-    return `<p class="mtxt">${d.flavor}</p>${skinBonusText(kind, d.bonus)}
-      <div class="mbtns"><button class="ghost" data-act="close" type="button">${next ? '다음' : '취소'}</button>${btn}</div>`;
+    return `<div class="mbtns"><button class="ghost" data-act="close" type="button">${next ? '다음' : '취소'}</button>${btn}</div>`;
   };
   const title = isP ? '행성 스킨' : all || PLANET[pid].orbits === 1 ? '궤도 스킨' : `궤도 ${k + 1} 스킨`;
   openModal(`
