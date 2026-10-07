@@ -407,12 +407,13 @@ function updateHome(dt) {
     const pts = Array.from({ length: 8 }, (_, i) => [Math.cos(i / 8 * TAU) * rnd(.72, 1), Math.sin(i / 8 * TAU) * rnd(.72, 1)]);
     HOME.rocks.push({ x, y: -24, vx: (tx - x) / ((s.cy + 24) / vy), vy, r: rnd(8, 15), rot: rnd(0, TAU), vr: rnd(-1.2, 1.2), pts, v: Math.floor(Math.random() * 4), hp: 1, locked: 0 });
   }
-  // 낙하 보물상자: at most one falling or waiting at a time
+  // 보물 우주선: a UFO crosses the sky; shoot it down and it drops the reward chest. At most one flying or waiting at a time
   HOME.chestCd -= dt;
-  if (HOME.chestCd <= 0 && !HOME.loot && !HOME.rocks.some(r => r.kind === 'chest')) {
+  if (HOME.chestCd <= 0 && !HOME.loot && !HOME.rocks.some(r => r.kind === 'ufo')) {
     HOME.chestCd = rnd(...AD_CHEST.cd);
-    const x = rnd(W * .2, W * .8);
-    HOME.rocks.push({ kind: 'chest', x, y: -30, vx: (s.cx - x) / ((s.cy + 30) / 34), vy: 34, r: 15, rot: 0, vr: 0, hp: AD_CHEST.hp, locked: 0 });
+    const sky0 = HOME.skyBottom || H * .5, left = Math.random() < .5, sp = rnd(52, 64);
+    const by = 70 + (sky0 - 70) * rnd(.5, .7); // inside the band the constellations aim at
+    HOME.rocks.push({ kind: 'ufo', x: left ? -30 : W + 30, y: by, by, ph: rnd(0, TAU), vx: left ? sp : -sp, vy: 0, r: 18, rot: 0, vr: 0, hp: AD_CHEST.hp, locked: 0 });
   }
   if (HOME.loot && (HOME.loot.t += dt) > AD_CHEST.life) { HOME.loot = null; } // unclaimed chest drifts away
   const sky = HOME.skyBottom || H * .5;
@@ -421,7 +422,7 @@ function updateHome(dt) {
     if (c.cd > 0) continue;
     // aim only at meteors that are well inside the open sky and not already locked by two shots
     const skyTop = 70 + (sky - 70) * .35; // let meteors fall into view first
-    const cand = HOME.rocks.filter(r => r.hp > 0 && r.y > skyTop && r.y < sky && r.locked < (r.kind === 'chest' ? r.hp : 2));
+    const cand = HOME.rocks.filter(r => r.hp > 0 && r.y > skyTop && r.y < sky && r.locked < (r.kind === 'ufo' ? r.hp : 2) && (r.kind !== 'ufo' || (r.x > W * .25 && r.x < W * .75))); // the UFO flies into view first
     if (!cand.length) { c.cd = .1; continue; }
     const t = cand.sort((a, b) => b.y - a.y)[0];
     t.locked += 1; c.cd = 1;
@@ -431,7 +432,7 @@ function updateHome(dt) {
     const p = HOME.shots[i], dx = p.t.x - p.x, dy = p.t.y - p.y, d = Math.hypot(dx, dy);
     p.trail.push([p.x, p.y]); if (p.trail.length > 6) p.trail.shift();
     if (p.t.hp <= 0) { HOME.shots.splice(i, 1); continue; }
-    if (d < p.t.r && p.t.kind === 'chest') {
+    if (d < p.t.r && p.t.kind === 'ufo') {
       HOME.shots.splice(i, 1); p.t.hp -= 1; p.t.locked -= 1; p.t.flash = .15;
       burst(p.t.x, p.t.y, 8, '#ffe08a');
       if (p.t.hp <= 0) chestBroken(p.t);
@@ -446,9 +447,13 @@ function updateHome(dt) {
     p.vx = dx / d; p.vy = dy / d; p.x += p.vx * 420 * dt; p.y += p.vy * 420 * dt;
   }
   HOME.rocks = HOME.rocks.filter(r => {
-    r.x += r.vx * dt; r.y += r.vy * dt; r.rot += r.vr * dt;
     if (r.flash > 0) r.flash -= dt;
-    if (r.hp > 0 && r.kind === 'chest' && r.y > sky + 10) { chestBroken(r); return false; } // caught before it reaches the planet
+    if (r.kind === 'ufo') { // weaving flight across the sky; it gets away if it reaches the far side
+      r.ph += dt * 1.6; r.x += r.vx * dt; r.y = r.by + Math.sin(r.ph) * 14;
+      if (r.x < -40 || r.x > W + 40) r.hp = 0; // escaped: in-flight shots drop it
+      return r.hp > 0;
+    }
+    r.x += r.vx * dt; r.y += r.vy * dt; r.rot += r.vr * dt;
     if (r.hp > 0 && Math.hypot(r.x - s.cx, r.y - s.cy) < s.pr) { burst(r.x, r.y, 10, '#9fb8ff'); return false; } // absorbed by the planet's field
     return r.hp > 0 && r.y < H + 30;
   });
@@ -459,7 +464,21 @@ function chestBroken(r) {
   r.hp = 0;
   const sky = HOME.skyBottom || H * .5;
   HOME.loot = { x: clamp(r.x, 40, W - 40), y: clamp(r.y, 110, sky - 20), t: 0 };
-  burst(r.x, r.y, 26, '#ffd76a'); HOME.booms.push({ x: r.x, y: r.y, r: 18, t: .45, col: '#ffd76a' });
+  burst(r.x, r.y, 18, '#ffb05a'); burst(r.x, r.y, 26, '#ffd76a'); HOME.booms.push({ x: r.x, y: r.y, r: 18, t: .45, col: '#ffd76a' });
+}
+function drawUfo(r, t) { // the reward ship: arcade saucer art with a golden glow so it reads as loot
+  ctx.save(); ctx.globalAlpha = .3 + .15 * Math.sin(t * 6); ctx.fillStyle = '#ffd76a';
+  ctx.beginPath(); ctx.arc(r.x, r.y, r.r * 1.9, 0, TAU); ctx.fill(); ctx.restore();
+  const im = pxSprite('ship_saucer'), w = r.r * SHIP_LOOK.saucer.w;
+  if (im) {
+    const h = w * im.naturalHeight / im.naturalWidth, tilt = Math.cos(r.ph) * .12 * Math.sign(r.vx);
+    ctx.save(); ctx.imageSmoothingEnabled = false; ctx.translate(r.x, r.y); ctx.rotate(tilt);
+    ctx.drawImage(im, -w / 2, -h / 2, w, h);
+    if (r.flash > 0) { ctx.globalAlpha = .7; ctx.drawImage(shipWhite('saucer', im), -w / 2, -h / 2, w, h); }
+    ctx.restore();
+  } else drawChest(r.x, r.y, r.r * 2, false, r.flash);
+  for (let i = 0; i < AD_CHEST.hp; i++) { ctx.fillStyle = i < r.hp ? '#ffd76a' : 'rgba(255,255,255,.2)'; ctx.fillRect(r.x - 12 + i * 9, r.y + r.r + 6, 7, 3); }
+  if (save.settings.glow && Math.random() < .5) G.fx.push({ x: r.x - Math.sign(r.vx) * w * .45, y: r.y + rnd(-2, 2), vx: -r.vx * .4, vy: rnd(-8, 8), t: rnd(.2, .4), c: Math.random() < .5 ? '#ffd76a' : '#9fe8ff' });
 }
 function drawChest(x, y, w, open, flash) {
   const im = pxSprite('chest_closed');
@@ -492,16 +511,10 @@ function drawHome(t) {
   drawBg(t);
   const s = HOME.sys; if (!s) return;
   for (const r of HOME.rocks) {
+    if (r.kind === 'ufo') { drawUfo(r, t); continue; }
     // fiery entry trail, then the rock itself
     const sp = Math.hypot(r.vx, r.vy), ux = r.vx / sp, uy = r.vy / sp;
     if (save.settings.glow) pixelTrail(r.x, r.y, ux, uy, r.r);
-    if (r.kind === 'chest') {
-      ctx.save(); ctx.globalAlpha = .35 + .15 * Math.sin(t * 6); ctx.fillStyle = '#ffd76a';
-      ctx.beginPath(); ctx.arc(r.x, r.y, r.r * 1.9, 0, TAU); ctx.fill(); ctx.restore();
-      drawChest(r.x, r.y + Math.sin(t * 3) * 2, r.r * 2, false, r.flash);
-      for (let i = 0; i < AD_CHEST.hp; i++) { ctx.fillStyle = i < r.hp ? '#ffd76a' : 'rgba(255,255,255,.2)'; ctx.fillRect(r.x - 12 + i * 9, r.y + r.r + 6, 7, 3); }
-      continue;
-    }
     const rim = pxSprite('rock_' + (r.v || 0));
     if (rim) pxDraw(ctx, rim, r.x, r.y, r.r * 2.3, r.rot);
     else {
