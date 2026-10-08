@@ -159,6 +159,7 @@ function crash(m) {
   if (!REDUCED_MOTION) G.shake = Math.min(SHAKE_MAX, G.shake + (m.mob === 'rock' ? 4 : 2.5));
   applyDamage(P, P.maxHp * m.pct, 'phys', { color: '#ff8a9a' }); // no src: a crash can't be dodged
   G.arc.killed += 1;
+  questAdd('kill', 1, true); if (m.mob === 'boss') questAdd('boss', 1, true); // 주간 퀘스트 (app.js) · finishBattle이 저장
 }
 function shipUpdate(m, dt) {
   const A = G.arc, [sx, sy] = slotPos(m);
@@ -223,6 +224,7 @@ function arcadeClear() {
 // called from killCon for every mob my side destroys
 function arcadeKilled(m) {
   G.arc.killed += 1;
+  questAdd('kill', 1, true); if (m.mob === 'boss') questAdd('boss', 1, true); // 주간 퀘스트 (app.js) · finishBattle이 저장
   if (m.mob === 'boss') { burst(m.x, m.y, 60, '#ffe9a8'); burst(m.x, m.y, 40, '#ff7a3c'); if (!REDUCED_MOTION) G.shake = SHAKE_MAX; }
   else if (m.mob === 'rock') { burst(m.x, m.y, 14, '#c9a27a'); }
 }

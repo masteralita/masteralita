@@ -30,6 +30,7 @@
 | `cur_dust.png`, `cur_piece.png` | 128×128 | `.dust::before`, `.piece::before` |
 | `nav_store/planets/home/const/team.png` | 192×192 | `.nav button svg` 교체 |
 | `icon_mail.png`, `icon_rank.png`, `icon_chest.png` | 192×192 | 로비 우편함·랭킹, 보물 상자 |
+| `icon_quest.png` | 96×96 | 로비 퀘스트 버튼 (두루마리, SpriteCook) |
 | `banner_ophiuchus/gold/premium.webp` | 1024×~333 (3:1) | 상점 패키지 배너, 미네랄/별모래 뽑기 카드 |
 | `card_common/magic/rare/unique/epic/legend.webp` | 240×~360 | `.ccell`, `.gcard` 등급별 배경 |
 
