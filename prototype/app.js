@@ -598,7 +598,7 @@ function openAdChest() {
 }
 
 /* ---------- 퀘스트 (data.js QUEST): 로비 두루마리 버튼 · 일일 / 주간, 모두 완료하면 별모래 ---------- */
-// save.quest = { d, w: 지금 기간 (한국 시간 · 리셋 시각 기준), daily / weekly: { id: 진행 }, dDone: 오늘 일일 다 깸, dGot / wGot: 묶음 보상 받음 }
+// save.quest = { d, w: 지금 기간 (한국 시간 · 리셋 시각 기준), daily / weekly: { id: 진행 }, dx / wx: { id: 항목 경험치 받음 }, dDone: 오늘 일일 다 깸, dGot / wGot: 묶음 보상 받음 }
 const KST = 9 * 3600000, DAY_MS = 86400000;
 const qOff = () => KST - clamp(QUEST.resetHour | 0, 0, 23) * 3600000;
 const qShift = () => ((4 - (QUEST.weekDay | 0)) % 7 + 7) % 7; // 1970-01-01 was a Thursday
@@ -609,8 +609,8 @@ function questLeft(kind) { // ms until the next reset
 }
 function questSync() {
   const k = questKeys(), q = save.quest && typeof save.quest === 'object' ? save.quest : (save.quest = {});
-  if (q.d !== k.d) Object.assign(q, { d: k.d, daily: {}, dDone: false, dGot: false });
-  if (q.w !== k.w) Object.assign(q, { w: k.w, weekly: {}, wGot: false });
+  if (q.d !== k.d) Object.assign(q, { d: k.d, daily: {}, dx: {}, dDone: false, dGot: false });
+  if (q.w !== k.w) Object.assign(q, { w: k.w, weekly: {}, wx: {}, wGot: false });
   return q;
 }
 const qProg = (kind, x) => Math.min(x.n, (questSync()[kind][x.id] | 0));
@@ -627,9 +627,11 @@ function questAdd(ev, n = 1, keep = false) {
   if (!keep) persist();
   questDot();
 }
-// red dot on the scroll button: a bundle reward waiting to be claimed
+const qXp = kind => { const q = questSync(), k = kind === 'daily' ? 'dx' : 'wx'; return q[k] || (q[k] = {}); }; // 항목별 경험치 받음
+const qXpReady = kind => QUEST[kind].list.some(x => qProg(kind, x) >= x.n && !qXp(kind)[x.id]);
+// red dot on the scroll button: an item's 경험치 or a bundle reward waiting to be claimed
 function questDot() {
-  const ready = kind => !questSync()[kind === 'daily' ? 'dGot' : 'wGot'] && qAllDone(kind);
+  const ready = kind => qXpReady(kind) || (!questSync()[kind === 'daily' ? 'dGot' : 'wGot'] && qAllDone(kind));
   $('questDot').hidden = !(ready('daily') || ready('weekly'));
   return { daily: ready('daily'), weekly: ready('weekly') };
 }
@@ -647,7 +649,7 @@ function openQuests(kind = questTab) {
     return `<div class="qrow${ok ? ' done' : ''}">
       <span class="qic${ic ? '' : ' sword'}" aria-hidden="true">${ic ? `<img src="${imgUrl(ic.slice(4))}" alt="">` : ''}</span>
       <div class="qmid"><b>${x.name}</b><span class="qgauge"><i style="transform:scaleX(${p / x.n})"></i><em>${fmt(p)} / ${fmt(x.n)}</em></span></div>
-      ${ok ? '<span class="qok">완료</span>' : x.go ? `<button class="ghost sm" data-act="go" data-go="${x.go}" type="button">이동</button>` : '<span class="qok wait">진행 중</span>'}
+      ${ok ? (qXp(kind)[x.id] ? '<span class="qok">완료</span>' : `<button class="cta sm qxp" data-act="xp" data-id="${x.id}" type="button">보상 받기<small>경험치 ${fmt(QUEST.xp)}</small></button>`) : x.go ? `<button class="ghost sm" data-act="go" data-go="${x.go}" type="button">이동</button>` : '<span class="qok wait">진행 중</span>'}
     </div>`;
   };
   openModal(`<div class="quest">
@@ -664,6 +666,13 @@ function openQuests(kind = questTab) {
   </div>`, (act, b) => {
     if (act === 'close') closeModal();
     else if (act === 'tab') openQuests(b.dataset.k);
+    else if (act === 'xp') {
+      const x = Q.list.find(y => y.id === b.dataset.id), got2 = qXp(kind);
+      if (!x || got2[x.id] || qProg(kind, x) < x.n) return;
+      got2[x.id] = true; const up = gainAccXp(QUEST.xp); renderTopBar(); questDot();
+      toast(up.up ? `계정 Lv ${save.lv} 달성 · 에너지 가득 · 미네랄 +${fmt(up.dust)} · 별모래 +${fmt(up.piece)}` : `계정 경험치 +${fmt(QUEST.xp)}`);
+      openQuests(kind);
+    }
     else if (act === 'claim') {
       const q2 = questSync(), key = kind === 'daily' ? 'dGot' : 'wGot';
       if (q2[key] || !qAllDone(kind)) return;

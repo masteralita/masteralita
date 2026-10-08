@@ -605,7 +605,7 @@ const AD_CHEST = { first:[8, 14], cd:[45, 90], every:300, stay:30, hp:3, reward:
    일일 = 매일 resetHour시, 주간 = weekDay 요일 resetHour시 (0 일 · 1 월 … 6 토).
    ev: 진행이 오르는 행동 (app.js questAdd), go: '이동' 버튼이 데려가는 곳 */
 const QUEST = {
-  resetHour: 0, weekDay: 1,
+  resetHour: 0, weekDay: 1, xp: 50, // xp: 항목 하나 완료하면 '보상 받기'로 받는 계정 경험치
   daily: { reward: 50, list: [
     { id:'login',  ev:'login',  n:1, name:'로그인 1회',      go:null },
     { id:'arcade', ev:'arcade', n:1, name:'아케이드 1회',    go:'arcade' },

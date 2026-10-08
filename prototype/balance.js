@@ -119,6 +119,7 @@ const BAL_SECTIONS = [
     ] },
   { id:'quest', title:'퀘스트', desc:'로비 두루마리 버튼의 일일·주간 퀘스트. 모두 완료하면 별모래 묶음 보상. 리셋은 한국 시간 기준 (요일 0 일 · 1 월 … 6 토)', kv: [
       ['quest/resetHour', '리셋 시각 (시, 0~23)', 'int'], ['quest/weekDay', '주간 리셋 요일 (0 일 · 1 월 … 6 토)', 'int'],
+      ['quest/xp', '퀘스트 항목 완료 보상 (계정 경험치)', 'int'],
       ['quest/daily/reward', '일일퀘스트 모두 완료 보상 (별모래)', 'int'], ['quest/weekly/reward', '주간퀘스트 모두 완료 보상 (별모래)', 'int'],
       ...['daily', 'weekly'].flatMap(k => QUEST[k].list.flatMap((q, i) => [[`quest/${k}/list/${i}/n`, `${k === 'daily' ? '일일' : '주간'} · ${q.name} 목표 횟수`, 'int'], [`quest/${k}/list/${i}/name`, `${k === 'daily' ? '일일' : '주간'} · ${q.name} 이름`, 'text']])),
     ] },
