@@ -599,3 +599,27 @@ const AD_CONFIG = {
 };
 // 로비 낙하 보물상자: falls among the meteors, needs `hp` hits, then opens via rewarded ad (or instantly with the ad pass)
 const AD_CHEST = { first:[8, 14], cd:[45, 90], every:300, stay:30, hp:3, reward:[20, 40], life:40 }; // every: 보물 우주선 재등장 (초), stay: 로비에 머무는 시간 (초) · cd는 예전 값 (안 씀)
+
+/* ---------- 퀘스트 (로비 두루마리 버튼) ----------
+   일일 6개 · 주간 6개. 모두 완료하면 묶음 보상 (별모래). 리셋 시각은 한국 시간 기준:
+   일일 = 매일 resetHour시, 주간 = weekDay 요일 resetHour시 (0 일 · 1 월 … 6 토).
+   ev: 진행이 오르는 행동 (app.js questAdd), go: '이동' 버튼이 데려가는 곳 */
+const QUEST = {
+  resetHour: 0, weekDay: 1, xp: 50, // xp: 항목 하나 완료하면 '보상 받기'로 받는 계정 경험치
+  daily: { reward: 50, list: [
+    { id:'login',  ev:'login',  n:1, name:'로그인 1회',      go:null },
+    { id:'arcade', ev:'arcade', n:1, name:'아케이드 1회',    go:'arcade' },
+    { id:'battle', ev:'battle', n:1, name:'배틀 1회',        go:'pvp' },
+    { id:'conUp',  ev:'conUp',  n:1, name:'별자리 강화 1회', go:'stars' },
+    { id:'plUp',   ev:'plUp',   n:1, name:'행성 강화 1회',   go:'planets' },
+    { id:'claim',  ev:'claim',  n:2, name:'자원 수령 2회',   go:'home' },
+  ] },
+  weekly: { reward: 300, list: [
+    { id:'kill',   ev:'kill',   n:1000, name:'적 처치 (아케이드) 1,000회', go:'arcade' },
+    { id:'boss',   ev:'boss',   n:10,   name:'보스 처치 (아케이드) 10회',  go:'arcade' },
+    { id:'conUp',  ev:'conUp',  n:5,    name:'별자리 강화 5회',            go:'stars' },
+    { id:'plUp',   ev:'plUp',   n:5,    name:'행성 강화 5회',              go:'planets' },
+    { id:'daily',  ev:'daily',  n:5,    name:'일일퀘스트 완료 5회',        go:'daily' },
+    { id:'battle', ev:'battle', n:7,    name:'배틀 7회',                   go:'pvp' },
+  ] },
+};

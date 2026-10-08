@@ -323,7 +323,7 @@ function enterHome() {
   G.state = 'home'; G.me = null; G.foe = null; G.zone = ZONES[1]; G.shield = 0; G.pShield = 0;
   G.fx = []; G.texts = []; G.proj = []; G.beams = []; $('banner').classList.remove('show');
   HOME.sys = buildMySystem(); HOME.rocks = []; HOME.shots = []; HOME.booms = []; HOME.loot = null;
-  setScreen('shell'); renderTopBar(); setTab(tab); layoutHome();
+  setScreen('shell'); renderTopBar(); setTab(tab); layoutHome(); questAdd('login');
 }
 // The home system sits just above the lobby cards so meteors cross a tall stretch of open sky
 function layoutHome() {
@@ -356,7 +356,7 @@ function renderHome() {
   $('homeBest').textContent = save.best ? `최고 WAVE ${save.best}` : '기록 없음';
   $('homePvp').textContent = `${save.wins}승 ${save.losses}패`;
   $('homePower').textContent = fmt(teamPower());
-  refreshPowerRank();
+  refreshPowerRank(); questDot();
 }
 // 전투력 옆의 전체 랭킹: Firestore count, at most every 60s or when 전투력 changes
 const PRANK = { at: 0, power: -1, busy: false };
@@ -373,7 +373,7 @@ $('homeRank').addEventListener('click', () => window.LIVE && LIVE.open('ranking'
 $('collectBtn').addEventListener('click', () => {
   const inc = pendingIncome();
   save.dust += inc.dust; save.piece += inc.piece;
-  save.lastCollect = Date.now(); persist(); renderTopBar(); renderHome();
+  save.lastCollect = Date.now(); persist(); renderTopBar(); renderHome(); questAdd('claim');
   toast(`미네랄 ${fmt(inc.dust)} · 별모래 ${fmt(inc.piece)} 수령`);
 });
 $('chestBtn').addEventListener('click', () => {
@@ -592,10 +592,105 @@ function openAdChest() {
     const n = Math.round(rnd(...AD_CHEST.reward));
     const { x, y } = HOME.loot; HOME.loot = null;
     burst(x, y, 30, '#c77dff'); HOME.booms.push({ x, y, r: 20, t: .45, col: '#c77dff' });
-    gain('piece', n);
+    gain('piece', n); questAdd('claim');
     showGachaResult([], '보물 상자', [`별모래 +${fmt(n)}`]);
   });
 }
+
+/* ---------- 퀘스트 (data.js QUEST): 로비 두루마리 버튼 · 일일 / 주간, 모두 완료하면 별모래 ---------- */
+// save.quest = { d, w: 지금 기간 (한국 시간 · 리셋 시각 기준), daily / weekly: { id: 진행 }, dx / wx: { id: 항목 경험치 받음 }, dDone: 오늘 일일 다 깸, dGot / wGot: 묶음 보상 받음 }
+const KST = 9 * 3600000, DAY_MS = 86400000;
+const qOff = () => KST - clamp(QUEST.resetHour | 0, 0, 23) * 3600000;
+const qShift = () => ((4 - (QUEST.weekDay | 0)) % 7 + 7) % 7; // 1970-01-01 was a Thursday
+function questKeys() { const d = Math.floor((Date.now() + qOff()) / DAY_MS); return { d, w: Math.floor((d + qShift()) / 7) }; }
+function questLeft(kind) { // ms until the next reset
+  const k = questKeys(), day = kind === 'daily' ? k.d + 1 : (k.w + 1) * 7 - qShift();
+  return day * DAY_MS - qOff() - Date.now();
+}
+function questSync() {
+  const k = questKeys(), q = save.quest && typeof save.quest === 'object' ? save.quest : (save.quest = {});
+  if (q.d !== k.d) Object.assign(q, { d: k.d, daily: {}, dx: {}, dDone: false, dGot: false });
+  if (q.w !== k.w) Object.assign(q, { w: k.w, weekly: {}, wx: {}, wGot: false });
+  return q;
+}
+const qProg = (kind, x) => Math.min(x.n, (questSync()[kind][x.id] | 0));
+const qAllDone = kind => QUEST[kind].list.every(x => qProg(kind, x) >= x.n);
+// ev: login · arcade · battle · conUp · plUp · claim · kill · boss · daily. keep = don't save yet (arcade kills; finishBattle saves)
+function questAdd(ev, n = 1, keep = false) {
+  const q = questSync(); let hit = false;
+  for (const kind of ['daily', 'weekly']) for (const x of QUEST[kind].list) {
+    if (x.ev !== ev || (q[kind][x.id] | 0) >= x.n) continue;
+    q[kind][x.id] = Math.min(x.n, (q[kind][x.id] | 0) + n); hit = true;
+  }
+  if (!hit) return;
+  if (!q.dDone && qAllDone('daily')) { q.dDone = true; questAdd('daily', 1, true); toast('일일 퀘스트를 모두 완료했어요! 보상을 받으세요'); }
+  if (!keep) persist();
+  questDot();
+}
+const qXp = kind => { const q = questSync(), k = kind === 'daily' ? 'dx' : 'wx'; return q[k] || (q[k] = {}); }; // 항목별 경험치 받음
+const qXpReady = kind => QUEST[kind].list.some(x => qProg(kind, x) >= x.n && !qXp(kind)[x.id]);
+// red dot on the scroll button: an item's 경험치 or a bundle reward waiting to be claimed
+function questDot() {
+  const ready = kind => qXpReady(kind) || (!questSync()[kind === 'daily' ? 'dGot' : 'wGot'] && qAllDone(kind));
+  $('questDot').hidden = !(ready('daily') || ready('weekly'));
+  return { daily: ready('daily'), weekly: ready('weekly') };
+}
+const Q_ICON = { login: 'img/nav_home.png', arcade: 'img/ship_scout.png', battle: '', conUp: 'img/nav_const.png', plUp: 'img/nav_planets.png',
+  claim: 'img/cur_dust.png', kill: 'img/ship_crab.png', boss: 'img/ship_boss.png', daily: 'img/icon_quest.png' };
+const qLeftText = ms => { const m = Math.max(1, Math.ceil(ms / 60000)), d = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60), mm = m % 60;
+  return d ? `${d}일 ${h}시간` : h ? `${h}시간 ${mm}분` : `${mm}분`; };
+let questTab = 'daily';
+function openQuests(kind = questTab) {
+  questTab = kind; questAdd('login');
+  const q = questSync(), Q = QUEST[kind], got = q[kind === 'daily' ? 'dGot' : 'wGot'], ready = questDot();
+  const done = Q.list.filter(x => qProg(kind, x) >= x.n).length, all = done === Q.list.length;
+  const row = x => {
+    const p = qProg(kind, x), ok = p >= x.n, ic = Q_ICON[x.ev];
+    return `<div class="qrow${ok ? ' done' : ''}">
+      <span class="qic${ic ? '' : ' sword'}" aria-hidden="true">${ic ? `<img src="${imgUrl(ic.slice(4))}" alt="">` : ''}</span>
+      <div class="qmid"><b>${x.name}</b><span class="qgauge"><i style="transform:scaleX(${p / x.n})"></i><em>${fmt(p)} / ${fmt(x.n)}</em></span></div>
+      ${ok ? (qXp(kind)[x.id] ? '<span class="qok">완료</span>' : `<button class="cta sm qxp" data-act="xp" data-id="${x.id}" type="button">보상 받기<small>경험치 ${fmt(QUEST.xp)}</small></button>`) : x.go ? `<button class="ghost sm" data-act="go" data-go="${x.go}" type="button">이동</button>` : '<span class="qok wait">진행 중</span>'}
+    </div>`;
+  };
+  openModal(`<div class="quest">
+    <h3>${kind === 'daily' ? '일일 퀘스트' : '주간 퀘스트'}</h3>
+    <div class="qtop">
+      <div class="qtrack"><span class="qgauge big"><i style="transform:scaleX(${done / Q.list.length})"></i><em>${done} / ${Q.list.length}</em></span>
+        <button class="qchest${all && !got ? ' ready' : ''}${got ? ' got' : ''}" data-act="claim" type="button" ${all && !got ? '' : 'disabled'} aria-label="모두 완료 보상 받기">
+          <img src="${imgUrl('chest_closed.png')}" alt="" aria-hidden="true"><b class="piece">${fmt(Q.reward)}</b></button></div>
+      <p class="qinfo">${got ? '보상을 받았어요' : all ? '모두 완료! 상자를 눌러 보상을 받으세요' : `모두 완료하면 별모래 ${fmt(Q.reward)}개`} · 남은 시간 ${qLeftText(questLeft(kind))}</p>
+    </div>
+    <div class="qlist">${Q.list.map(row).join('')}</div>
+    <div class="qtabs" role="tablist">${['daily', 'weekly'].map(k => `<button type="button" role="tab" data-act="tab" data-k="${k}" aria-selected="${k === kind}">${k === 'daily' ? '일일 퀘스트' : '주간 퀘스트'}${ready[k] ? '<i class="dot"></i>' : ''}</button>`).join('')}</div>
+    <button class="ghost sm qclose" data-act="close" type="button">닫기</button>
+  </div>`, (act, b) => {
+    if (act === 'close') closeModal();
+    else if (act === 'tab') openQuests(b.dataset.k);
+    else if (act === 'xp') {
+      const x = Q.list.find(y => y.id === b.dataset.id), got2 = qXp(kind);
+      if (!x || got2[x.id] || qProg(kind, x) < x.n) return;
+      got2[x.id] = true; const up = gainAccXp(QUEST.xp); renderTopBar(); questDot();
+      toast(up.up ? `계정 Lv ${save.lv} 달성 · 에너지 가득 · 미네랄 +${fmt(up.dust)} · 별모래 +${fmt(up.piece)}` : `계정 경험치 +${fmt(QUEST.xp)}`);
+      openQuests(kind);
+    }
+    else if (act === 'claim') {
+      const q2 = questSync(), key = kind === 'daily' ? 'dGot' : 'wGot';
+      if (q2[key] || !qAllDone(kind)) return;
+      q2[key] = true; save.piece += Q.reward; persist(); renderTopBar(); questDot();
+      gwEvent('quest_reward', { kind });
+      closeModal(); showGachaResult([], kind === 'daily' ? '일일 퀘스트 보상' : '주간 퀘스트 보상', [`별모래 +${fmt(Q.reward)}`]);
+    } else if (act === 'go') {
+      const g = b.dataset.go;
+      if (g === 'daily') { openQuests('daily'); return; }
+      closeModal();
+      if (g === 'arcade' || g === 'pvp') tryStart(g);
+      else if (g === 'stars') { starView = 'list'; setTab('stars'); toast('별자리를 골라 파츠를 강화해 보세요'); }
+      else if (g === 'planets') { planetView = 'list'; setTab('planets'); toast('행성을 골라 강화해 보세요'); }
+      else { setTab('home'); toast('보관 자원 수령이나 보물 우주선 상자를 열어 보세요'); }
+    }
+  });
+}
+$('questBtn').addEventListener('click', () => openQuests());
 
 const gwEvent = (name, params) => window.CLOUD && CLOUD.event(name, params); // cloud.js: stats + analytics
 // 우편함 · 쿠폰 rewards → applied to the save, shown like a gacha result
@@ -1006,7 +1101,7 @@ $('pane-planets').addEventListener('click', e => {
   if (act === 'oskin') { openSkinList('o', +a.dataset.k, planetSel); return; }
   if (act === 'eskill') { openSkillEquip(planetSel); return; }
   if (act === 'unlock') { if (spend('piece', d.unlock)) { save.planets[planetSel] = { lv: 1, skin: 'basic', orbitSkins: [] }; persist(); toast(`${d.name} 해금`); renderPlanets(); } }
-  else if (act === 'up') { const o = save.planets[planetSel]; if (spend('dust', planetUpCost(o.lv))) { o.lv += 1; persist(); toast(`${d.name} Lv ${o.lv}`); renderPlanets(); } }
+  else if (act === 'up') { const o = save.planets[planetSel]; if (spend('dust', planetUpCost(o.lv))) { o.lv += 1; questAdd('plUp', 1, true); persist(); toast(`${d.name} Lv ${o.lv}`); renderPlanets(); } }
   else if (act === 'main') {
     save.mainPlanet = planetSel;
     normalizeForm();
@@ -1159,6 +1254,7 @@ $('pane-stars').addEventListener('click', e => {
     if (spend('dust', enhanceCost(p))) {
       if (chance(enhanceRate(p.en))) { p.en += 1; toast(`강화 성공 · +${p.en}`); }
       else toast('강화 실패 · 수치는 유지돼요');
+      questAdd('conUp', 1, true); // 실패해도 강화 1회
     }
   }
   else if (act === 'promote') { const p = s.part; if (spend('piece', promoteCost(p))) { p.g += 1; p.en = 0; toast(`${GRADES[p.g].name} 등급으로 승급`); } }
@@ -1458,6 +1554,7 @@ function finishBattle(win) {
   else { dust = win ? 600 : 180; chest = win ? 3 : 1; xp = win ? ACCOUNT.winXp : ACCOUNT.loseXp; win ? save.wins++ : save.losses++; }
   save.dust += dust; save.chest = Math.min(CHEST_MAX, save.chest + chest);
   const up = gainAccXp(xp);
+  questAdd(arcade ? 'arcade' : 'battle', 1, true);
   persist();
   gwEvent(arcade ? 'arcade_end' : 'battle_end', arcade ? { wave: G.wave } : { win: !!win });
   $('resEyebrow').textContent = arcade ? 'PLANET DESTROYED' : win ? 'VICTORY' : 'DEFEAT';

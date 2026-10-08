@@ -11,7 +11,7 @@ const BAL_ROOTS = {
   con: CON, skin: SKIN, planet: PLANET, orbit: ORBIT_BASE, pskin: PSKIN, oskin: OSKIN,
   grade: GRADES, gacha: GACHA, tier: SKIN_TIER, chest: CHEST_ODDS, adchest: AD_CHEST,
   income: INCOME, slot: SLOT, enhance: ENHANCE_RATE, wave: WAVE, eskill: ESKILL, skgacha: SKILL_GACHA, sklv: SKILL_LV,
-  stamina: STAMINA, account: ACCOUNT, hole: HOLE, pool: GACHA_POOL,
+  stamina: STAMINA, account: ACCOUNT, hole: HOLE, pool: GACHA_POOL, quest: QUEST,
 };
 
 // Param defaults per effect type, taken from the first skin that uses it (for switching an awakening's type)
@@ -116,6 +116,12 @@ const BAL_SECTIONS = [
       ['account/winXp', '대전 승리 경험치', 'int'], ['account/loseXp', '대전 패배 경험치', 'int'],
       ['account/dust', '레벨업 보상 미네랄 (× 새 레벨)', 'int'], ['account/piece', '레벨업 보상 별모래', 'int'],
       ['hole/at', '블랙홀 등장 (초)', 'int'], ['hole/dmg', '블랙홀 행성 피해 (매초)', 'int'], ['hole/conDmg', '블랙홀 별자리 피해 (매초)', 'int'],
+    ] },
+  { id:'quest', title:'퀘스트', desc:'로비 두루마리 버튼의 일일·주간 퀘스트. 모두 완료하면 별모래 묶음 보상. 리셋은 한국 시간 기준 (요일 0 일 · 1 월 … 6 토)', kv: [
+      ['quest/resetHour', '리셋 시각 (시, 0~23)', 'int'], ['quest/weekDay', '주간 리셋 요일 (0 일 · 1 월 … 6 토)', 'int'],
+      ['quest/xp', '퀘스트 항목 완료 보상 (계정 경험치)', 'int'],
+      ['quest/daily/reward', '일일퀘스트 모두 완료 보상 (별모래)', 'int'], ['quest/weekly/reward', '주간퀘스트 모두 완료 보상 (별모래)', 'int'],
+      ...['daily', 'weekly'].flatMap(k => QUEST[k].list.flatMap((q, i) => [[`quest/${k}/list/${i}/n`, `${k === 'daily' ? '일일' : '주간'} · ${q.name} 목표 횟수`, 'int'], [`quest/${k}/list/${i}/name`, `${k === 'daily' ? '일일' : '주간'} · ${q.name} 이름`, 'text']])),
     ] },
   { id:'wave', title:'웨이브', desc:'아케이드 난이도 곡선', kv: [
       ['wave/planetHp', '모선(보스) 기본 HP', 'int'], ['wave/planetGrowth', '모선 HP 증가 (웨이브마다 ×)', 'num'],
@@ -260,7 +266,7 @@ const IMG_FIXED = [
   ['meteor_fire.png', 'enemy', '운석 (불꽃)'], ['blackhole.png', 'enemy', '블랙홀'],
   ['sk_meteor.png', 'skill', '스킬 아이콘 · 공격'], ['sk_nova.png', 'skill', '스킬 아이콘 · 마법·버프 (스킬 탭 메뉴)'], ['sk_shield.png', 'skill', '스킬 아이콘 · 방어·치유'],
   ['nav_home.png', 'ui', '메뉴 · 로비'], ['nav_team.png', 'ui', '메뉴 · 팀'], ['nav_planets.png', 'ui', '메뉴 · 행성'], ['nav_const.png', 'ui', '메뉴 · 별자리'], ['nav_store.png', 'ui', '메뉴 · 상점'],
-  ['icon_mail.png', 'ui', '우편함 아이콘'], ['icon_rank.png', 'ui', '랭킹 아이콘'],
+  ['icon_mail.png', 'ui', '우편함 아이콘'], ['icon_rank.png', 'ui', '랭킹 아이콘'], ['icon_quest.png', 'ui', '퀘스트 아이콘 (두루마리)'],
   ['btn_teal.png', 'ui', '버튼 · 청록'], ['btn_steel.png', 'ui', '버튼 · 강철'], ['btn_red.png', 'ui', '버튼 · 빨강'],
   ['banner_ophiuchus.png', 'ui', '상점 배너 · 뱀주인'], ['banner_gold.png', 'ui', '상점 배너 · 미네랄 뽑기'], ['banner_premium.png', 'ui', '상점 배너 · 별모래 뽑기'],
   ['card_common.png', 'ui', '카드 틀 · 커먼'], ['card_magic.png', 'ui', '카드 틀 · 매직'], ['card_rare.png', 'ui', '카드 틀 · 레어'],
