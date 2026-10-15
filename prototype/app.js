@@ -16,7 +16,7 @@ function freshSave() {
     pSkins: ['basic'], oSkins: ['dash'],
     skills: [...STARTER_SKILLS], equip: {}, shopBuys: {}, // 장착 스킬: owned ids, and the two slots per planet (unset → the starter pair)
     skillLv: {}, skillCopies: {}, // per owned skill: level (unset = 1) and duplicate copies toward the next level
-    settings: { glow: true, fps: 60, sfx: true, bgm: true, push: true },
+    settings: { glow: true, fps: 60, sfx: true, bgm: true, push: true, shake: true, dmgNum: true, vibe: false },
   };
 }
 function newCon(g) { return { g, slots: {}, skins: [], skin: null }; }
@@ -323,7 +323,7 @@ function enterHome() {
   G.state = 'home'; G.me = null; G.foe = null; G.zone = ZONES[1]; G.shield = 0; G.pShield = 0;
   G.fx = []; G.texts = []; G.proj = []; G.beams = []; $('banner').classList.remove('show');
   HOME.sys = buildMySystem(); HOME.rocks = []; HOME.shots = []; HOME.booms = []; HOME.loot = null;
-  setScreen('shell'); renderTopBar(); setTab(tab); layoutHome(); questAdd('login');
+  setScreen('shell'); renderTopBar(); setTab(tab); layoutHome(); questAdd('login'); metaHome();
 }
 // The home system sits just above the lobby cards so meteors cross a tall stretch of open sky
 function layoutHome() {
@@ -370,12 +370,7 @@ function refreshPowerRank() {
   }).catch(err => console.warn('power rank', err)).finally(() => { PRANK.busy = false; });
 }
 $('homeRank').addEventListener('click', () => window.LIVE && LIVE.open('ranking', 'power'));
-$('collectBtn').addEventListener('click', () => {
-  const inc = pendingIncome();
-  save.dust += inc.dust; save.piece += inc.piece;
-  save.lastCollect = Date.now(); persist(); renderTopBar(); renderHome(); questAdd('claim');
-  toast(`미네랄 ${fmt(inc.dust)} · 별모래 ${fmt(inc.piece)} 수령`);
-});
+$('collectBtn').addEventListener('click', () => openCollect()); // meta.js: 받기 · 광고 보고 2배
 $('chestBtn').addEventListener('click', () => {
   const n = Math.floor(save.chest / CHEST_STEP); if (!n) return;
   save.chest -= n * CHEST_STEP;
@@ -392,7 +387,7 @@ $('chestBtn').addEventListener('click', () => {
   save.dust += dust; save.piece += piece; persist(); renderTopBar(); renderHome();
   showGachaResult(got, `상자 ${n}개`, [dust && `미네랄 +${fmt(dust)}`, piece && `별모래 +${fmt(piece)}`].filter(Boolean));
 });
-$('arcadeBtn').addEventListener('click', () => tryStart('arcade'));
+$('arcadeBtn').addEventListener('click', () => { if (checkTeam()) openVoyage(); }); // meta.js 출항 준비 (모드 선택)
 $('pvpBtn').addEventListener('click', () => tryStart('pvp'));
 $('tbEnPvp').addEventListener('click', () => openStaminaInfo('pvp'));
 $('tbEnArc').addEventListener('click', () => openStaminaInfo('arcade'));
@@ -669,7 +664,7 @@ function openQuests(kind = questTab) {
     else if (act === 'xp') {
       const x = Q.list.find(y => y.id === b.dataset.id), got2 = qXp(kind);
       if (!x || got2[x.id] || qProg(kind, x) < x.n) return;
-      got2[x.id] = true; const up = gainAccXp(QUEST.xp); renderTopBar(); questDot();
+      got2[x.id] = true; spAdd(SEASON.ptsQuest); const up = gainAccXp(QUEST.xp); renderTopBar(); questDot(); // meta.js 시즌 패스 포인트
       toast(up.up ? `계정 Lv ${save.lv} 달성 · 에너지 가득 · 미네랄 +${fmt(up.dust)} · 별모래 +${fmt(up.piece)}` : `계정 경험치 +${fmt(QUEST.xp)}`);
       openQuests(kind);
     }
@@ -1495,6 +1490,7 @@ function openSettings() {
       ${tg('glow', '광원 효과', '끄면 글로우와 성운이 사라져 가벼워져요')}
       <div class="set-row"><span>프레임 레이트</span>
         <div class="seg" role="group" aria-label="프레임 레이트">${[30, 45, 60].map(f => `<button type="button" data-fps="${f}" aria-pressed="${st.fps === f}">${f === 60 ? '무제한' : f}</button>`).join('')}</div></div>
+      ${tg('shake', '화면 흔들림')}${tg('dmgNum', '피해 숫자')}${tg('vibe', '진동', '행성이 크게 맞으면 휴대폰이 떨려요')}
       ${tg('sfx', '효과음')}${tg('bgm', '배경음')}
     </div>
     <div class="set-group"><span class="set-h">계정</span>
@@ -1550,22 +1546,30 @@ function openSettings() {
 function finishBattle(win) {
   const arcade = G.mode === 'arcade';
   let dust, chest, xp;
-  if (arcade) { dust = arcadeDust(); chest = G.wave >= 5 ? 3 : 1; xp = ACCOUNT.arcadeXp * G.wave; save.best = Math.max(save.best, G.wave); }
+  flushOrbs(); const M = metaFinish(win), best0 = save.best; // meta.js: 모드별 보상 · 기록 · 시즌 패스
+  if (arcade) {
+    dust = Math.round(arcadeDust() * M.dustMul) + M.extraDust; chest = G.wave >= 5 ? 3 : 1; xp = ACCOUNT.arcadeXp * (G.variant.kind === 'raid' ? Math.round(G.wave / 3) : G.wave);
+    if (countsForBest()) save.best = Math.max(save.best, G.wave);
+  }
   else { dust = win ? 600 : 180; chest = win ? 3 : 1; xp = win ? ACCOUNT.winXp : ACCOUNT.loseXp; win ? save.wins++ : save.losses++; }
+  const newBest = arcade && save.best > best0;
   save.dust += dust; save.chest = Math.min(CHEST_MAX, save.chest + chest);
   const up = gainAccXp(xp);
   questAdd(arcade ? 'arcade' : 'battle', 1, true);
   persist();
   gwEvent(arcade ? 'arcade_end' : 'battle_end', arcade ? { wave: G.wave } : { win: !!win });
-  $('resEyebrow').textContent = arcade ? 'PLANET DESTROYED' : win ? 'VICTORY' : 'DEFEAT';
-  $('resEyebrow').style.color = !arcade && win ? 'var(--gold)' : 'var(--act)';
-  $('resWave').textContent = arcade ? `WAVE ${G.wave}` : win ? '승리' : '패배';
-  $('resTxt').textContent = arcade
-    ? `${G.me.planet.name} 행성계가 ${G.zone.name} ${G.wave}웨이브에서 무너졌어요. 전투 Lv ${G.lv}까지 성장했어요. 최고 기록 WAVE ${save.best}.`
+  const kind = arcade ? G.variant.kind : 'pvp', good = arcade ? (kind === 'chapter' && win) || kind === 'raid' : win;
+  $('resEyebrow').textContent = kind === 'chapter' && win ? 'CHAPTER CLEAR' : kind === 'raid' ? 'TIME UP' : arcade ? 'PLANET DESTROYED' : win ? 'VICTORY' : 'DEFEAT';
+  $('resEyebrow').style.color = good ? 'var(--gold)' : 'var(--act)';
+  $('resWave').innerHTML = (kind === 'raid' ? fmtBig(Math.round(G.raidDmg)) : arcade ? `WAVE ${G.wave}` : win ? '승리' : '패배') + (newBest ? ' <em class="new-best">최고 기록!</em>' : '');
+  $('resTxt').textContent = kind === 'raid' ? `이번 주 이벤트 보스 ${raidBoss().name}에게 ${RAID.time}초 동안 입힌 피해예요. 이번 주 최고 ${fmtBig(save.raid.best)}.`
+    : arcade ? `${modeName()} · ${G.me.planet.name} 행성계가 ${G.zone.name} ${G.wave}웨이브까지 버텼어요. 전투 Lv ${G.lv}. 최고 기록 WAVE ${save.best}.`
     : `${G.ghost.name}의 ${G.ghost.planet} 행성계와 싸웠어요. 전적 ${save.wins}승 ${save.losses}패.`;
-  $('resRewards').innerHTML = [`<span class="dust">+${fmt(dust)}</span>`, `<span>상자 게이지 +${chest}</span>`, `<span>계정 경험치 +${xp}</span>`,
+  $('resRewards').innerHTML = [`<span class="dust">+${fmt(dust)}</span>`, `<span>상자 게이지 +${chest}</span>`, `<span>계정 경험치 +${xp}</span>`, ...M.lines.map(l => `<span>${l}</span>`),
     up.up ? `<span class="lvup-tag">계정 Lv ${save.lv} 달성 · 에너지 가득 · 미네랄 +${fmt(up.dust)} · 별모래 +${fmt(up.piece)}</span>` : ''].join('');
   $('resPerks').innerHTML = arcade ? G.taken.map(t => `<span>${t}</span>`).join('') : '';
+  $('resDmg').innerHTML = arcade ? resultDamage() : ''; // meta.js 피해 통계
+  $('shareBtn').dataset.txt = kind === 'raid' ? `갤럭시워 이벤트 보스 ${fmtBig(Math.round(G.raidDmg))} 피해!` : arcade ? `갤럭시워 ${modeName()} WAVE ${G.wave} 달성!` : `갤럭시워 대전 ${win ? '승리' : '패배'}`;
   $('retryBtn').textContent = arcade ? '다시 출항' : '다른 상대와 대전';
   $('hudTop').hidden = true; $('hudBot').hidden = true; $('lvup').hidden = true; $('resultScr').hidden = false;
 }
@@ -1583,6 +1587,8 @@ function pauseSkills() {
     for (const [k, name] of c.skin.stats) if (c.stacks[k]) out.push({ img, name, sub: `Lv${c.stacks[k]} · ${c.skin.name}` });
     if (c.chain) out.push({ img, name: c.skin.chain[c.chain - 1].name, sub: `각성 ${ROMAN[c.chain]} · ${c.skin.name}`, cls: 'chain' });
   }
+  for (const [k, lv] of Object.entries(G.pas || {})) out.push({ svg: pasSvg(PASSIVE[k].ic), name: PASSIVE[k].name, sub: `패시브 Lv${lv}`, cls: 'passive' }); // run.js
+  SK.list.forEach(s => { if (s && s.evo) out.push({ img: `img/sk_${GSKILL[s.type].icon}.png`, name: s.name, sub: '진화한 게이지 스킬', cls: 'evo' }); });
   const fix = G.taken.filter(t => t === '행성 수리').length;
   if (fix) out.push({ img: pxPlanetUrl(save.mainPlanet), name: '행성 수리', sub: `×${fix} · ${G.me.planet.name}`, cls: 'repair', pl: true });
   return out;
@@ -1593,7 +1599,7 @@ function renderPause() {
   $('pauseSkills').hidden = stats; $('pauseStatsList').hidden = !stats;
   const list = pauseSkills();
   $('pauseSkills').innerHTML = pvp ? '<p class="pm-empty">대전은 모든 능력치와 각성이 최대로 시작해요</p>'
-    : list.length ? list.map(o => `<div class="pm-skill ${o.cls || ''}"><span class="pm-orb"><img ${o.pl ? 'class="pl" ' : ''}src="${o.img}" alt="" aria-hidden="true"></span><b>${o.name}</b><small>${o.sub}</small></div>`).join('')
+    : list.length ? list.map(o => `<div class="pm-skill ${o.cls || ''}"><span class="pm-orb">${o.svg || `<img ${o.pl ? 'class="pl" ' : ''}src="${o.img}" alt="" aria-hidden="true">`}</span><b>${o.name}</b><small>${o.sub}</small></div>`).join('')
     : '<p class="pm-empty">아직 습득한 스킬이 없어요.<br>적을 부숴 레벨업하면 새 스킬을 골라요.</p>';
   const by = G.dmgBy || {}, rows = Object.entries(by).sort((a, b) => b[1] - a[1]), top = rows.length ? rows[0][1] : 1;
   $('pauseStatsList').innerHTML = rows.length ? rows.map(([id, v]) => {
@@ -1616,7 +1622,7 @@ function confirmTap(id, msg) {
 function setPaused(p) {
   G.paused = p; $('pauseMenu').hidden = !p;
   disarm();
-  if (p) { $('pauseStats').setAttribute('aria-selected', 'false'); renderPause(); }
+  if (p) { $('pauseStats').setAttribute('aria-selected', 'false'); renderPause(); pauseAutoLabel(); }
 }
 $('pauseBtn').addEventListener('click', () => setPaused(true));
 

@@ -90,7 +90,9 @@ function boot(AP, A, F) {
   const myPower = () => { try { return Math.max(0, Math.round(teamPower())) | 0; } catch { return 0; } };
   function pushLeaderboard(s) {
     if (!auth.currentUser || !s.name) return;
-    const e = { name: String(s.name).slice(0, 24), best: s.best | 0, lv: Math.max(1, s.lv | 0), power: myPower(), linked: !auth.currentUser.isAnonymous };
+    const dl = s.daily && typeof s.daily === 'object' ? s.daily : {}; // 일일 도전 (오늘 기록)
+    const e = { name: String(s.name).slice(0, 24), best: s.best | 0, lv: Math.max(1, s.lv | 0), power: myPower(), linked: !auth.currentUser.isAnonymous,
+      daily: dl.best | 0, dday: String(dl.day || '').slice(0, 10) };
     const key = auth.currentUser.uid + JSON.stringify(e);
     if (key === lastLb) return;
     F.setDoc(F.doc(db, 'leaderboard', auth.currentUser.uid), { ...e, updatedAt: Date.now() }, { merge: true })

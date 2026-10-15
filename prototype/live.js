@@ -24,9 +24,10 @@ document.querySelector('.side-icons').addEventListener('click', e => { const b =
 
 /* ---------- 랭킹: 최고 웨이브 (best) or 전투력 (power), standard competition ranking (ties share a rank) ---------- */
 async function openRanking(kind = 'best') {
+  if (kind === 'daily') return openDailyRanking();
   const K = kind === 'power' ? { f: 'power', h: '전투력', v: r => `전투력 ${fmt(r.power)}`, none: '전투력 기록이 없어요' } : { f: 'best', h: '최고 웨이브', v: r => `WAVE ${r.best}`, none: '아케이드 기록이 없어요' };
-  const tabs = `<div class="lv-tabs">${[['best', '최고 웨이브'], ['power', '전투력']].map(([k, l]) => `<button class="chip" aria-pressed="${k === kind}" data-act="${k}" type="button">${l}</button>`).join('')}</div>`;
-  const onAct = act => { if (act === 'close') closeModal(); else if (act !== kind && (act === 'best' || act === 'power')) openRanking(act); };
+  const tabs = `<div class="lv-tabs">${RANK_TABS.map(([k, l]) => `<button class="chip" aria-pressed="${k === kind}" data-act="${k}" type="button">${l}</button>`).join('')}</div>`;
+  const onAct = act => { if (act === 'close') closeModal(); else if (act !== kind && RANK_TABS.some(t => t[0] === act)) openRanking(act); };
   openModal(`<h3>랭킹 <small>${K.h}</small></h3>${tabs}<p class="mtxt">불러오는 중…</p>`, onAct);
   const { F } = fb(), me = CLOUD.uid, s = window.__save();
   const myVal = kind === 'power' ? Math.round(teamPower()) : s.best;
@@ -43,6 +44,26 @@ async function openRanking(kind = 'best') {
         <b>${esc(r.name)}</b><em>${K.v(r)}</em><small>Lv ${r.lv}${r.linked ? '' : ' · 게스트'}</small></li>`).join('') : '<li class="mtxt">아직 기록이 없어요. 첫 번째가 되어 보세요!</li>'}</ol>
       <div class="mbtns"><button class="cta sm" data-act="close" type="button">닫기</button></div>`, onAct);
   } catch (err) { console.warn('ranking', err); openModal('<h3>랭킹</h3><p class="mtxt">랭킹을 불러오지 못했어요.</p><div class="mbtns"><button class="cta sm" data-act="close" type="button">닫기</button></div>', () => closeModal()); }
+}
+
+// 일일 도전: 오늘 (한국 시간) 기록만, 같은 날짜 항목을 모아 웨이브 순으로
+const RANK_TABS = [['best', '최고 웨이브'], ['power', '전투력'], ['daily', '일일 도전']];
+async function openDailyRanking() {
+  const tabs = `<div class="lv-tabs">${RANK_TABS.map(([k, l]) => `<button class="chip" aria-pressed="${k === 'daily'}" data-act="${k}" type="button">${l}</button>`).join('')}</div>`;
+  const onAct = act => { if (act === 'close') closeModal(); else if (act !== 'daily' && RANK_TABS.some(t => t[0] === act)) openRanking(act); };
+  const today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10), s = window.__save(), me = CLOUD.uid;
+  openModal(`<h3>랭킹 <small>일일 도전</small></h3>${tabs}<p class="mtxt">불러오는 중…</p>`, onAct);
+  try {
+    const { F } = fb(), snap = await F.getDocs(F.query(C('leaderboard'), F.where('dday', '==', today), F.limit(300)));
+    const all = snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(r => !r.hidden && r.daily > 0).sort((a, b) => b.daily - a.daily);
+    all.forEach((r, i) => { r.rank = i && r.daily === all[i - 1].daily ? all[i - 1].rank : i + 1; });
+    const rows = all.slice(0, 50), mine = all.find(r => r.uid === me), my = s.daily && s.daily.day === today ? s.daily.best : 0;
+    openModal(`<h3>랭킹 <small>일일 도전 · ${today.slice(5).replace('-', '/')}</small></h3>${tabs}
+      <div class="lv-me"><span>${esc(s.name || '나')}</span><span>${my ? `${mine ? `<b>${mine.rank}위</b> · ` : ''}WAVE ${my}` : '오늘 기록이 없어요'}</span></div>
+      <ol class="lv-list">${rows.length ? rows.map(r => `<li class="lv-row${r.uid === me ? ' me' : ''}"><span class="rk${r.rank <= 3 ? ' top' : ''}">${r.rank}</span>
+        <b>${esc(r.name)}</b><em>WAVE ${r.daily}</em><small>Lv ${r.lv}${r.linked ? '' : ' · 게스트'}</small></li>`).join('') : '<li class="mtxt">오늘은 아직 기록이 없어요. 첫 번째가 되어 보세요!</li>'}</ol>
+      <div class="mbtns"><button class="cta sm" data-act="close" type="button">닫기</button></div>`, onAct);
+  } catch (err) { console.warn('daily ranking', err); openModal('<h3>랭킹</h3><p class="mtxt">랭킹을 불러오지 못했어요.</p><div class="mbtns"><button class="cta sm" data-act="close" type="button">닫기</button></div>', () => closeModal()); }
 }
 
 /* ---------- 우편함: mail to everyone or to this account; claims live in the save ---------- */
