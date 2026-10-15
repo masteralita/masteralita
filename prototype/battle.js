@@ -90,7 +90,7 @@ function startRun(mode) {
     lv: 1, xp: 0, pendingLv: 0, taken: [], zone: ZONES[0], choosing: false, paused: false, dmgBy: {}, arc: null });
   G.T = { armor: 0, marmor: 0, evade: 0, dmgRed: 0, planetRed: P.dmgRed };
   $('myName').textContent = P.name;
-  showBattleUi(true); setupSkills();
+  showBattleUi(true); setupSkills(); runStart(mode); // run.js: 패시브 · 연구소 · 모드 (챕터 · 일일 도전 · 보스 러시 · 이벤트 보스)
   if (mode === 'pvp') { startPvp(); maxOutPvp(); } else startArcadeWave();
   beginIntro();
 }
@@ -256,7 +256,7 @@ function sysOf(side) { return side === 'me' ? G.me : G.foe; }
 function other(side) { return side === 'me' ? G.foe : G.me; }
 function posOf(t) { if (t.isPlanet) { const s = sysOf(t.side); return [s.cx, s.cy]; } return [t.x, t.y]; }
 function alive(t) { return !!t && (t.isPlanet ? t.hp > 0 : !t.dead); }
-function say(x, y, v, c, t = .9, size) { G.texts.push({ x, y, v, c, t, size }); }
+function say(x, y, v, c, t = .9, size) { if (typeof v === 'number' && save.settings.dmgNum === false) return; G.texts.push({ x, y, v, c, t, size }); }
 
 function critRate(c) { return .05 + c.m.crit + (c.side === 'me' ? G.me.planet.crit + skillCrit() + Math.max(0, G.T.evade - .75) * 2 : 0); }
 function critDmg(c) { const e = E(c, 'critDmg'); return 1.5 + c.m.critDmg + (e ? e.v : 0) + (c.side === 'me' ? skillCritDmg() : 0); }
@@ -325,6 +325,7 @@ function applyDamage(t, dmg, kind, { src = null, tier = 0, color = null, silent 
   t.hp -= d; t.flash = .12;
   if (t.side === 'foe' && d > 0 && G.dmgBy) { const k = src && src.side === 'me' && src.def ? src.def.id : 'skill'; G.dmgBy[k] = (G.dmgBy[k] || 0) + Math.min(d, d + t.hp); }
   if (t.side === 'me' && t.isPlanet && d > 0 && !REDUCED_MOTION) G.shake = Math.min(SHAKE_MAX, G.shake + 1 + 40 * d / t.maxHp);
+  if (t.side === 'me' && t.isPlanet && d > t.maxHp * .04 && save.settings.vibe && navigator.vibrate) navigator.vibrate(30); // 설정: 진동
   if (!silent) {
     const big = tier >= 1;
     say(x + rnd(-10, 10), y - 14, Math.max(1, Math.round(d)), color || (t.side === 'me' ? '#ff8a9a' : CRIT_COL[tier]), big ? 1 : .8, big ? 13 + tier * 2 : 13);
@@ -355,8 +356,8 @@ function killCon(t, src) {
   if (G.focus === t) G.focus = null;
   if (t.side === 'foe') {
     G.kills += 1;
-    gainXp(t.xp ?? 6 + G.wave);
-    if (t.mob) arcadeKilled(t);
+    if (t.mob) { dropOrb(t, t.xp ?? 6 + G.wave); arcadeKilled(t); } // run.js: 경험치 별가루로 떨어져 행성으로 날아와요
+    else gainXp(t.xp ?? 6 + G.wave);
     if ((e = E(src, 'energyKill'))) { G.energy = Math.min(G.maxEnergy, G.energy + e.v); say(x, y - 26, '기력 +' + e.v, '#f5c451', 1); }
     if (t.dot && G.me.cons.some(s => E(s, 'poisonSpread'))) {
       const live = G.foe.cons.filter(x => !x.dead && x !== t), n = live[Math.floor(Math.random() * live.length)];
@@ -417,6 +418,7 @@ function burst(x, y, n, c) {
 }
 function onPlanetDown(side) {
   if (G.state !== 'fight') return;
+  if (side === 'me' && offerRevive()) return; // run.js 부활
   G.proj = [];
   explodePlanet(sysOf(side));
   if (G.mode === 'pvp') { G.state = 'over'; banner(side === 'foe' ? 'VICTORY' : 'DEFEAT', '', 1); setTimeout(() => finishBattle(side === 'foe'), BOOM.end * 1000); return; }
@@ -445,19 +447,22 @@ function perkOptions() {
     }
     if (c.chain < 3) { const ch = S.chain[c.chain]; opts.push({ type: 'chain', id, lvl: c.chain + 1, name: ch.name, desc: ch.desc }); }
   }
+  opts.push(...passiveOptions()); // run.js 패시브 카드
   // awakenings are rarer than stat cards but always possible
   const weighted = opts.flatMap(o => o.type === 'chain' ? [o, o] : [o, o, o]);
-  const picked = [];
+  const picked = evoOptions().slice(0, 1); // run.js: 진화할 수 있으면 한 장은 꼭 진화 카드
   while (picked.length < 3 && weighted.length) {
     const o = weighted.splice(Math.floor(Math.random() * weighted.length), 1)[0];
     if (!picked.includes(o)) picked.push(o);
   }
-  while (picked.length < 3) picked.push({ type: 'repair', id: null, name: '행성 수리', desc: '행성 HP를 <b>30%</b> 회복해요.' });
+  while (picked.length < 3) picked.push(curseOn('norep') ? { type: 'dust', id: null, v: 100 * G.wave, name: '미네랄 보급', desc: `미네랄 <b>+${fmt(100 * G.wave)}</b>을 받아요.` }
+    : { type: 'repair', id: null, name: '행성 수리', desc: '행성 HP를 <b>30%</b> 회복해요.' });
   return picked;
 }
 // 새로운 스킬! popup (Soul Hunter style): three tall cards side by side — coloured header with the
 // skill name, the constellation's art in a round frame, the description, and stars for its level.
 function perkCard(o, i) {
+  if (o.type === 'passive' || o.type === 'evo') return runCard(o, i);
   const c = o.id ? G.me.cons.find(x => x.def.id === o.id) : null, d = o.id ? CON[o.id] : null;
   const kind = o.type === 'stat' ? 'stat' : o.type === 'chain' ? (d && d.special ? 'special' : 'chain') : 'repair';
   const total = o.type === 'stat' ? STAT_MAX : o.type === 'chain' ? 3 : 0;
@@ -474,10 +479,17 @@ function perkCard(o, i) {
   </button>`;
 }
 function openLevelUp() {
-  G.choosing = true; G.pendingLv -= 1;
-  const opts = perkOptions();
+  G.pendingLv -= 1;
+  let opts = perkOptions();
+  if (autoOn()) { const o = autoChoose(opts); applyPerk(o); say(G.me.cx, G.me.cy - G.me.pr - 18, `자동 · ${o.name}`, '#f5c451', 1.2); return; } // run.js 자동 선택 (패스)
+  G.choosing = true;
   $('lvupSub').textContent = `전투 Lv ${G.lv - G.pendingLv} · 하나를 골라요`;
   $('cards').innerHTML = opts.map(perkCard).join('');
+  lvupFoot();
+  $('rerollBtn').onclick = () => { // run.js 다시 뽑기
+    if (!(G.rerolls > 0)) return;
+    G.rerolls -= 1; opts = perkOptions(); $('cards').innerHTML = opts.map(perkCard).join(''); lvupFoot();
+  };
   $('cards').onclick = e => {
     const b = e.target.closest('[data-i]'); if (!b) return;
     applyPerk(opts[+b.dataset.i]);
@@ -514,6 +526,7 @@ function maxOutPvp() {
   F.planet.hp = F.planet.maxHp;
 }
 function applyPerk(o, quiet = false) {
+  if (runPerk(o, quiet)) return; // run.js 패시브 · 진화 · 미네랄
   if (o.type === 'repair') { heal(G.me.planet, G.me.planet.maxHp * .3); G.taken.push('행성 수리'); return; }
   const cons = G.me.cons.filter(c => c.def.id === o.id);
   const d = CON[o.id];
@@ -665,6 +678,7 @@ function conSize(sys) { return sys.R * .22; }
 cv.addEventListener('pointerdown', e => {
   if (G.state !== 'fight' || G.paused || G.choosing) return;
   const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  if (G.mode === 'arcade' && tapCapsule(x, y)) return; // run.js 보급 캡슐
   const hitCon = sys => sys.cons.find(c => !c.dead && Math.hypot(c.x - x, c.y - y) < conSize(sys) * c.s * 1.25);
   const mine = hitCon(G.me);
   if (mine) {
@@ -712,7 +726,7 @@ function updateSystem(sys, dt) {
   updateBoom(sys, dt);
   if (sys.side === 'me') {
     const o = Math.floor(sys.phase / TAU);
-    if (o > sys.orbits) { sys.orbits = o; if (fighting) G.energy = Math.min(G.maxEnergy, G.energy + 1); }
+    if (o > sys.orbits) { sys.orbits = o; if (fighting) G.energy = Math.min(G.maxEnergy, G.energy + 1 + (coreProc() ? 1 : 0)); } // run.js 기력 코어
   }
   for (const r of sys.rings) r.phase += r.speed * dt;
   sys.cons.forEach(c => {
@@ -743,11 +757,14 @@ function updateSystem(sys, dt) {
 }
 
 function update(dt) {
+  if (G.hitstop > 0) { G.hitstop -= dt; dt *= .3; } // run.js: 엘리트 · 보스 · 진화 때 잠깐 느려져요
+  if (save.settings.shake === false) G.shake = 0;
   G.shake = Math.max(0, G.shake - dt * 16);
   if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) $('banner').classList.remove('show'); }
   if (!G.me) return;
   if (G.state === 'fight' && G.pendingLv > 0 && !G.choosing) { openLevelUp(); return; }
   const arc = G.mode === 'arcade';
+  if (arc && G.state !== 'intro' && runTick(dt)) return; // run.js: 별가루 · 캡슐 · 상자 · 이벤트 보스 시간
   updateSystem(G.me, dt); if (arc) updateArcade(dt); else updateSystem(G.foe, dt);
   if (G.state === 'intro') updateIntro(dt);
   if (G.goT > 0) G.goT -= dt;
@@ -760,7 +777,7 @@ function update(dt) {
       explodePlanet(win ? G.foe : G.me);
       setTimeout(() => finishBattle(win), BOOM.end * 1000); return;
     }
-    if (G.mode === 'arcade' && G.timer <= 0 && !G.enraged) { G.enraged = true; banner('적 폭주', '공격력 +50%', 1.2); }
+    if (G.mode === 'arcade' && G.timer <= 0 && !G.enraged && G.variant.kind !== 'raid') { G.enraged = true; banner('적 폭주', '공격력 +50%', 1.2); }
     if (G.shield > 0) G.shield -= dt;
     if (G.nova > 0) G.nova -= dt;
     if (G.roar > 0) G.roar -= dt;
@@ -768,8 +785,7 @@ function update(dt) {
     if (!arc && G.state === 'fight') updateHole(dt);
   } else if (G.state === 'clear') {
     G.clearT -= dt;
-    if (G.clearT <= 0 && G.pendingLv === 0) { G.wave += 1; startArcadeWave(); }
-    else if (G.clearT <= 0 && !G.choosing) openLevelUp();
+    if (G.clearT <= 0 && !G.choosing) { if (G.pendingLv > 0) openLevelUp(); else runNext(); } // run.js: 챕터 끝 · 보급 선택 · 다음 웨이브
   }
 
   for (let i = G.proj.length - 1; i >= 0; i--) {
@@ -1164,7 +1180,7 @@ function drawScene(t) {
     const oy = introOffset(sys);
     if (oy) { ctx.save(); ctx.translate(0, oy); drawSystem(sys, t); ctx.restore(); } else drawSystem(sys, t);
   }
-  if (arc) drawArcade(t); else drawBlackHole(t);
+  if (arc) { drawArcade(t); drawRun(t); } else drawBlackHole(t);
   drawReticle(t);
   for (const b of G.beams) {
     const al = clamp(b.t * 6, 0, 1);

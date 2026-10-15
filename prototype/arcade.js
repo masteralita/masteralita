@@ -41,8 +41,8 @@ function shipWhite(k, im) { // white silhouette for the hit flash
 /* ---------- Wave setup ---------- */
 function arcScale(n) { return Math.pow(WAVE.statGrowth, n - 1) * Math.pow(WAVE.deepGrowth, Math.max(0, n - WAVE.deepFrom)); }
 function startArcadeWave() {
-  const n = G.wave, z = zoneOf(n), bossTier = n % 10 === 0 ? 2 : n % 5 === 0 ? 1 : 0;
-  const look = bossTier === 2 ? z.boss : bossTier === 1 ? z.mid : null;
+  const n = G.wave, z = zoneOf(n), raid = G.variant && G.variant.kind === 'raid', bossTier = raid ? 2 : n % 10 === 0 ? 2 : n % 5 === 0 ? 1 : 0;
+  const look = raid ? raidBoss() : bossTier === 2 ? z.boss : bossTier === 1 ? z.mid : null;
   // a dummy enemy "system": holds the mobs in .cons; its planet is never alive, so planet-only effects skip it
   G.foe = makeSystem('foe', { isPlanet: true, side: 'foe', hp: 0, maxHp: 1, dArmor: 0, mArmor: 0, flash: 0, dot: null, shred: 0, name: '' }, []);
   // Alien ships are the main force: many of them, arriving in quick squadrons (up to 5 formation rows of 6).
@@ -62,15 +62,17 @@ function startArcadeWave() {
   if (bossTier) q.push({ at: .3, kind: 'boss', tier: bossTier });
   q.sort((a, b) => a.at - b.at);
   G.arc = { q, t: 0, total: q.length, killed: 0, boss: null, bossTier, look, m: arcScale(n), diveCd: 5, bossCd: 4, bossCd2: 6, bossCd3: 8 };
+  runWave(n, q, bossTier); G.arc.total = q.length; // run.js: 엘리트 · 운석 폭풍
   for (const c of G.me.cons) { c.dead = false; c.hp = c.maxHp; c.alpha = 1; c.stun = 0; c.dot = null; c.revived = false; c.molted = false; c.invuln = 0; }
-  const P = G.me.planet; if (n > 1) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * .15);
+  const P = G.me.planet; if (n > 1 && !curseOn('norep')) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * .15);
   resetHole();
-  G.timer = WAVE.timer; G.enraged = false; G.focus = null; G.proj = []; G.beams = [];
+  G.timer = raid ? RAID.time : WAVE.timer; G.enraged = false; G.focus = null; G.proj = []; G.beams = [];
   G.state = 'fight';
   const newZone = z !== G.zone || n === 1; G.zone = z;
   $('waveNo').textContent = n; $('zoneChip').textContent = z.name;
   layout();
-  if (newZone) banner(z.en, `${z.name} 진입 · WAVE ${n}`, 2);
+  if (raid) banner('이벤트 보스', `${look.name} · ${RAID.time}초 동안 최대한 피해를 입혀요`, 2);
+  else if (newZone) banner(z.en, `${z.name} 진입 · WAVE ${n}`, 2);
   else banner(bossTier ? `BOSS WAVE ${n}` : `WAVE ${n}`, bossTier ? look.name : `${MOB.rock.name} · ${MOB.meteor.name} · 외계 우주선`, 1.3);
 }
 function spawnMob(s) {
@@ -99,7 +101,9 @@ function spawnMob(s) {
       else { m.x = e === 1 ? -r : W + r; m.y = rnd(top - 40, top + (bot - top) * .6); }
     }
   }
+  runMob(m, s); // run.js: 엘리트 · 저주 · 이벤트 보스 · 도감
   m.maxHp = m.hp;
+  if (m.raid) m.hp = 1e15; // 이벤트 보스: 쓰러지지 않아요 (최대 HP 비율 피해는 보통 보스 기준)
   G.foe.cons.push(m);
 }
 
@@ -187,6 +191,7 @@ function bossUpdate(m, dt) {
   const A = G.arc, by = fieldTop() + 40;
   if (m.st === 'enter') { m.y += 60 * dt; if (m.y >= by) { m.y = by; m.st = 'form'; } return; }
   m.x = W / 2 + Math.sin(A.t * .45) * W * .18; m.y = by + Math.sin(A.t * 1.3) * 4;
+  runBoss(m, dt); // run.js: 레이저 · 호위선 소환
   if ((A.bossCd -= dt * (G.enraged ? 1.4 : 1)) <= 0) { // fan of 5 bullets that curve in on the planet
     A.bossCd = m.tier === 2 ? 3.2 : 3.8;
     for (let i = 0; i < 5; i++) enemyShot(m, { x: m.x + (i - 2) * 10, sp: 150, swerve: (i - 2) * .32, steer: 1.4, col: '#ff7ad9', w: 4 });
@@ -216,14 +221,15 @@ function arcadeClear() {
   G.state = 'clear'; G.clearT = 1.4; G.proj = G.proj.filter(p => !p.foeShot);
   gainXp(15 + G.wave * 2);
   banner('CLEAR', G.wave % 10 === 0 ? '구역 보스 격파' : G.wave % 5 === 0 ? '모선 격파' : `WAVE ${G.wave}`, 1.2);
-  if (G.wave > (save.arcClear || 0)) { // 최고 클리어 WAVE (app.js 전투 배속 해금)
+  if (['endless', 'daily', 'chapter'].includes(G.variant.kind) && G.wave % RUN.supplyEvery === 0) G.supplyQ = true; // run.js 보급 선택
+  if (G.wave > (save.arcClear || 0) && (G.variant.kind === 'endless' || G.variant.kind === 'chapter')) { // 최고 클리어 WAVE (app.js 전투 배속 해금)
     save.arcClear = G.wave; persist();
     if (G.wave === SPEED.unlockWave) { banner('1.5배속 해금', '위쪽 ×1 버튼으로 속도를 바꿀 수 있어요', 2.2); toast('1.5배속이 열렸어요'); }
   }
 }
 // called from killCon for every mob my side destroys
 function arcadeKilled(m) {
-  G.arc.killed += 1;
+  G.arc.killed += 1; runKilled(m); // run.js 엘리트 상자 · 히트스탑
   questAdd('kill', 1, true); if (m.mob === 'boss') questAdd('boss', 1, true); // 주간 퀘스트 (app.js) · finishBattle이 저장
   if (m.mob === 'boss') { burst(m.x, m.y, 60, '#ffe9a8'); burst(m.x, m.y, 40, '#ff7a3c'); if (!REDUCED_MOTION) G.shake = SHAKE_MAX; }
   else if (m.mob === 'rock') { burst(m.x, m.y, 14, '#c9a27a'); }
@@ -318,7 +324,11 @@ function arcadeHud() {
   const A = G.arc; if (!A) return;
   const B = A.boss && !A.boss.dead ? A.boss : null;
   const left = A.q.length + G.foe.cons.filter(m => !m.dead).length;
-  if (B) {
+  if (B && G.variant.kind === 'raid') {
+    $('foeName').textContent = '이벤트 보스 · ' + B.name;
+    $('foeHp').style.transform = `scaleX(${clamp(G.timer / RAID.time, 0, 1)})`;
+    $('foeHpTxt').textContent = `누적 피해 ${fmtBig(G.raidDmg || 0)}`;
+  } else if (B) {
     $('foeName').textContent = (A.bossTier === 2 ? '구역 보스 · ' : 'BOSS · ') + B.name;
     $('foeHp').style.transform = `scaleX(${clamp(B.hp / B.maxHp, 0, 1)})`;
     $('foeHpTxt').textContent = `${Math.ceil(B.hp).toLocaleString()} / ${B.maxHp.toLocaleString()}`;

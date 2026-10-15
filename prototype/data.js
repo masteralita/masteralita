@@ -623,3 +623,78 @@ const QUEST = {
     { id:'battle', ev:'battle', n:7,    name:'배틀 7회',                   go:'pvp' },
   ] },
 };
+
+/* ==========================================================================
+   로그라이크 업데이트 (run.js · meta.js)
+   ========================================================================== */
+/* ---------- 패시브 카드: 레벨업 3카드에 섞여 나와요. 최대 레벨이 되면 짝이 되는 분류의 게이지 스킬이 진화해요 ---------- */
+const PASSIVE = {
+  fire:  { name:'화력 증폭기', ic:'atk',   max:5, v:.08, evo:'atk',  txt:v => `행성계 전체 공격력이 <b>${Math.round(v*100)}%</b> 올라요.` },
+  amp:   { name:'스킬 증폭기', ic:'amp',   max:5, v:.10, evo:'mag',  txt:v => `게이지 스킬 위력이 <b>${Math.round(v*100)}%</b> 올라요.` },
+  rapid: { name:'연사 장치',   ic:'rate',  max:5, v:.07, evo:'buf',  txt:v => `행성계 전체 공격속도가 <b>${Math.round(v*100)}%</b> 빨라져요.` },
+  crust: { name:'강화 지각',   ic:'crust', max:5, v:.08, evo:'heal', txt:v => `행성 최대 HP가 <b>${Math.round(v*100)}%</b> 늘고 받는 피해가 <b>2%</b> 줄어요.` },
+  lens:  { name:'조준 렌즈',   ic:'crit',  max:5, v:.04, txt:v => `행성계 전체 치명타율이 <b>${Math.round(v*100)}%</b> 올라요.` },
+  core:  { name:'기력 코어',   ic:'core',  max:5, v:.15, txt:v => `공전할 때마다 <b>${Math.round(v*100)}%</b> 확률로 기력을 1 더 얻어요.` },
+};
+// 진화한 게이지 스킬: 위력 ×mul (상한 SKILL_CAP), 지속시간 ×durMul, 기력 비용 -costCut (최소 1)
+const EVOLVE = { mul:1.6, durMul:1.3, costCut:1, prefix:'진화 · ' };
+const RUN = {
+  rerolls:2,                                    // 레벨업 카드 다시 뽑기 (한 판 기본)
+  revives:1, revivePiece:50, reviveHp:.5,       // 부활: 기본 횟수 · 별모래 비용 · 부활 HP
+  eliteFrom:3, eliteChance:.6, eliteMax:2, eliteHp:4, eliteXp:3,   // 엘리트 외계선
+  chest:[{ n:1, w:70 }, { n:3, w:25 }, { n:5, w:5 }], chestDust:40, // 엘리트 상자 룰렛: 레벨업 n번 · 레벨업당 미네랄
+  orbFly:.35,                                   // 경험치 별가루: 떨어진 뒤 행성으로 날아오기 시작하는 시간 (초)
+  capsuleEvery:[16, 26], capsuleLife:9,         // 보급 캡슐 (탭해서 획득)
+  stormFrom:6, stormChance:.15,                 // 운석 폭풍 이벤트
+  supplyEvery:5,                                // N웨이브 클리어마다 보급 선택
+};
+// 저주 (끝없는 항해): 켤수록 어렵고 보상(미네랄) 배율이 올라요. WAVE unlock 이상 기록이 있어야 열려요
+const CURSE_UNLOCK = 10;
+const CURSES = [
+  { id:'tough', name:'강철 함대',   desc:'적 HP +40%',                    bonus:.3 },
+  { id:'fury',  name:'분노한 적',   desc:'적 공격력 +30%',                bonus:.3 },
+  { id:'norep', name:'수리 금지',   desc:'웨이브 사이 회복 · 행성 수리 없음', bonus:.3 },
+  { id:'fast',  name:'초고속 낙하', desc:'소행성 · 운석 속도 +40%',        bonus:.2 },
+];
+// 챕터: 정해진 10웨이브를 깨면 클리어. 별 ★1 클리어 · ★2 행성 HP 50% 이상 · ★3 부활 없이 HP 80% 이상
+const CHAPTERS = [1, 11, 21, 31, 41, 51].map((from, i) => ({ n:i + 1, from, waves:10, startLv:i * 5, piece:100 * (i + 1), dust:5000 * (i + 1), star:30 }));
+const DAILY = { pieceWave:5, pieceMax:200, curses:2 };      // 일일 도전: 오늘의 저주 2개 · 첫 기록 보상 별모래 = 웨이브 × pieceWave
+const RUSH = { unlock:10, step:5, piece:15 };               // 보스 러시: 모선만 연속 · 보스당 별모래
+const RAID = { time:60, tiers:[1e5, 5e5, 2e6, 1e7, 5e7], piece:[30, 60, 100, 150, 250] }; // 이벤트 보스: 60초 동안 누적 피해 · 주간 단계 보상
+
+/* ---------- 연구소 (영구 강화): 미네랄로 올려요. 비용 = cost × grow^레벨 ---------- */
+const LAB = [
+  { id:'atk',     name:'함포 연구',   max:20, cost:800,  grow:1.22, v:.03, txt:v => `공격력 +${Math.round(v*100)}%` },
+  { id:'hp',      name:'지각 연구',   max:20, cost:800,  grow:1.22, v:.04, txt:v => `행성 최대 HP +${Math.round(v*100)}%` },
+  { id:'rate',    name:'궤도 가속',   max:10, cost:1500, grow:1.3,  v:.02, txt:v => `공격속도 +${Math.round(v*100)}%` },
+  { id:'energy',  name:'기력 저장고', max:3,  cost:4000, grow:2,    v:1,   txt:v => `시작 기력 +${v}` },
+  { id:'reroll',  name:'확률 조작',   max:3,  cost:5000, grow:2,    v:1,   txt:v => `레벨업 다시 뽑기 +${v}회` },
+  { id:'revive',  name:'비상 수리선', max:1,  cost:30000,grow:1,    v:1,   txt:v => `부활 +${v}회` },
+  { id:'startLv', name:'선행 학습',   max:5,  cost:3000, grow:1.8,  v:1,   txt:v => `시작할 때 레벨업 +${v}` },
+  { id:'dust',    name:'채굴 효율',   max:10, cost:2000, grow:1.35, v:.05, txt:v => `아케이드 미네랄 +${Math.round(v*100)}%` },
+];
+const labCost = (L, lv) => Math.round(L.cost * Math.pow(L.grow, lv) / 10) * 10;
+
+/* ---------- 업적: 누적 기록 단계별 보상 (별모래), 일부 단계는 행성을 해금해요 ---------- */
+const ACH = [
+  { id:'kills',  name:'적 처치',       tiers:[100, 1000, 5000, 20000], piece:[20, 50, 100, 200] },
+  { id:'bosses', name:'보스 처치',     tiers:[5, 30, 100, 300],        piece:[20, 50, 100, 200] },
+  { id:'elites', name:'엘리트 처치',   tiers:[5, 30, 100, 300],        piece:[20, 50, 100, 200], planet:[null, null, null, 'sun'] },
+  { id:'best',   name:'최고 웨이브',   tiers:[10, 20, 30, 50],         piece:[30, 60, 100, 200], planet:[null, 'moon', 'pluto', null] },
+  { id:'evos',   name:'스킬 진화',     tiers:[1, 10, 30, 100],         piece:[30, 50, 100, 200] },
+  { id:'runs',   name:'아케이드 출항', tiers:[10, 50, 200, 500],       piece:[20, 50, 100, 200] },
+  { id:'chapters', name:'챕터 클리어', tiers:[1, 3, 6],                piece:[50, 100, 300] },
+  { id:'stars',  name:'챕터 별',       tiers:[6, 12, 18],              piece:[50, 100, 300], planet:[null, 'mercury', null] },
+];
+const DEX_PIECE = 10; // 도감에 처음 등록하면 받는 별모래
+
+/* ---------- 7일 출석 (한국 시간 자정 기준, 7일 다 받으면 처음부터) ---------- */
+const ATTEND = [{ piece:30 }, { dust:3000 }, { piece:50 }, { dust:6000 }, { piece:80 }, { dust:10000 }, { piece:200 }];
+
+/* ---------- 시즌 패스 (30일 시즌): 패스 포인트로 단계가 올라요. 유료 줄은 30일 패스를 가진 동안 받을 수 있어요 ---------- */
+const SEASON = {
+  epoch:Date.UTC(2026, 9, 1) - 9 * 3600000, days:30, tiers:30, need:100,
+  ptsWave:3, ptsWaveMax:90, ptsBattle:20, ptsQuest:15,       // 아케이드 웨이브당 · 배틀 한 판 · 퀘스트 항목 보상
+  free: t => t % 10 === 0 ? { piece:100 } : t % 2 ? { dust:1500 * Math.ceil(t / 5) } : { piece:20 },
+  paid: t => t % 10 === 0 ? { piece:300 } : t % 2 ? { piece:40 } : { dust:4000 * Math.ceil(t / 5) },
+};

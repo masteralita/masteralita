@@ -12,7 +12,7 @@ function setupSkills() {
   SK.dur = [0, 0, 0]; SK.durT = [1, 1, 1]; SK.crit = 0; SK.cd = 0; SK.expose = 0; SK.regen = 0;
   G.shieldV = .7; G.novaV = 1;
   skBtns.forEach((b, i) => {
-    const s = SK.list[i]; b.hidden = !s; if (!s) return;
+    const s = SK.list[i]; b.hidden = !s; b.classList.remove('evo'); if (!s) return;
     b.querySelector('img').src = `img/sk_${GSKILL[s.type].icon}.png`;
     b.querySelector('.nm').textContent = s.name;
     b.querySelector('.cs').textContent = `${s.grade} · 기력 ${s.cost}`;
@@ -22,7 +22,7 @@ function setupSkills() {
 }
 
 function castSkill(i) {
-  const s = SK.list[i];
+  const s = skPower(SK.list[i]); // run.js 스킬 증폭기
   if (!s || G.state !== 'fight' || G.paused || G.choosing || G.energy < s.cost) return;
   G.energy -= s.cost;
   const foes = G.foe.cons.filter(c => !c.dead && onField(c)), P = G.me.planet;

@@ -639,7 +639,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .toast{position:absolute;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,10px);max-width:calc(100% - 32px);padding:10px 16px;border-radius:12px;background:rgba(20,28,66,.97);border:1px solid var(--line);font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:30;text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 .pause-menu{position:absolute;inset:0;display:grid;place-items:center;padding-inline:16px;padding-block:calc(24px + env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-bottom,0px));background:rgba(3,5,14,.8);z-index:15;box-sizing:border-box}
-.pm-panel{display:grid;gap:12px;width:min(380px,100%);max-height:100%;min-height:0;grid-template-rows:auto auto minmax(0,1fr) auto auto auto;padding:0 14px 16px;border-radius:14px;box-sizing:border-box}
+.pm-panel{display:grid;gap:12px;width:min(380px,100%);max-height:100%;min-height:0;grid-template-rows:auto auto minmax(0,1fr) auto auto auto auto;padding:0 14px 16px;border-radius:14px;box-sizing:border-box}
 .pm-head{margin:0 -14px;padding:12px 16px;text-align:center;font-size:18px;font-weight:700;color:#fff;border-radius:12px 12px 0 0}
 .pm-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .pm-tabs button{padding:7px 4px;border:1px solid var(--line);border-radius:8px;background:rgba(15,22,52,.7);color:var(--dim);font-size:13px;font-weight:700}
@@ -671,6 +671,94 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .rewards{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
 .rewards span{font-family:var(--f-disp);font-size:13px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel)}
 .rewards .lvup-tag{border-color:var(--gold);color:var(--gold)}
+
+/* ---------- 로그라이크 업데이트 (run.js · meta.js) ---------- */
+.ncard.passive{--hc:#36c9d8;--hd:#1b8f9c}
+.ncard.evo{--hc:#ff7ad9;--hd:#c83fa4;box-shadow:0 3px 0 var(--hd),0 0 18px rgba(255,122,217,.6),0 8px 18px rgba(0,0,0,.45)}
+.nc-orb .pas-ic{width:62%;height:62%;fill:none;stroke:#9ff3ff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nc-stars.five i{width:15px;height:15px}
+.evo-hint{display:block;margin-top:4px;font-size:10px;color:#7a6bd0;font-weight:700}
+.lv-foot{display:flex;justify-content:center;gap:8px}
+.lv-foot button[disabled]{opacity:.45}
+.lv-foot #autoBtn[aria-pressed="true"],.pm-auto[aria-pressed="true"]{border-color:var(--gold);color:var(--gold)}
+.pm-auto{justify-self:center}
+.pm-skill.passive .pm-orb{display:grid;place-items:center;background:#0d2a3a;border:2px solid #36c9d8}
+.pm-skill.passive .pas-ic{width:60%;height:60%;fill:none;stroke:#9ff3ff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.pm-skill.evo .pm-orb{border:2px solid #ff7ad9;box-shadow:0 0 10px rgba(255,122,217,.6)}
+.skill.evo{border-color:#ff7ad9;box-shadow:0 0 12px rgba(255,122,217,.45)}
+.skill.evo .nm{color:#ffb3ec}
+.runpop{position:absolute;inset:0;display:grid;place-items:center;padding:16px;background:rgba(3,5,14,.82);z-index:16}
+.rp-panel{display:grid;gap:12px;justify-items:center;width:min(360px,100%);padding:18px 16px;border-radius:16px;border:1px solid #b89a4e;background:linear-gradient(180deg,#1b2350,#0e1330);box-sizing:border-box;text-align:center}
+.rp-title{font-size:20px;font-weight:700;color:var(--gold);letter-spacing:.04em}
+.rp-txt{margin:0;font-size:13.5px;color:var(--dim);line-height:1.6}
+.rp-txt b{color:#fff}
+.rp-chest{width:72px;height:72px;image-rendering:pixelated;animation:rpbob 1s ease-in-out infinite alternate}
+@keyframes rpbob{from{transform:translateY(0)}to{transform:translateY(-6px)}}
+.roul{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+.roul span{display:grid;gap:2px;padding:10px 4px;border-radius:12px;border:2px solid var(--line);background:rgba(8,12,30,.7);font-size:11px;color:var(--dim)}
+.roul b{font-family:var(--f-disp);font-size:22px;color:#fff}
+.roul span.on{border-color:var(--gold);background:rgba(245,196,81,.15)}
+.roul span.win{box-shadow:0 0 18px rgba(245,196,81,.7);animation:rpwin .5s ease-out}
+@keyframes rpwin{from{transform:scale(1.25)}to{transform:none}}
+.rp-panel .cta{width:100%}
+.rp-opts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+.rp-opts.col{grid-template-columns:1fr}
+.rp-opt{display:grid;gap:6px;padding:14px 6px;border-radius:12px;border:2px solid #b98a3a;background:rgba(255,236,190,.08);font-size:12px;color:var(--dim)}
+.rp-opt b{font-size:15px;color:#fff}
+.rp-opt span b{font-size:13px;color:var(--gold)}
+.rp-opts button[disabled]{opacity:.45}
+@media (prefers-reduced-motion:reduce){.rp-chest,.roul span.win{animation:none}}
+.res-dmg{display:grid;gap:6px;width:min(320px,100%)}
+.res-dmg:empty{display:none}
+.new-best{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:999px;background:var(--gold);color:#1d1403;font-size:12px;font-style:normal;vertical-align:middle;font-family:var(--f-body)}
+.side-icons.left{left:16px;right:auto}
+.side-icons .meta-ic svg{width:22px;height:22px;stroke:#ffd98a;stroke-width:1.7}
+.att-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.att-day{display:grid;gap:3px;justify-items:center;padding:10px 4px;border-radius:10px;border:2px solid var(--line);background:rgba(8,12,30,.7);font-size:12px}
+.att-day small{color:var(--dim)}
+.att-day b{font-family:var(--f-disp);font-size:14px}
+.att-day em{font-style:normal;font-size:10.5px;color:#5fe0a0;font-weight:700}
+.att-day.got{opacity:.55}
+.att-day.now{border-color:var(--gold);box-shadow:0 0 12px rgba(245,196,81,.5)}
+.att-day.big{grid-column:span 2}
+.season{display:grid;gap:8px}
+.mtxt.small{font-size:11.5px}
+.sp-head,.sp-row{display:grid;grid-template-columns:34px 1fr 1fr;gap:6px;align-items:center}
+.sp-head{font-size:11px;color:var(--dim);text-align:center}
+.sp-list{display:grid;gap:5px;max-height:42vh;overflow-y:auto;padding-right:2px}
+.sp-row>b{display:grid;place-items:center;height:30px;border-radius:8px;background:rgba(0,0,0,.35);font-family:var(--f-disp);font-size:13px;color:var(--dim)}
+.sp-row.on>b{background:var(--gold);color:#1d1403}
+.sp-cell{display:flex;justify-content:space-between;align-items:center;gap:4px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:rgba(8,12,30,.7);font-size:11.5px;min-width:0}
+.sp-cell em{font-style:normal;font-size:10.5px;font-weight:700;color:var(--dim)}
+.sp-cell.ready{border-color:var(--gold);color:#fff}.sp-cell.ready em{color:var(--gold)}
+.sp-cell.got{opacity:.5}.sp-cell.lock{opacity:.6}
+.qlist.lab .qmid small,.lab-now{font-size:11px;color:var(--dim)}
+.qic.lab-lv{font-family:var(--f-disp);font-weight:700;font-size:16px;color:var(--gold)}
+.qrow .cta.sm small{display:block;font-size:10px}
+.records{display:grid;gap:10px}
+.records .qlist,.voyage .qlist{max-height:46vh;overflow-y:auto}
+.gold{color:var(--gold)}
+.dex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-height:46vh;overflow-y:auto}
+.dex-cell{display:grid;gap:3px;justify-items:center;padding:8px 4px;border-radius:10px;border:1px solid var(--line);background:rgba(8,12,30,.7);font-size:11.5px}
+.dex-cell img{width:40px;height:40px;object-fit:contain;image-rendering:pixelated}
+.dex-cell small{font-size:10px;color:var(--dim)}
+.dex-cell.unk img{filter:brightness(0) opacity(.5)}
+.dex-cell.gold img{filter:sepia(1) saturate(4) hue-rotate(5deg)}
+.dex-cell.ready{border-color:var(--gold)}.dex-cell.ready small{color:var(--gold);font-weight:700}
+.voyage{display:grid;gap:10px}
+.vy-tabs{flex-wrap:wrap}
+.vy-curses{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.vy-curses .chip{display:grid;gap:2px;text-align:left;border-radius:10px;padding:8px 10px}
+.vy-curses .chip small{font-size:10.5px;color:var(--dim)}
+.vy-curses .chip[disabled]{opacity:.45}
+.vy-ch{display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:44vh;overflow-y:auto}
+.vy-chb{display:grid;gap:3px;justify-items:start;padding:10px;border-radius:10px;border:2px solid var(--line);background:rgba(8,12,30,.7);text-align:left;font-size:12px}
+.vy-chb small{font-size:10.5px;color:var(--dim)}
+.vy-chb[aria-pressed="true"]{border-color:var(--gold);background:rgba(245,196,81,.1)}
+.vy-chb[disabled]{opacity:.45}
+.vy-chb .stars{display:flex;gap:2px}
+.vy-chb .stars i{width:14px;height:14px;background:#3a4258;clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.vy-chb .stars i.on{background:#f5c451}
 </style>
 <link rel="stylesheet" href="theme.css">
 
@@ -715,7 +803,10 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
       <p id="lvupSub">전투 Lv 2 · 하나를 골라요</p>
     </header>
     <div class="ncards" id="cards"></div>
+    <div class="lv-foot"><button class="ghost sm" id="rerollBtn" type="button">다시 뽑기</button><button class="ghost sm" id="autoBtn" type="button" aria-pressed="false">자동 선택</button></div>
   </section>
+
+  <section class="runpop" id="runPop" hidden aria-live="polite"><div class="rp-panel" id="runPopBody"></div></section>
 
   <section class="pause-menu" id="pauseMenu" hidden aria-labelledby="pauseTitle">
     <div class="pm-panel">
@@ -729,6 +820,7 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
         <div class="pm-stats-list" id="pauseStatsList" hidden></div>
       </div>
       <div class="pm-coin" id="pauseCoin"><img src="img/cur_dust.png" alt="" aria-hidden="true"><b id="pauseDust">0</b><small>획득 예정 미네랄</small></div>
+      <button class="ghost sm pm-auto" id="pauseAuto" type="button" aria-pressed="false">레벨업 자동 선택</button>
       <p class="pm-warn" id="quitWarn" hidden></p>
       <div class="pm-btns">
         <button class="ghost" id="restartBtn" type="button">재시작</button>
@@ -745,9 +837,11 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
       <p id="resTxt"></p>
       <div class="rewards" id="resRewards"></div>
       <div class="taken" id="resPerks"></div>
+      <div class="res-dmg" id="resDmg"></div>
       <div class="btns">
         <button class="cta" id="retryBtn" type="button">다시 출항</button>
         <button class="ghost" id="lobbyBtn" type="button">로비로</button>
+        <button class="ghost sm" id="shareBtn" type="button">기록 공유</button>
       </div>
     </div>
   </section>
@@ -791,6 +885,12 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
           <button class="gear" type="button" data-live="mailbox" aria-label="우편함" title="우편함"><img src="img/icon_mail.png" alt="" aria-hidden="true"><i class="dot" id="mailDot" hidden></i></button>
           <button class="gear" type="button" data-live="ranking" aria-label="랭킹" title="랭킹"><img src="img/icon_rank.png" alt="" aria-hidden="true"></button>
           <button class="gear" type="button" id="questBtn" aria-label="퀘스트" title="일일 · 주간 퀘스트"><img src="img/icon_quest.png" alt="" aria-hidden="true"><i class="dot" id="questDot" hidden></i></button>
+        </div>
+        <div class="side-icons left">
+          <button class="gear meta-ic" type="button" id="attBtn" aria-label="7일 출석" title="7일 출석"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8.5 15l2.5 2.5 4.5-5"/></svg><i class="dot" id="attDot" hidden></i></button>
+          <button class="gear meta-ic" type="button" id="spBtn" aria-label="시즌 패스" title="시즌 패스"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18l-7-4-7 4z"/><path d="M9 9l2 2 4-4"/></svg><i class="dot" id="spDot" hidden></i></button>
+          <button class="gear meta-ic" type="button" id="recBtn" aria-label="업적 · 도감" title="업적 · 도감"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg><i class="dot" id="recDot" hidden></i></button>
+          <button class="gear meta-ic" type="button" id="labBtn" aria-label="연구소" title="연구소 (영구 강화)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3"/><path d="M7 15h10"/></svg><i class="dot" id="labDot" hidden></i></button>
         </div>
         <div class="power">전투력 <b id="homePower">0</b><button class="prank" id="homeRank" type="button" hidden>랭킹 <b id="homeRankN">-</b></button></div>
         <div class="home-strip">
@@ -846,7 +946,9 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 <script src="battle.js"></script>
 <script src="arcade.js"></script>
 <script src="skills.js"></script>
+<script src="run.js"></script>
 <script src="ads.js"></script>
 <script src="app.js"></script>
+<script src="meta.js"></script>
 <script type="module" src="cloud.js"></script>
 <script type="module" src="live.js"></script>
