@@ -529,6 +529,8 @@ function showGachaResult(list, title, extra = []) {
 }
 function conSvg(id, size, opts = {}) {
   const d = CON[id], sh = d.sh, sk = SKIN[opts.skin || (save.cons[id] ? equippedSkin(id) : id)];
+  // default skin uses the painted art (img/con_*.webp); other skins keep their coloured line drawing
+  if (sk.id === id) return `<img class="csvg cimg${opts.dim ? ' dim' : ''}" src="img/con_${id}.webp" width="${size}" height="${size}" alt="" aria-hidden="true">`;
   const P = sh.pts.map(([x, y]) => [x * 40, y * 34]);
   const lines = sh.edges.map(([a, b]) => `<line x1="${P[a][0]}" y1="${P[a][1]}" x2="${P[b][0]}" y2="${P[b][1]}"/>`).join('');
   const dots = P.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.2"/>`).join('');

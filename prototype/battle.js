@@ -753,6 +753,26 @@ function drawMoonSat(sys, t, front) {
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, r, 0, TAU); ctx.fill();
 }
 
+// Painted art for default-skin constellations (img/con_*.webp); other skins keep the line drawing
+const CON_IMG = {};
+function conImg(c) {
+  if (c.skin.id !== c.def.id) return null;
+  let im = CON_IMG[c.def.id];
+  if (!im) { im = CON_IMG[c.def.id] = new Image(); im.src = `img/con_${c.def.id}.webp`; }
+  return im.complete && im.naturalWidth ? im : null;
+}
+function drawConArt(c, k, im, mine) {
+  const sz = k * 2.1, x = c.x - sz / 2, y = c.y - sz / 2;
+  const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, k * 1.15);   // side colour: soft halo behind the art
+  g.addColorStop(0, mine ? 'rgba(120,200,255,.28)' : 'rgba(255,80,100,.38)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c.x, c.y, k * 1.15, 0, TAU); ctx.fill();
+  ctx.drawImage(im, x, y, sz, sz);
+  if (c.flash > 0 || (mine && c.chain)) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha *= c.flash > 0 ? .8 : .15 * c.chain; ctx.drawImage(im, x, y, sz, sz); ctx.restore();
+  }
+  if (!mine) { ctx.strokeStyle = 'rgba(255,90,110,.75)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(c.x, c.y + k * .85, k * .7, k * .16, 0, 0, TAU); ctx.stroke(); }
+}
 function drawCon(sys, c, t) {
   if (c.alpha <= 0) return;
   const k = conSize(sys) * c.s, pts = c.def.sh.pts.map(([px, py]) => [c.x + px * k, c.y + py * k * .85]);
@@ -760,18 +780,22 @@ function drawCon(sys, c, t) {
   const lineC = mine ? c.skin.pal.line : '255,123,138';
   ctx.globalAlpha = c.alpha * (c.stun > 0 ? .55 : 1);
   ctx.lineCap = 'round';
-  const glowW = mine && c.chain ? 5 + c.chain * 2 : 5;
-  for (const [w, a] of [[glowW * c.s, .18], [1.5 * c.s, .95]]) {
-    ctx.strokeStyle = `rgba(${lineC},${a})`; ctx.lineWidth = w;
-    ctx.beginPath();
-    for (const [i, j] of c.def.sh.edges) { ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[j][0], pts[j][1]); }
-    ctx.stroke();
+  const im = conImg(c);
+  if (im) drawConArt(c, k, im, mine);
+  else {
+    const glowW = mine && c.chain ? 5 + c.chain * 2 : 5;
+    for (const [w, a] of [[glowW * c.s, .18], [1.5 * c.s, .95]]) {
+      ctx.strokeStyle = `rgba(${lineC},${a})`; ctx.lineWidth = w;
+      ctx.beginPath();
+      for (const [i, j] of c.def.sh.edges) { ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[j][0], pts[j][1]); }
+      ctx.stroke();
   }
   ctx.fillStyle = c.flash > 0 ? '#ffffff' : mine ? c.skin.pal.star : '#fff1c2';
   for (const [px, py] of pts) { ctx.beginPath(); ctx.arc(px, py, 2.1 * c.s, 0, TAU); ctx.fill(); }
   const [kx, ky] = pts[c.def.sh.key];
   ctx.strokeStyle = c.def.special ? '#c35bff' : mine ? '#ff5a6e' : '#ff9a5a'; ctx.lineWidth = 1.6;
   ctx.beginPath(); ctx.arc(kx, ky, 6 * c.s, 0, TAU); ctx.stroke();
+  }
   if (c.invuln > 0) { ctx.strokeStyle = 'rgba(169,193,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(c.x, c.y, k * 1.1, 0, TAU); ctx.stroke(); }
   if (c.stun > 0) { ctx.strokeStyle = 'rgba(195,91,255,.8)'; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.arc(c.x, c.y, k * 1.15, t * 3, t * 3 + TAU); ctx.stroke(); ctx.setLineDash([]); }
   if (c.dot) { ctx.fillStyle = c.dot.burn ? 'rgba(255,138,74,.95)' : 'rgba(157,255,106,.9)'; for (let i = 0; i < (c.dot.stacks || 1); i++) { ctx.beginPath(); ctx.arc(c.x + k + i * 5, c.y - k * .6, 2.3, 0, TAU); ctx.fill(); } }
