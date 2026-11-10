@@ -1,6 +1,18 @@
 // Firebase REST helpers for the tools in this folder (Node 18+, no dependencies).
-// Credentials come from FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY (see docs/FIREBASE.md).
+// Credentials come from FIREBASE_PROJECT_ID / FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY (see docs/FIREBASE.md)
+// or from firebase-key.json in the repo root.
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+
+// Fallback: a service account key saved as firebase-key.json in the repo root (gitignored), so the deploy
+// can run as the bare `node tools/deploy.mjs hosting` without setting environment variables first.
+const keyFile = new URL('../firebase-key.json', import.meta.url);
+if (!process.env.FIREBASE_PRIVATE_KEY && fs.existsSync(keyFile)) {
+  const k = JSON.parse(fs.readFileSync(keyFile, 'utf8'));
+  process.env.FIREBASE_PROJECT_ID ||= k.project_id;
+  process.env.FIREBASE_CLIENT_EMAIL ||= k.client_email;
+  process.env.FIREBASE_PRIVATE_KEY = k.private_key;
+}
 
 export const PROJECT = process.env.FIREBASE_PROJECT_ID;
 export const DATABASE = process.env.FIREBASE_DATABASE || 'glaxywardb';
